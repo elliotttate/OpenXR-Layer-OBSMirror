@@ -179,9 +179,20 @@
                                                 <RowDefinition Height="Auto" />
                                                 <RowDefinition Height="Auto" />
                                             </Grid.RowDefinitions>
-                                            <Button Grid.Row="0" Grid.Column="0" Click="RegisterLayer_Click" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Stretch">
-                                                <StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Link" /><TextBlock Text="Register layer now" /></StackPanel>
-                                            </Button>
+                                            <Border Grid.Row="0" Grid.Column="0" Padding="12,7" CornerRadius="8"
+                                                    BorderBrush="{StaticResource CardStrokeBrush}" BorderThickness="1">
+                                                <Grid ColumnSpacing="10">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="Layer" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                    <ToggleSwitch x:Name="DashboardLayerRegistrationToggle" Grid.Column="1"
+                                                                  HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                                  OnContent="Enabled" OffContent="Disabled"
+                                                                  Toggled="LayerRegistrationToggle_Toggled" />
+                                                </Grid>
+                                            </Border>
                                             <Button Grid.Row="0" Grid.Column="1" Click="LaunchObs_Click" Style="{StaticResource SecondaryButtonStyle}" HorizontalAlignment="Stretch">
                                                 <StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Video" /><TextBlock Text="Open OBS" /></StackPanel>
                                             </Button>
@@ -485,7 +496,21 @@
                                         <TextBlock Text="OPENXR API LAYER" Style="{StaticResource EyebrowStyle}" />
                                         <TextBlock x:Name="InstallLayerStatusText" FontSize="22" FontWeight="SemiBold" Text="Checking…" />
                                         <TextBlock x:Name="InstallLayerPathText" Style="{StaticResource MutedTextStyle}" FontFamily="Cascadia Mono" FontSize="12" TextWrapping="Wrap" />
-                                        <Button Click="RegisterLayer_Click" Style="{StaticResource SecondaryButtonStyle}" HorizontalAlignment="Left" Content="Register layer now" />
+                                        <Grid ColumnSpacing="20">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                                <TextBlock Text="Enable for the current user" FontWeight="SemiBold" />
+                                                <TextBlock Text="Turn this off to stop OpenXR applications from loading the layer. Installed files and the OBS source remain in place."
+                                                           Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <ToggleSwitch x:Name="InstallationLayerRegistrationToggle" Grid.Column="1"
+                                                          HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                          OnContent="Enabled" OffContent="Disabled"
+                                                          Toggled="LayerRegistrationToggle_Toggled" />
+                                        </Grid>
                                     </StackPanel>
                                 </Border>
                                 <Border Grid.Column="1" Style="{StaticResource CardStyle}">
@@ -536,17 +561,6 @@
                                 </Border>
                             </Expander>
 
-                            <Expander Header="Advanced actions">
-                                <Border Style="{StaticResource CardStyle}" Margin="0,8,0,0">
-                                    <Grid>
-                                        <StackPanel>
-                                            <TextBlock Text="Unregister for the current user" FontWeight="SemiBold" />
-                                            <TextBlock Text="Leaves installed files in place and removes only the OpenXR implicit-layer registry entry." Style="{StaticResource MutedTextStyle}" />
-                                        </StackPanel>
-                                        <Button HorizontalAlignment="Right" VerticalAlignment="Center" Click="UnregisterLayer_Click" Content="Unregister layer" />
-                                    </Grid>
-                                </Border>
-                            </Expander>
                         </StackPanel>
                     </ScrollViewer>
 
