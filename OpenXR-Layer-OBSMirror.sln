@@ -5,6 +5,8 @@ VisualStudioVersion = 17.10.34928.147
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XR_APILAYER_NOVENDOR_OBSMirror", "XR_APILAYER_NOVENDOR_OBSMirror\XR_APILAYER_NOVENDOR_OBSMirror.vcxproj", "{93D573D0-634F-4BA0-8FE0-FB63D7D00A05}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OBSMirror.ControlCenter", "ControlCenter\OBSMirror.ControlCenter.csproj", "{C2A6F138-F16B-4A70-8E09-99237E8BCB19}"
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Files", "Solution Files", "{A53ED6CB-95D3-4833-8A16-C6A588F16F6E}"
 	ProjectSection(SolutionItems) = preProject
 		.clang-format = .clang-format
@@ -16,6 +18,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Files", "Solution 
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Scripts", "Scripts", "{BA775DE9-671E-4E3B-92AC-9828C2AAF490}"
 	ProjectSection(SolutionItems) = preProject
+		scripts\Build-ControlCenter.ps1 = scripts\Build-ControlCenter.ps1
 		scripts\Build-OBSPlugin.ps1 = scripts\Build-OBSPlugin.ps1
 		scripts\Install-Layer.ps1 = scripts\Install-Layer.ps1
 		scripts\Setup-OBS.ps1 = scripts\Setup-OBS.ps1
@@ -39,6 +42,10 @@ Global
 		{93D573D0-634F-4BA0-8FE0-FB63D7D00A05}.Release|Win32.Build.0 = Release|Win32
 		{93D573D0-634F-4BA0-8FE0-FB63D7D00A05}.Release|x64.ActiveCfg = Release|x64
 		{93D573D0-634F-4BA0-8FE0-FB63D7D00A05}.Release|x64.Build.0 = Release|x64
+		{C2A6F138-F16B-4A70-8E09-99237E8BCB19}.Debug|Win32.ActiveCfg = Debug|x64
+		{C2A6F138-F16B-4A70-8E09-99237E8BCB19}.Debug|x64.ActiveCfg = Debug|x64
+		{C2A6F138-F16B-4A70-8E09-99237E8BCB19}.Release|Win32.ActiveCfg = Release|x64
+		{C2A6F138-F16B-4A70-8E09-99237E8BCB19}.Release|x64.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

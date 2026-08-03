@@ -22,10 +22,6 @@ $runningOBS = Get-Process -Name obs64 -ErrorAction SilentlyContinue
 if ($runningOBS -and -not $AllowRunningOBS) {
     throw 'OBS is running. Close it before installing or updating win-openxr.dll.'
 }
-if ($runningOBS) {
-    Write-Warning 'OBS is running; the plugin is staged but will not load until OBS restarts.'
-}
-
 $layerDll = Join-Path $LayerBuildDirectory 'XR_APILAYER_NOVENDOR_OBSMirror.dll'
 $layerManifest = Join-Path $LayerBuildDirectory 'XR_APILAYER_NOVENDOR_OBSMirror.json'
 foreach ($requiredPath in @($layerDll, $layerManifest, $PluginBinary)) {
@@ -49,7 +45,17 @@ foreach ($scriptName in @('Install-Layer.ps1', 'Uninstall-Layer.ps1')) {
 }
 
 $pluginDestination = Join-Path $pluginBinDirectory 'win-openxr.dll'
-Copy-Item -LiteralPath $PluginBinary -Destination $pluginDestination -Force
+$pluginSourceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $PluginBinary).Hash
+$pluginAlreadyCurrent = (Test-Path -LiteralPath $pluginDestination -PathType Leaf) -and
+    ((Get-FileHash -Algorithm SHA256 -LiteralPath $pluginDestination).Hash -eq $pluginSourceHash)
+if ($runningOBS -and -not $pluginAlreadyCurrent) {
+    Write-Warning 'OBS is running; the plugin is staged but will not load until OBS restarts.'
+}
+if ($pluginAlreadyCurrent) {
+    Write-Verbose "OBS plugin is already current; skipping the in-use DLL copy."
+} else {
+    Copy-Item -LiteralPath $PluginBinary -Destination $pluginDestination -Force
+}
 Copy-Item -Path (Join-Path $repoRoot 'OBSPlugin\win-openxr\data\*') `
     -Destination $pluginDataDirectory -Recurse -Force
 

@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "obs_mirror_ipc.h"
 #include "dxgi_format_info.h"
+#include <DirectXMath.h>
 #include <d3d11_4.h>
 #include <map>
 #include <vector>
@@ -105,6 +106,26 @@ namespace Mirror
 
         bool createSourceView(SourceData& srcData);
 
+        /// True when the OBS-side camera smoothing sliders request smoothing
+        /// and there is crop margin to pan within.
+        bool smoothingActive() const;
+
+        /// Advances the smoothed-camera filter for this display time (the
+        /// second eye of a frame reuses the cached delta) and stores the
+        /// clamped camera offset relative to the rendered pose.
+        void computeSmoothedDelta(const XrTime displayTime, const XrPosef& pose, const XrFovf& fov);
+
+        /// Reprojects one eye image from the smoothed camera with a slight
+        /// tan-space crop, absorbing high-frequency head motion.
+        void drawSmoothedEye(const XrCompositionLayerProjectionView* view,
+                             const SourceData& src,
+                             const XrRect2Di& targetRect,
+                             const bool seamBlend,
+                             const float alphaOverride,
+                             const XrTime displayTime);
+
+        static XrFovf scaleFovTan(const XrFovf& fov, const float scale);
+
         /// GPU-side wait for the game's copy into the shared texture before
         /// the mirror device reads from it.
         void syncToSource(const SourceData& srcData);
@@ -164,5 +185,15 @@ namespace Mirror
         float _fovHorizRatio = 1.f;
         XrFovf _hmdFov{0.0f, 0.0f, 0.0f, 0.0f};
         XrFovf _viewFov{0.0f, 0.0f, 0.0f, 0.0f};
+
+        // Camera smoothing filter state (single virtual camera shared by both
+        // eyes so stereo output stays fused).
+        XrTime _smoothLastTime = 0;
+        XrTime _smoothRelTime = 0;
+        bool _smoothValid = false;
+        DirectX::XMFLOAT4 _smoothQuat{0.0f, 0.0f, 0.0f, 1.0f};
+        DirectX::XMFLOAT3 _smoothPos{0.0f, 0.0f, 0.0f};
+        DirectX::XMFLOAT4 _smoothRelQuat{0.0f, 0.0f, 0.0f, 1.0f};
+        DirectX::XMFLOAT3 _smoothRelPos{0.0f, 0.0f, 0.0f};
     };
 }

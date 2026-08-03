@@ -32,6 +32,13 @@ target_include_directories(win-openxr PRIVATE
 target_link_libraries(win-openxr
 	libobs)
 
+if(MSVC)
+	# Keep the installed-binary hash stable across no-op rebuilds so the
+	# Control Center only reports an update when the plugin actually changed.
+	target_compile_options(win-openxr PRIVATE /Brepro)
+	target_link_options(win-openxr PRIVATE /Brepro)
+endif()
+
 if(COMMAND install_obs_plugin_with_data)
 	install_obs_plugin_with_data(win-openxr data)
 endif()

@@ -32,6 +32,12 @@ namespace {
     // skipping this frame's mirror update instead of stalling the render thread.
     constexpr DWORD kAcquireTimeoutMs = 8;
 
+    // Camera smoothing: distance of the virtual reprojection plane (positional
+    // smoothing error shrinks with distance) and the fraction of the crop
+    // margin the smoothed camera may consume before being clamped back.
+    constexpr float kSmoothingPlaneDistance = 2.0f;
+    constexpr float kSmoothingMarginSafety = 0.85f;
+
     // RAII acquire of an optional keyed mutex. Passes through when the
     // resource has no keyed mutex (D3D12-created textures, older resources).
     class ScopedKeyedMutex {
@@ -550,6 +556,197 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
             _d3d11MirrorContext4->Wait(srcData._copyFence.Get(), srcData._copyFenceValue);
     }
 
+    XrFovf D3D11Mirror::scaleFovTan(const XrFovf& fov, const float scale) {
+        XrFovf out;
+        out.angleLeft = atanf(tanf(fov.angleLeft) * scale);
+        out.angleRight = atanf(tanf(fov.angleRight) * scale);
+        out.angleUp = atanf(tanf(fov.angleUp) * scale);
+        out.angleDown = atanf(tanf(fov.angleDown) * scale);
+        return out;
+    }
+
+    bool D3D11Mirror::smoothingActive() const {
+        // Without crop margin there is no room to pan, so smoothing is a no-op;
+        // fall back to the cheaper unsmoothed paths.
+        return _initialized && _pMirrorSurfaceData->smoothing > 0.5f && _pMirrorSurfaceData->smoothCrop > 0.5f;
+    }
+
+    void D3D11Mirror::computeSmoothedDelta(const XrTime displayTime, const XrPosef& pose, const XrFovf& fov) {
+        if (_smoothRelTime == displayTime)
+            return; // The second eye of this frame reuses the same delta.
+        _smoothRelTime = displayTime;
+
+        XMVECTOR qA = XMLoadFloat4((XMFLOAT4*)&pose.orientation);
+        const XMVECTOR pA = XMLoadFloat3((XMFLOAT3*)&pose.position);
+
+        // Some games submit zeroed poses; pass through rather than reproject
+        // with garbage.
+        if (XMVectorGetX(XMVector4LengthSq(qA)) < 0.25f) {
+            _smoothRelQuat = {0.0f, 0.0f, 0.0f, 1.0f};
+            _smoothRelPos = {0.0f, 0.0f, 0.0f};
+            _smoothValid = false;
+            return;
+        }
+        qA = XMQuaternionNormalize(qA);
+
+        const float strength = std::clamp(_pMirrorSurfaceData->smoothing, 0.0f, 100.0f) / 100.0f;
+        // Filter time constant from ~40 ms (subtle) to ~800 ms (very floaty);
+        // quadratic mapping gives the slider a useful low end.
+        const float tau = 0.04f + strength * strength * 0.76f;
+
+        const float dt = _smoothValid
+                             ? std::clamp(static_cast<float>(displayTime - _smoothLastTime) * 1e-9f, 0.0f, 0.1f)
+                             : 0.0f;
+        _smoothLastTime = displayTime;
+
+        XMVECTOR qS = XMLoadFloat4(&_smoothQuat);
+        XMVECTOR pS = XMLoadFloat3(&_smoothPos);
+
+        bool snap = !_smoothValid;
+        if (!snap) {
+            // Snap turns, teleports and reference-space changes should be
+            // followed instantly instead of sweeping the camera across them.
+            const float dot = std::min(fabsf(XMVectorGetX(XMQuaternionDot(qS, qA))), 1.0f);
+            const float angle = 2.0f * acosf(dot);
+            const float dist = XMVectorGetX(XMVector3Length(XMVectorSubtract(pA, pS)));
+            snap = angle > XMConvertToRadians(25.0f) || dist > 0.5f;
+        }
+
+        if (snap) {
+            qS = qA;
+            pS = pA;
+            _smoothValid = true;
+        } else {
+            const float alpha = 1.0f - expf(-dt / tau);
+            qS = XMQuaternionNormalize(XMQuaternionSlerp(qS, qA, alpha));
+            pS = XMVectorLerp(pS, pA, alpha);
+        }
+
+        // Express the smoothed camera relative to the rendered pose: S = rel * A.
+        const XMVECTOR qAInv = XMQuaternionInverse(qA);
+        XMVECTOR relQ = XMQuaternionMultiply(qS, qAInv);
+        XMVECTOR relP = XMVector3Rotate(XMVectorSubtract(pS, pA), qAInv);
+
+        // Clamp the offset so the cropped view can never sample outside the
+        // rendered image (no black edges).
+        const float cropScale = 1.0f - std::clamp(_pMirrorSurfaceData->smoothCrop, 0.0f, 25.0f) / 100.0f;
+        const XrFovf cropFov = scaleFovTan(fov, cropScale);
+        const float marginL = cropFov.angleLeft - fov.angleLeft;
+        const float marginR = fov.angleRight - cropFov.angleRight;
+        const float marginU = fov.angleUp - cropFov.angleUp;
+        const float marginD = cropFov.angleDown - fov.angleDown;
+        const float marginH = std::max(std::min(marginL, marginR), 0.0f) * kSmoothingMarginSafety;
+        const float marginV = std::max(std::min(marginU, marginD), 0.0f) * kSmoothingMarginSafety;
+        const float marginRoll = std::min(marginH, marginV) * 0.5f;
+
+        const XMVECTOR fwd = XMVector3Rotate(XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f), relQ);
+        const XMVECTOR right = XMVector3Rotate(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), relQ);
+        const float yaw = atan2f(-XMVectorGetX(fwd), -XMVectorGetZ(fwd));
+        const float pitch = asinf(std::clamp(XMVectorGetY(fwd), -1.0f, 1.0f));
+        const float roll = atan2f(XMVectorGetY(right), XMVectorGetX(right));
+
+        const float clampedYaw = std::clamp(yaw, -marginH, marginH);
+        const float clampedPitch = std::clamp(pitch, -marginV, marginV);
+        const float clampedRoll = std::clamp(roll, -marginRoll, marginRoll);
+
+        bool rewound = false;
+        if (clampedYaw != yaw || clampedPitch != pitch || clampedRoll != roll) {
+            relQ = XMQuaternionRotationRollPitchYaw(clampedPitch, clampedYaw, clampedRoll);
+            rewound = true;
+        }
+
+        // The rotation uses up part of the margin; positional offset, expressed
+        // at the reprojection plane distance, may consume the remainder.
+        const float posLimitX = tanf(std::max(marginH - fabsf(clampedYaw), 0.0f)) * kSmoothingPlaneDistance;
+        const float posLimitY = tanf(std::max(marginV - fabsf(clampedPitch), 0.0f)) * kSmoothingPlaneDistance;
+        XMFLOAT3 relPf;
+        XMStoreFloat3(&relPf, relP);
+        const XMFLOAT3 clampedP{std::clamp(relPf.x, -posLimitX, posLimitX),
+                                std::clamp(relPf.y, -posLimitY, posLimitY),
+                                std::clamp(relPf.z, -0.10f, 0.10f)};
+        if (clampedP.x != relPf.x || clampedP.y != relPf.y || clampedP.z != relPf.z) {
+            relP = XMLoadFloat3(&clampedP);
+            rewound = true;
+        }
+
+        if (rewound) {
+            // Anti-windup: keep the filter state on the clamped camera so it
+            // catches up instead of lagging ever further behind.
+            qS = XMQuaternionNormalize(XMQuaternionMultiply(relQ, qA));
+            pS = XMVectorAdd(pA, XMVector3Rotate(relP, qA));
+        }
+
+        XMStoreFloat4(&_smoothQuat, qS);
+        XMStoreFloat3(&_smoothPos, pS);
+        XMStoreFloat4(&_smoothRelQuat, relQ);
+        XMStoreFloat3(&_smoothRelPos, relP);
+    }
+
+    void D3D11Mirror::drawSmoothedEye(const XrCompositionLayerProjectionView* view,
+                                      const SourceData& src,
+                                      const XrRect2Di& targetRect,
+                                      const bool seamBlend,
+                                      const float alphaOverride,
+                                      const XrTime displayTime) {
+        D3D11_TEXTURE2D_DESC srcDesc;
+        src._texture->GetDesc(&srcDesc);
+
+        syncToSource(src);
+        ScopedKeyedMutex lock(src._keyedMutex.Get());
+        if (!lock.acquired())
+            return;
+
+        const UVRect uv = writeQuadUVs(view->subImage.imageRect, srcDesc);
+
+        float blendStartX = 0.0f;
+        float blendEndX = 0.0f;
+        if (seamBlend) {
+            const float blendOffset = _pMirrorSurfaceData->blend / 2.0f;
+            const float blendWidth = (uv.endX - uv.startX) / 100.0f;
+            blendStartX = std::max(uv.startX, uv.startX + ((_pMirrorSurfaceData->blendPos - blendOffset) * blendWidth));
+            blendEndX = std::min(uv.endX, uv.startX + ((_pMirrorSurfaceData->blendPos + blendOffset) * blendWidth));
+        }
+        const float texIndex = srcDesc.ArraySize > 1 ? static_cast<float>(view->subImage.imageArrayIndex) : 0.0f;
+        writeBlendConstants(blendStartX, blendEndX, texIndex, alphaOverride);
+        bindQuadPipeline(src);
+        setTargetRect(targetRect);
+
+        computeSmoothedDelta(displayTime, view->pose, view->fov);
+
+        // A quad covering the rendered FOV at a fixed distance in front of the
+        // pose the game rendered with.
+        const float tanL = tanf(view->fov.angleLeft);
+        const float tanR = tanf(view->fov.angleRight);
+        const float tanU = tanf(view->fov.angleUp);
+        const float tanD = tanf(view->fov.angleDown);
+        const float quadW = (tanR - tanL) * kSmoothingPlaneDistance;
+        const float quadH = (tanU - tanD) * kSmoothingPlaneDistance;
+        const float quadCX = (tanR + tanL) * 0.5f * kSmoothingPlaneDistance;
+        const float quadCY = (tanU + tanD) * 0.5f * kSmoothingPlaneDistance;
+
+        const XMVECTOR poseQ = XMQuaternionNormalize(XMLoadFloat4((XMFLOAT4*)&view->pose.orientation));
+        const XMMATRIX poseA = XMMatrixAffineTransformation(
+            DirectX::g_XMOne, DirectX::g_XMZero, poseQ, XMLoadFloat3((XMFLOAT3*)&view->pose.position));
+
+        const XMMATRIX world = XMMatrixScaling(quadW, quadH, 1.0f) *
+                               XMMatrixTranslation(quadCX, quadCY, -kSmoothingPlaneDistance) * poseA;
+
+        // Render the quad from the smoothed camera with the cropped FOV; head
+        // jitter moves the crop window instead of the image.
+        const XMMATRIX relM = XMMatrixAffineTransformation(
+            DirectX::g_XMOne, DirectX::g_XMZero, XMLoadFloat4(&_smoothRelQuat), XMLoadFloat3(&_smoothRelPos));
+        const XMMATRIX viewM = XMMatrixInverse(nullptr, relM * poseA);
+
+        const float cropScale = 1.0f - std::clamp(_pMirrorSurfaceData->smoothCrop, 0.0f, 25.0f) / 100.0f;
+        const XMMATRIX projM = d3dXrProjection(scaleFovTan(view->fov, cropScale), 0.05f, 100.0f);
+
+        quad_transform_buffer_t transform_buffer;
+        XMStoreFloat4x4(&transform_buffer.viewproj, XMMatrixTranspose(viewM * projM));
+        XMStoreFloat4x4(&transform_buffer.world, XMMatrixTranspose(world));
+        _d3d11MirrorContext->UpdateSubresource(_quadConstantBuffer.Get(), 0, nullptr, &transform_buffer, 0, 0);
+        _d3d11MirrorContext->DrawIndexed((UINT)_countof(quad_inds), 0, 0);
+    }
+
     bool D3D11Mirror::enabled() const {
         return _initialized && _obsRunning;
     }
@@ -557,6 +754,10 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
     void D3D11Mirror::flush() {
         if (!_initialized)
             return;
+
+        // Restart the smoothing filter from the live pose when it re-enables.
+        if (!smoothingActive())
+            _smoothValid = false;
 
         _d3d11MirrorContext->Flush();
         if (_targetView) {
@@ -709,14 +910,25 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         XrRect2Di rect = {{0, 0}, {static_cast<int32_t>(_comp_desc.Width), static_cast<int32_t>(_comp_desc.Height)}};
         setTargetRect(rect);
 
-        // Set up camera matrices based on OpenXR's predicted viewpoint information
-        XMMATRIX mat_projection = d3dXrProjection(hmdFov, 0.05f, 100.0f);
-        XMMATRIX mat_view =
-            XMMatrixInverse(nullptr,
-                            XMMatrixAffineTransformation(DirectX::g_XMOne,
-                                                         DirectX::g_XMZero,
-                                                         XMLoadFloat4((XMFLOAT4*)&view->pose.orientation),
-                                                         XMLoadFloat3((XMFLOAT3*)&view->pose.position)));
+        // Set up camera matrices based on OpenXR's predicted viewpoint
+        // information; when camera smoothing is active, draw the quad from the
+        // same smoothed camera and cropped FOV as the eye image so overlays
+        // stay registered with the background.
+        XrFovf projectionFov = hmdFov;
+        XMMATRIX cameraPose = XMMatrixAffineTransformation(DirectX::g_XMOne,
+                                                           DirectX::g_XMZero,
+                                                           XMLoadFloat4((XMFLOAT4*)&view->pose.orientation),
+                                                           XMLoadFloat3((XMFLOAT3*)&view->pose.position));
+        if (smoothingActive()) {
+            computeSmoothedDelta(displayTime, view->pose, hmdFov);
+            const XMMATRIX relM = XMMatrixAffineTransformation(
+                DirectX::g_XMOne, DirectX::g_XMZero, XMLoadFloat4(&_smoothRelQuat), XMLoadFloat3(&_smoothRelPos));
+            cameraPose = relM * cameraPose;
+            const float cropScale = 1.0f - std::clamp(_pMirrorSurfaceData->smoothCrop, 0.0f, 25.0f) / 100.0f;
+            projectionFov = scaleFovTan(hmdFov, cropScale);
+        }
+        XMMATRIX mat_projection = d3dXrProjection(projectionFov, 0.05f, 100.0f);
+        XMMATRIX mat_view = XMMatrixInverse(nullptr, cameraPose);
 
         // Put camera matrices into the shader's constant buffer
         quad_transform_buffer_t transform_buffer;
@@ -761,7 +973,9 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         if (!_initialized)
             return;
 
-        if (XMScalarNearEqual(hmdFov.angleDown, view->fov.angleDown, 0.001f) &&
+        const bool smoothing = smoothingActive();
+
+        if (!smoothing && XMScalarNearEqual(hmdFov.angleDown, view->fov.angleDown, 0.001f) &&
             XMScalarNearEqual(hmdFov.angleUp, view->fov.angleUp, 0.001f) &&
             XMScalarNearEqual(hmdFov.angleLeft, view->fov.angleLeft, 0.001f) &&
             XMScalarNearEqual(hmdFov.angleRight, view->fov.angleRight, 0.001f))
@@ -779,6 +993,12 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
 
         if (_compositorTexture == nullptr || _mirrorTextures.size() == 0)
             return;
+
+        if (smoothing) {
+            const XrRect2Di rect = {{0, 0}, view->subImage.imageRect.extent};
+            drawSmoothedEye(view, it->second, rect, false, 1.0f, displayTime);
+            return;
+        }
 
         D3D11_TEXTURE2D_DESC srcDesc;
         it->second._texture->GetDesc(&srcDesc);
@@ -826,8 +1046,14 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         if (_compositorTexture == nullptr || _mirrorTextures.size() == 0)
             return;
 
+        const bool smoothing = smoothingActive();
+
         // First eye
-        if (XMScalarNearEqual(hmdFov1.angleDown, view1->fov.angleDown, 0.001f) &&
+        if (smoothing) {
+            const XrRect2Di rect = {{0, 0}, view1->subImage.imageRect.extent};
+            drawSmoothedEye(view1, it1->second, rect, false, 0.0f, displayTime);
+        }
+        else if (XMScalarNearEqual(hmdFov1.angleDown, view1->fov.angleDown, 0.001f) &&
             XMScalarNearEqual(hmdFov1.angleUp, view1->fov.angleUp, 0.001f) &&
             XMScalarNearEqual(hmdFov1.angleLeft, view1->fov.angleLeft, 0.001f) &&
             XMScalarNearEqual(hmdFov1.angleRight, view1->fov.angleRight, 0.001f))
@@ -859,7 +1085,12 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         }
 
         // Second eye, drawn at an offset with a smoothstep blend across the seam
-        {
+        if (smoothing) {
+            XrRect2Di rect = {{0, 0}, view2->subImage.imageRect.extent};
+            rect.offset.x =
+                rect.offset.x + static_cast<int32_t>((rect.extent.width * _pMirrorSurfaceData->overlap) / 100);
+            drawSmoothedEye(view2, it2->second, rect, true, 1.0f, displayTime);
+        } else {
             D3D11_TEXTURE2D_DESC srcDesc;
             it2->second._texture->GetDesc(&srcDesc);
 

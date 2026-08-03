@@ -24,6 +24,10 @@ namespace obs_mirror_ipc {
         float overlap = 50.0f;
         float blend = 10.0f;
         float blendPos = 10.0f;
+        // Camera smoothing (recording only): 0 = off, 100 = maximum smoothing.
+        float smoothing = 0.0f;
+        // Tan-space crop percentage the smoother may pan within (0-25).
+        float smoothCrop = 8.0f;
         std::uint64_t sharedHandle[kMirrorTextureCount] = {};
 
         void reset() {
@@ -34,6 +38,6 @@ namespace obs_mirror_ipc {
 
     static_assert(std::atomic<std::uint32_t>::is_always_lock_free,
                   "Cross-process signalling requires lock-free 32-bit atomics");
-    static_assert(sizeof(MirrorSurfaceData) == 48, "The OpenXR layer and OBS plugin must use the same IPC layout");
+    static_assert(sizeof(MirrorSurfaceData) == 56, "The OpenXR layer and OBS plugin must use the same IPC layout");
 
 } // namespace obs_mirror_ipc

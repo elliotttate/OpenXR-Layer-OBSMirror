@@ -74,6 +74,12 @@ struct win_openxrmirror {
 	float blend = 0.0f;
 	float blendPos = 0.0f;
 	float overlap = 0.0f;
+	float smoothing = 0.0f;
+	float smoothCrop = 8.0f;
+	bool appSmoothingManaged = false;
+	float appSmoothing = 0.0f;
+	float appSmoothCrop = 8.0f;
+	ULONGLONG lastAppSettingsCheckTick = 0;
 
 	gs_texture_t *texture = nullptr;
 	winrt::com_ptr<ID3D11Device> dev11 = nullptr;
@@ -97,6 +103,50 @@ struct win_openxrmirror {
 	bool active;
 
 };
+
+static void publish_smoothing(win_openxrmirror *context)
+{
+	if (!context->surface)
+		return;
+
+	context->surface->smoothing = context->appSmoothingManaged
+					      ? context->appSmoothing
+					      : context->smoothing;
+	context->surface->smoothCrop = context->appSmoothingManaged
+					       ? context->appSmoothCrop
+					       : context->smoothCrop;
+}
+
+static void refresh_app_smoothing(win_openxrmirror *context, bool force = false)
+{
+	const ULONGLONG now = GetTickCount64();
+	if (!force && now - context->lastAppSettingsCheckTick < 250)
+		return;
+	context->lastAppSettingsCheckTick = now;
+
+	DWORD managed = 0;
+	DWORD smoothing = 0;
+	DWORD cropTenths = 80;
+	HKEY key = nullptr;
+	if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\OpenXR-OBSMirror", 0,
+			  KEY_QUERY_VALUE, &key) == ERROR_SUCCESS) {
+		DWORD size = sizeof(DWORD);
+		RegQueryValueExW(key, L"CameraSmoothingManaged", nullptr, nullptr,
+				 reinterpret_cast<BYTE *>(&managed), &size);
+		size = sizeof(DWORD);
+		RegQueryValueExW(key, L"CameraSmoothing", nullptr, nullptr,
+				 reinterpret_cast<BYTE *>(&smoothing), &size);
+		size = sizeof(DWORD);
+		RegQueryValueExW(key, L"SmoothingCropTenths", nullptr, nullptr,
+				 reinterpret_cast<BYTE *>(&cropTenths), &size);
+		RegCloseKey(key);
+	}
+
+	context->appSmoothingManaged = managed != 0;
+	context->appSmoothing = static_cast<float>(std::clamp<DWORD>(smoothing, 0, 100));
+	context->appSmoothCrop = static_cast<float>(std::clamp<DWORD>(cropTenths, 0, 250)) / 10.0f;
+	publish_smoothing(context);
+}
 
 static void win_openxrmirror_deinit(void *data)
 {
@@ -152,8 +202,14 @@ static void win_openxrmirror_init(void *data, bool forced = false)
 		obs_mirror_ipc::kSharedMemoryName);
 
 	if (context->map_file == nullptr) {
-		warn("win_openxrmirror_init: Could not open file mapping object:  %d",
-		     GetLastError());
+		const DWORD error = GetLastError();
+		// The VR application normally creates this mapping after OBS starts.
+		// Keep retrying silently while it is absent, but report unexpected
+		// failures such as access-denied or resource exhaustion.
+		if (error != ERROR_FILE_NOT_FOUND) {
+			warn("win_openxrmirror_init: Could not open file mapping object:  %d",
+			     error);
+		}
 		return;
 	}
 
@@ -174,6 +230,7 @@ static void win_openxrmirror_init(void *data, bool forced = false)
         context->surface->blend = context->blend;
         context->surface->blendPos = context->blendPos;
         context->surface->overlap = context->overlap;
+	refresh_app_smoothing(context, true);
 
         HRESULT hr;
         obs_enter_graphics();
@@ -194,7 +251,8 @@ static void win_openxrmirror_init(void *data, bool forced = false)
         context->mirror_textures = std::vector<winrt::com_ptr<ID3D11Texture2D>>();
         const std::uint64_t published_handle = context->surface->sharedHandle[0];
         if (published_handle == 0) {
-            warn("win_openxrmirror_init: Mirror surface is not ready");
+			// The layer publishes handles after the application's first usable
+			// swapchain image. This is an expected transient state, not an error.
             return;
         }
         MemoryBarrier();
@@ -356,11 +414,17 @@ static void win_openxrmirror_update(void *data, obs_data_t *settings)
 		std::clamp(obs_data_get_double(settings, "eyeblend"), 0.0, 100.0));
 	context->blendPos = static_cast<float>(
 		std::clamp(obs_data_get_double(settings, "eyeblendpos"), 0.0, 100.0));
+	context->smoothing = static_cast<float>(
+		std::clamp(obs_data_get_double(settings, "camerasmoothing"), 0.0, 100.0));
+	context->smoothCrop = static_cast<float>(
+		std::clamp(obs_data_get_double(settings, "smoothingcrop"), 0.0, 25.0));
+	refresh_app_smoothing(context, true);
 
 	if (context->initialized && context->surface && !needsReinit) {
 		context->surface->blend = context->blend;
 		context->surface->blendPos = context->blendPos;
 		context->surface->overlap = context->overlap;
+		publish_smoothing(context);
 		return;
 	}
 
@@ -376,6 +440,8 @@ static void win_openxrmirror_defaults(obs_data_t *settings)
 	obs_data_set_default_double(settings, "eyeoverlap", 50);
 	obs_data_set_default_double(settings, "eyeblend", 50);
 	obs_data_set_default_double(settings, "eyeblendpos", 50);
+	obs_data_set_default_double(settings, "camerasmoothing", 0);
+	obs_data_set_default_double(settings, "smoothingcrop", 8);
 	obs_data_set_default_double(settings, "cropleft", 0);
 	obs_data_set_default_double(settings, "cropright", 0);
 	obs_data_set_default_double(settings, "croptop", 0);
@@ -489,6 +555,7 @@ static void win_openxrmirror_tick(void *data, float seconds)
 	struct win_openxrmirror *context = (win_openxrmirror *)data;
 
 	context->active = obs_source_active(context->source);
+	refresh_app_smoothing(context);
 
 	// Heartbeat: tells the layer the plugin is alive even on frames where
 	// the source itself is not rendered.
@@ -584,6 +651,14 @@ static obs_properties_t *win_openxrmirror_properties(void *data)
 	p = obs_properties_add_float_slider(props, "eyeblendpos",
 					    obs_module_text("EyeBlendPosition"), 0.0,
 					    100.0, 0.1);
+
+	p = obs_properties_add_float_slider(props, "camerasmoothing",
+					    obs_module_text("CameraSmoothing"), 0.0,
+					    100.0, 1.0);
+
+	p = obs_properties_add_float_slider(props, "smoothingcrop",
+					    obs_module_text("SmoothingCrop"), 0.0,
+					    25.0, 0.5);
 
 	p = obs_properties_add_list(props, "croppreset",
 				    obs_module_text("CropPreset"),

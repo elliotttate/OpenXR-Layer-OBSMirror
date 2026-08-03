@@ -1142,9 +1142,33 @@ namespace {
                     if (!fovNearEqual(view.fov, wide))
                         continue;
 
-                    view.subImage.imageRect = computeCenterCrop(view.subImage.imageRect, wide, orig);
+                    const XrRect2Di wideRect = view.subImage.imageRect;
+                    const XrRect2Di croppedRect = computeCenterCrop(wideRect, wide, orig);
+                    view.subImage.imageRect = croppedRect;
                     view.fov = orig;
                     patchDepthInfo(view, wide, orig);
+                    if (!_overscanSubmissionLogged) {
+                        Log("Recording overscan headset crop: view %u rect %d,%d %dx%d -> %d,%d %dx%d; "
+                            "wide FOV %.6f,%.6f,%.6f,%.6f -> runtime FOV %.6f,%.6f,%.6f,%.6f\n",
+                            v,
+                            wideRect.offset.x,
+                            wideRect.offset.y,
+                            wideRect.extent.width,
+                            wideRect.extent.height,
+                            croppedRect.offset.x,
+                            croppedRect.offset.y,
+                            croppedRect.extent.width,
+                            croppedRect.extent.height,
+                            wide.angleLeft,
+                            wide.angleRight,
+                            wide.angleUp,
+                            wide.angleDown,
+                            orig.angleLeft,
+                            orig.angleRight,
+                            orig.angleUp,
+                            orig.angleDown);
+                        _overscanSubmissionLogged = true;
+                    }
                     anyPatched = true;
                 }
                 newLayer.views = &_patchedProjViews[firstView];
@@ -1225,6 +1249,7 @@ namespace {
         float _overscanVScale = 1.0f;
         bool _overscanScalesComputed = false;
         bool _depthPatchWarned = false;
+        bool _overscanSubmissionLogged = false;
         std::vector<XrFovf> _originalViewFovs;
         // Per-frame scratch for the patched runtime submission.
         std::vector<const XrCompositionLayerBaseHeader*> _patchedLayerPtrs;

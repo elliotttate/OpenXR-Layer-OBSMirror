@@ -121,6 +121,7 @@ namespace LAYER_NAMESPACE {
 
         // Dump the requested extensions.
         XrInstanceCreateInfo chainInstanceCreateInfo = *instanceCreateInfo;
+        const XrInstanceCreateInfo* nextInstanceCreateInfo = instanceCreateInfo;
         std::vector<const char*> newEnabledExtensionNames;
         for (uint32_t i = 0; i < chainInstanceCreateInfo.enabledExtensionCount; i++) {
             const std::string_view ext(chainInstanceCreateInfo.enabledExtensionNames[i]);
@@ -137,14 +138,22 @@ namespace LAYER_NAMESPACE {
             Log("Requesting extension: %s\n", ext.c_str());
             newEnabledExtensionNames.push_back(ext.c_str());
         }
-        chainInstanceCreateInfo.enabledExtensionNames = newEnabledExtensionNames.data();
-        chainInstanceCreateInfo.enabledExtensionCount = (uint32_t)newEnabledExtensionNames.size();
+        // Preserve the application's original create-info object when this layer
+        // did not alter the extension list. Some runtimes (including recent Meta
+        // XR Simulator builds) reject an otherwise identical stack copy here.
+        // Only substitute our copy when the chain actually needs a different
+        // extension array.
+        if (!blockedExtensions.empty() || !implicitExtensions.empty()) {
+            chainInstanceCreateInfo.enabledExtensionNames = newEnabledExtensionNames.data();
+            chainInstanceCreateInfo.enabledExtensionCount = (uint32_t)newEnabledExtensionNames.size();
+            nextInstanceCreateInfo = &chainInstanceCreateInfo;
+        }
 
         // Call the chain to create the instance.
         XrApiLayerCreateInfo chainApiLayerInfo = *apiLayerInfo;
         chainApiLayerInfo.nextInfo = apiLayerInfo->nextInfo->next;
         XrResult result =
-            apiLayerInfo->nextInfo->nextCreateApiLayerInstance(&chainInstanceCreateInfo, &chainApiLayerInfo, instance);
+            apiLayerInfo->nextInfo->nextCreateApiLayerInstance(nextInstanceCreateInfo, &chainApiLayerInfo, instance);
         if (result == XR_SUCCESS) {
             // Create our layer.
             LAYER_NAMESPACE::GetInstance()->SetGetInstanceProcAddr(apiLayerInfo->nextInfo->nextGetInstanceProcAddr,

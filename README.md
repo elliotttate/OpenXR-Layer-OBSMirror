@@ -70,6 +70,22 @@ manifest under `HKCU\Software\Khronos\OpenXR\1\ApiLayers\Implicit`, and
 installs the plugin under OBS's Windows discovery path at
 `%ProgramData%\obs-studio\plugins\win-openxr\bin\64bit`.
 
+## Control Center
+
+The dark WinUI 3 Control Center provides one place to inspect layer, plugin,
+runtime, and OBS status; install or update both components; register the layer;
+configure recording overscan; control camera smoothing; and read live logs.
+
+Build a self-contained x64 copy:
+
+```powershell
+pwsh -File .\scripts\Build-ControlCenter.ps1
+```
+
+Run `bin\x64\Release\ControlCenter\OBSMirror.ControlCenter.exe`. Overscan
+changes apply when the OpenXR application next starts. Camera-smoothing changes
+are picked up live by an active OBS Mirror source.
+
 ## Runtime notes
 
 - Start the OpenXR application after installing the layer.
@@ -79,11 +95,14 @@ installs the plugin under OBS's Windows discovery path at
   the plugin itself does not require administrator privileges.
 - The OpenXR application and OBS must run on the same Windows desktop and use a
   compatible D3D11 adapter for the shared textures to open.
+- Meta XR Simulator refreshes the OpenXR API-layer registry when it starts.
+  Start the Simulator first, then rerun `Setup-OBS.ps1` or `Install-Layer.ps1`
+  before launching the OpenXR application.
 
 ## Recording overscan (experimental)
 
 Recordings normally show exactly the headset's field of view, so head motion
-sits at the very edge of the frame. Recording overscan asks the game to render
+sits at the very edge of the frame. Recording overscan asks the OpenXR application to render
 a wider field of view and a proportionally larger image, feeds the full wide
 image to OBS, and submits only the original central crop to the OpenXR runtime
 — the headset view is unchanged, including its pixels-per-degree.
@@ -99,14 +118,43 @@ pwsh -File .\scripts\Set-RecordingOverscan.ps1 -Enable -HorizontalPercent 120 -V
 pwsh -File .\scripts\Set-RecordingOverscan.ps1 -Disable
 ```
 
-The setting is read once when the VR application starts, so restart the game
+The setting is read once when the VR application starts, so restart the application
 after changing it. Caveats:
 
 - Rendering cost grows with the extra pixels (`horizontal × vertical` scale).
 - The scale is automatically reduced (or overscan disabled) when the runtime's
   maximum swapchain size leaves no headroom, so the headset never degrades.
-- The hidden-area mask is suppressed while overscan is active so games do not
+- The hidden-area mask is suppressed while overscan is active so applications do not
   stencil away the extra perimeter; this adds a small amount of GPU cost.
-- Games that ignore `xrLocateViews` FOVs or the recommended render resolution
+- Applications that ignore `xrLocateViews` FOVs or the recommended render resolution
   fall back to normal behaviour automatically (their submissions pass through
   unmodified).
+
+## Camera smoothing (experimental)
+
+Raw VR footage carries every micro-movement of the head. Camera smoothing runs
+a low-pass-filtered virtual camera in the mirror and reprojects each frame from
+it, using a small tan-space crop as the pan margin that absorbs the jitter. The
+headset is completely unaffected — the smoothing only exists in the OBS image.
+
+Both controls live on the OBS source and apply live, no restarts. The Control
+Center can also manage them globally; turn off its override at any time to
+return to the values saved on the individual OBS source:
+
+- **Camera smoothing** (0-100): filter strength, from off to very floaty
+  (about 40 ms to 800 ms time constant). Start around 30-50.
+- **Smoothing crop percentage** (0-25, default 8): how much of the image edge
+  the smoother may pan within. More crop allows stronger smoothing before the
+  camera has to catch up; the output is upscaled accordingly.
+
+Notes:
+
+- The smoothed camera is clamped so the crop window never leaves the rendered
+  image — fast motion degrades to following the head rather than showing black
+  edges. Snap turns and teleports are followed instantly by design.
+- Pairs well with recording overscan: with overscan enabled the crop margin can
+  come out of the overscan perimeter, so the recording keeps the full headset
+  field of view.
+- Positional smoothing uses a flat reprojection plane at 2 m; very close
+  geometry can shimmer slightly during strong positional motion.
+- Cost is one textured-quad draw per eye on the mirror device — negligible.
