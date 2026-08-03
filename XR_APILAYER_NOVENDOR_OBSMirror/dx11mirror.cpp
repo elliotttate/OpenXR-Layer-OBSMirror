@@ -3,6 +3,7 @@
 #include "log.h"
 #include "util.h"
 #include "layer.h"
+#include "obs_mirror_ipc.h"
 
 #include <directxmath.h> // Matrix math functions and objects
 #include <d3dcompiler.h> // For compiling shaders! D3DCompile
@@ -232,7 +233,7 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
     uint16_t quad_inds[] = {2, 1, 0, 
                             2, 3, 1};
 
-    ID3DBlob* d3d_compile_shader(const char* hlsl, const char* entrypoint, const char* target) {
+    ComPtr<ID3DBlob> d3d_compile_shader(const char* hlsl, const char* entrypoint, const char* target) {
         DWORD flags =
             D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR | D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_WARNINGS_ARE_ERRORS;
 #ifdef _DEBUG
@@ -241,34 +242,31 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         flags |= D3DCOMPILE_OPTIMIZATION_LEVEL3;
 #endif
 
-        ID3DBlob *compiled, *errors;
-        if (FAILED(D3DCompile(
-                hlsl, strlen(hlsl), nullptr, nullptr, nullptr, entrypoint, target, flags, 0, &compiled, &errors)))
-            Log("Error: D3DCompile failed %s", (char*)errors->GetBufferPointer());
-        if (errors)
-            errors->Release();
+        ComPtr<ID3DBlob> compiled;
+        ComPtr<ID3DBlob> errors;
+        const HRESULT result = D3DCompile(hlsl,
+                                          strlen(hlsl),
+                                          nullptr,
+                                          nullptr,
+                                          nullptr,
+                                          entrypoint,
+                                          target,
+                                          flags,
+                                          0,
+                                          compiled.GetAddressOf(),
+                                          errors.GetAddressOf());
+        if (FAILED(result)) {
+            Log("Error: D3DCompile failed (0x%08x)%s%s\n",
+                result,
+                errors ? ": " : "",
+                errors ? static_cast<const char*>(errors->GetBufferPointer()) : "");
+            return nullptr;
+        }
 
         return compiled;
     }
 
-    HANDLE hMapFile;
-    WCHAR szName[] = L"OpenXROBSMirrorSurface";
-    char szName_[] = "OpenXROBSMirrorSurface";
-
-    struct MirrorSurfaceData {
-        uint32_t lastProcessedIndex = 0;
-        uint32_t frameNumber = 0;
-        uint32_t eyeIndex = 0;
-        float overlap = 50;
-        float blend = 10;
-        float blendPos = 10;
-        uint64_t sharedHandle[3] = {NULL};
-
-        void reset() {
-            for (int i = 0; i < 3; ++i)
-                sharedHandle[i] = NULL;
-        }
-    };
+    using obs_mirror_ipc::MirrorSurfaceData;
 
     D3D11Mirror::D3D11Mirror() {
         HRESULT hr;
@@ -294,9 +292,13 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
 
         Log("init: D3D11CreateDevice created\n");
 
-        ID3DBlob* vShaderBlob = d3d_compile_shader(quad_vs_code, "vs_quad", "vs_5_0");
-        ID3DBlob* pShaderBlob = d3d_compile_shader(quad_ps_code, "ps_quad", "ps_5_0");
-        ID3DBlob* psArrayBlob = d3d_compile_shader(quad_array_ps_code, "ps_quad", "ps_5_0");
+        const auto vShaderBlob = d3d_compile_shader(quad_vs_code, "vs_quad", "vs_5_0");
+        const auto pShaderBlob = d3d_compile_shader(quad_ps_code, "ps_quad", "ps_5_0");
+        const auto psArrayBlob = d3d_compile_shader(quad_array_ps_code, "ps_quad", "ps_5_0");
+        if (!vShaderBlob || !pShaderBlob || !psArrayBlob) {
+            Log("init: shader compilation failed\n");
+            return;
+        }
         CHECK_DX(_d3d11MirrorDevice->CreateVertexShader(vShaderBlob->GetBufferPointer(),
                                                         vShaderBlob->GetBufferSize(),
                                                         nullptr,
@@ -402,27 +404,39 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
             _pMirrorSurfaceData->reset();
             UnmapViewOfFile(_pMirrorSurfaceData);
             _pMirrorSurfaceData = nullptr;
-            CloseHandle(hMapFile);
+        }
+        if (_mapFile) {
+            CloseHandle(_mapFile);
+            _mapFile = nullptr;
         }
     }
 
     void D3D11Mirror::createSharedMirrorTexture(const XrSwapchain& swapchain,
-                                                const ComPtr<ID3D11Texture2D>& tex,
-                                                const DXGI_FORMAT format) {
+                                                 const ComPtr<ID3D11Texture2D>& tex,
+                                                 const DXGI_FORMAT format) {
+		if (!_d3d11MirrorDevice || !tex)
+			return;
 
         SourceData& srcData = _sourceData[swapchain];
         srcData = SourceData();
 
         ComPtr<IDXGIResource> pOtherResource = nullptr;
         CHECK_DX(tex->QueryInterface(IID_PPV_ARGS(&pOtherResource)));
+		if (!pOtherResource)
+			return;
 
-        HANDLE sharedHandle;
-        pOtherResource->GetSharedHandle(&sharedHandle);
+        HANDLE sharedHandle = nullptr;
+		if (FAILED(pOtherResource->GetSharedHandle(&sharedHandle)) || !sharedHandle)
+			return;
 
         CHECK_DX(_d3d11MirrorDevice->OpenSharedResource(sharedHandle,
                                                         IID_PPV_ARGS(&srcData._sharedResource)));
+		if (!srcData._sharedResource)
+			return;
 
         CHECK_DX(srcData._sharedResource->QueryInterface(IID_PPV_ARGS(&srcData._texture)));
+		if (!srcData._texture)
+			return;
 
         D3D11_TEXTURE2D_DESC srcDesc;
         srcData._texture->GetDesc(&srcDesc);
@@ -431,12 +445,14 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         DxgiFormatInfo info = {};
         if (!GetFormatInfo(srcDesc.Format, info)) {
             Log("Unknown DXGI texture format %d\n", srcDesc.Format);
+			return;
         }
 
         bool useLinearFormat = info.bpc > 8;
         DXGI_FORMAT type = useLinearFormat ? info.linear : info.srgb;
         D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc;
-        viewDesc.Format = format;
+		(void)format;
+        viewDesc.Format = type;
         viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
         viewDesc.Texture2D.MipLevels = 1;
         viewDesc.Texture2D.MostDetailedMip = 0;
@@ -446,12 +462,19 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
     }
 
     void D3D11Mirror::createSharedMirrorTexture(const XrSwapchain& swapchain, const HANDLE& handle) {
+		if (!_d3d11MirrorDevice || !handle)
+			return;
+
         SourceData& srcData = _sourceData[swapchain];
         srcData = SourceData();
         ComPtr<ID3D11Device1> pDevice = nullptr;
 
         CHECK_DX(_d3d11MirrorDevice->QueryInterface(IID_PPV_ARGS(&pDevice)));
+		if (!pDevice)
+			return;
         CHECK_DX(pDevice->OpenSharedResource1(handle, IID_PPV_ARGS(&srcData._texture)));
+		if (!srcData._texture)
+			return;
 
         pDevice.Reset();
 
@@ -463,6 +486,7 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         DxgiFormatInfo info = {};
         if (!GetFormatInfo(srcDesc.Format, info)) {
             Log("Unknown DXGI texture format %d\n", srcDesc.Format);
+			return;
         }
 
         bool useLinearFormat = info.bpc > 8;
@@ -486,10 +510,13 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
     }
 
     bool D3D11Mirror::enabled() const {
-        return _obsRunning;
+		return _obsRunning && _pMirrorSurfaceData && _d3d11MirrorContext;
     }
 
     void D3D11Mirror::flush() {
+		if (!_d3d11MirrorContext || !_pMirrorSurfaceData)
+			return;
+
         _d3d11MirrorContext->Flush();
         _pMirrorSurfaceData->lastProcessedIndex = _frameCounter;
         if (_targetView) {
@@ -603,7 +630,9 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         _d3d11MirrorContext->OMSetBlendState(_quadBlendState.Get(), blend_factor, 0xffffffff);
 
         //  Modify the view port and scissor to offset quad overlays between two eyes
-        XrRect2Di rect = {{0, 0}, {_comp_desc.Width, _comp_desc.Height}};
+        XrRect2Di rect = {{0, 0},
+                         {static_cast<int32_t>(_comp_desc.Width),
+                          static_cast<int32_t>(_comp_desc.Height)}};
         D3D11_VIEWPORT viewport = CD3D11_VIEWPORT(static_cast<float>(rect.offset.x),
                                                   static_cast<float>(rect.offset.y),
                                                   static_cast<float>(rect.extent.width),
@@ -1069,87 +1098,113 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         }
     }
 
-    void D3D11Mirror::checkCopyTex(const uint32_t srcWidth, 
-                                   const uint32_t height, 
-                                   const DXGI_FORMAT format) {
+    void D3D11Mirror::checkCopyTex(const uint32_t srcWidth, const uint32_t height, const DXGI_FORMAT format) {
+        if (!_d3d11MirrorDevice || !_d3d11MirrorContext || !_pMirrorSurfaceData || srcWidth == 0 || height == 0)
+            return;
 
-        float separation = 0.0f;
-
-        if (_pMirrorSurfaceData->eyeIndex == 2) {
-            separation = _pMirrorSurfaceData->overlap / 100.0f;
+        DxgiFormatInfo info = {};
+        if (!GetFormatInfo(format, info)) {
+            Log("Unknown DXGI texture format %d\n", format);
+            return;
         }
 
+        const bool linear = info.bpc > 8;
+        const DXGI_FORMAT renderFormat = linear ? info.linear : info.srgb;
+        const float separation =
+            _pMirrorSurfaceData->eyeIndex == 2 ? std::clamp(_pMirrorSurfaceData->overlap, 0.0f, 100.0f) / 100.0f : 0.0f;
         uint32_t targetWidth = static_cast<uint32_t>(srcWidth * (1.0f + separation));
-        targetWidth = targetWidth + (targetWidth % 2);
+        targetWidth += targetWidth % 2;
+
+        bool needsRebuild = !_compositorTexture || !_targetView || _mirrorTextures.size() != 3;
         if (_compositorTexture) {
-            D3D11_TEXTURE2D_DESC srcDesc;
-            _compositorTexture->GetDesc(&srcDesc);
-            if (srcDesc.Width != targetWidth || srcDesc.Height != height) {
-                _compositorTexture = nullptr;
-                _mirrorTextures.clear();
-            }
+            D3D11_TEXTURE2D_DESC currentDesc{};
+            _compositorTexture->GetDesc(&currentDesc);
+            needsRebuild = needsRebuild || currentDesc.Width != targetWidth || currentDesc.Height != height ||
+                           currentDesc.Format != renderFormat;
         }
-        if (_compositorTexture == nullptr) {
-            DXGI_FORMAT renderFmt = format;
-            DxgiFormatInfo info = {};
-            if (GetFormatInfo(renderFmt, info)) {
-                bool linear = info.bpc > 8;
-                Log("Use linear = %d Linear = %d sRGB = %d\n", linear, info.linear, info.srgb);
-                renderFmt = linear ? info.linear : info.srgb;
-            }
+        if (!needsRebuild)
+            return;
 
-            D3D11_TEXTURE2D_DESC desc;
-            ZeroMemory(&desc, sizeof(desc));
-            desc.Width = targetWidth;
-            desc.Height = height;
-            desc.MipLevels = 1;
-            desc.ArraySize = 1;
-            desc.Format = renderFmt;
-            desc.SampleDesc.Count = 1;
-            desc.SampleDesc.Quality = 0;
-            desc.Usage = D3D11_USAGE_DEFAULT;
-            desc.CPUAccessFlags = 0;
-            desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
-            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+        // Handle zero is the generation marker. Clear it before releasing or
+        // replacing resources, then publish it last after all three handles exist.
+        _pMirrorSurfaceData->sharedHandle[0] = 0;
+        MemoryBarrier();
+        _pMirrorSurfaceData->sharedHandle[1] = 0;
+        _pMirrorSurfaceData->sharedHandle[2] = 0;
 
-            Log("Creating mirror textures w %u h %u f %d\n", desc.Width, desc.Height, format);
+        D3D11_TEXTURE2D_DESC desc{};
+        desc.Width = targetWidth;
+        desc.Height = height;
+        desc.MipLevels = 1;
+        desc.ArraySize = 1;
+        desc.Format = renderFormat;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
 
-            CHECK_DX(_d3d11MirrorDevice->CreateTexture2D(&desc, NULL, _compositorTexture.ReleaseAndGetAddressOf()));
-            desc.Format = info.linear;
-            uint32_t i = 0;
-            _mirrorTextures.resize(3, nullptr);
-            for (auto&& tex : _mirrorTextures) {
-                CHECK_DX(_d3d11MirrorDevice->CreateTexture2D(&desc, NULL, tex.ReleaseAndGetAddressOf()));
+        Log("Use linear = %d Linear = %d sRGB = %d\n", linear, info.linear, info.srgb);
+        Log("Creating mirror textures w %u h %u f %d\n", desc.Width, desc.Height, format);
 
-                ComPtr<IDXGIResource> pOtherResource = nullptr;
-                CHECK_DX(tex->QueryInterface(IID_PPV_ARGS(&pOtherResource)));
+        ComPtr<ID3D11Texture2D> newCompositorTexture;
+        CHECK_DX(_d3d11MirrorDevice->CreateTexture2D(&desc, nullptr, newCompositorTexture.GetAddressOf()));
+        if (!newCompositorTexture)
+            return;
 
-                HANDLE sharedHandle;
-                pOtherResource->GetSharedHandle(&sharedHandle);
-                _pMirrorSurfaceData->sharedHandle[i++] = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(sharedHandle));
-                Log("Shared handle: 0x%p\n", sharedHandle);
-            }
+        desc.Format = info.linear;
+        std::vector<ComPtr<ID3D11Texture2D>> newMirrorTextures(3);
+        uint64_t newSharedHandles[3] = {};
+        for (size_t i = 0; i < newMirrorTextures.size(); ++i) {
+            auto& texture = newMirrorTextures[i];
+            CHECK_DX(_d3d11MirrorDevice->CreateTexture2D(&desc, nullptr, texture.GetAddressOf()));
+            if (!texture)
+                return;
 
-            _compositorTexture->GetDesc(&_comp_desc);
+            ComPtr<IDXGIResource> resource;
+            CHECK_DX(texture->QueryInterface(IID_PPV_ARGS(&resource)));
+            if (!resource)
+                return;
 
-            Log("Compositor texture description: %d x %d Format %d\n",
-                _comp_desc.Width,
-                _comp_desc.Height,
-                _comp_desc.Format);
+            HANDLE sharedHandle = nullptr;
+            if (FAILED(resource->GetSharedHandle(&sharedHandle)) || !sharedHandle)
+                return;
 
-            // Create a view resource for the swapchain image target that we can use to set
-            // up rendering.
-            D3D11_RENDER_TARGET_VIEW_DESC targetDesc = {};
-            targetDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
-            targetDesc.Format = _comp_desc.Format;
-            targetDesc.Texture2D.MipSlice = 0;
-            ID3D11RenderTargetView* rtv;
-            CHECK_DX(_d3d11MirrorDevice->CreateRenderTargetView(_compositorTexture.Get(), &targetDesc, &rtv));
-            _targetView.Attach(rtv);
+            newSharedHandles[i] = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(sharedHandle));
+            Log("Shared handle: 0x%p\n", sharedHandle);
         }
+
+        D3D11_RENDER_TARGET_VIEW_DESC targetDesc{};
+        targetDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+        targetDesc.Format = renderFormat;
+        targetDesc.Texture2D.MipSlice = 0;
+        ComPtr<ID3D11RenderTargetView> newTargetView;
+        CHECK_DX(_d3d11MirrorDevice->CreateRenderTargetView(
+            newCompositorTexture.Get(), &targetDesc, newTargetView.GetAddressOf()));
+        if (!newTargetView)
+            return;
+
+        _compositorTexture = std::move(newCompositorTexture);
+        _mirrorTextures = std::move(newMirrorTextures);
+        _targetView = std::move(newTargetView);
+        _compositorTexture->GetDesc(&_comp_desc);
+
+        _pMirrorSurfaceData->sharedHandle[1] = newSharedHandles[1];
+        _pMirrorSurfaceData->sharedHandle[2] = newSharedHandles[2];
+        MemoryBarrier();
+        _pMirrorSurfaceData->sharedHandle[0] = newSharedHandles[0];
+
+        Log("Compositor texture description: %d x %d Format %d\n",
+            _comp_desc.Width,
+            _comp_desc.Height,
+            _comp_desc.Format);
     }
 
     void D3D11Mirror::copyToMirror() {
+		if (!_d3d11MirrorContext || _mirrorTextures.empty())
+			return;
+
         _frameCounter = _frameCounter + 1;
         auto& tex = _mirrorTextures[0];
         if (_compositorTexture && tex) {
@@ -1158,40 +1213,43 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
     }
 
     void D3D11Mirror::checkOBSRunning() {
-        static uint32_t frameCounter = 10;
-        static uint32_t lastFrameNum = 0;
+		if (!_pMirrorSurfaceData) {
+			_obsRunning = false;
+			return;
+		}
 
-        if (lastFrameNum == _pMirrorSurfaceData->frameNumber)
-            frameCounter++;
+		if (_lastOBSFrameNumber == _pMirrorSurfaceData->frameNumber)
+			_obsFrameCounter++;
         else
-            frameCounter = 0;
+			_obsFrameCounter = 0;
 
-        if (frameCounter > 10)
+		if (_obsFrameCounter > 10)
             _obsRunning = false;
         else
             _obsRunning = true;
 
-        lastFrameNum = _pMirrorSurfaceData->frameNumber;
+		_lastOBSFrameNumber = _pMirrorSurfaceData->frameNumber;
     }
 
     uint32_t D3D11Mirror::getEyeIndex() const {
-        return _pMirrorSurfaceData->eyeIndex;
+		return _pMirrorSurfaceData ? std::min(_pMirrorSurfaceData->eyeIndex, 2u) : 0u;
     }
 
     void D3D11Mirror::createMirrorSurface() {
-        Log("Mapping file %s.\n", szName_);
-        hMapFile = CreateFileMappingW(INVALID_HANDLE_VALUE,      // use paging file
+        Log("Mapping OBS mirror IPC surface.\n");
+		_mapFile = CreateFileMappingW(INVALID_HANDLE_VALUE,      // use paging file
                                       NULL,                      // default security
                                       PAGE_READWRITE,            // read/write access
                                       0,                         // maximum object size (high-order DWORD)
                                       sizeof(MirrorSurfaceData), // maximum object size (low-order DWORD)
-                                      szName);                  // name of mapping object
+                                      obs_mirror_ipc::kSharedMemoryName); // name of mapping object
 
-        if (hMapFile == NULL) {
+		if (_mapFile == nullptr) {
             Log("Could not create file mapping object (%d).\n", GetLastError());
             throw std::string("Could not create file mapping object");
         }
-        _pMirrorSurfaceData = (MirrorSurfaceData*)MapViewOfFile(hMapFile,            // handle to map object
+		const bool created = GetLastError() != ERROR_ALREADY_EXISTS;
+		_pMirrorSurfaceData = (MirrorSurfaceData*)MapViewOfFile(_mapFile,           // handle to map object
                                                                 FILE_MAP_ALL_ACCESS, // read/write permission
                                                                 0,
                                                                 0,
@@ -1199,8 +1257,15 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
 
         if (_pMirrorSurfaceData == nullptr) {
             Log("Could not map view of file (%d).\n", GetLastError());
-            CloseHandle(hMapFile);
+			CloseHandle(_mapFile);
+			_mapFile = nullptr;
             throw std::string("Could not map view of file");
         }
+		if (created) {
+			ZeroMemory(_pMirrorSurfaceData, sizeof(MirrorSurfaceData));
+			_pMirrorSurfaceData->overlap = 50.0f;
+			_pMirrorSurfaceData->blend = 10.0f;
+			_pMirrorSurfaceData->blendPos = 10.0f;
+		}
     }
 } // Mirror namespace

@@ -1,11 +1,10 @@
 #pragma once
 #include "pch.h"
+#include "obs_mirror_ipc.h"
 #include <map>
 
 namespace Mirror
 {
-    struct MirrorSurfaceData;
-
     struct DxgiFormatInfo {
         /// The different versions of this format, set to DXGI_FORMAT_UNKNOWN if absent.
         /// Both the SRGB and linear formats should be UNORM.
@@ -82,7 +81,8 @@ namespace Mirror
         ComPtr<ID3D11DeviceContext> _d3d11MirrorContext = nullptr;
 
         std::map<XrSwapchain, SourceData> _sourceData;
-        MirrorSurfaceData* _pMirrorSurfaceData = nullptr;
+        obs_mirror_ipc::MirrorSurfaceData* _pMirrorSurfaceData = nullptr;
+        HANDLE _mapFile = nullptr;
 
         std::map<XrSpace, XrReferenceSpaceCreateInfo> _spaceInfo;
 
@@ -107,6 +107,8 @@ namespace Mirror
         std::vector<ComPtr<ID3D11Texture2D>> _mirrorTextures;
 
         uint32_t _frameCounter = 0;
+        uint32_t _obsFrameCounter = 10;
+        uint32_t _lastOBSFrameNumber = 0;
         bool _obsRunning = false;
 
         float _fovVertRatio = 1.f;

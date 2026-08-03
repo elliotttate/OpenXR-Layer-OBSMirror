@@ -19,16 +19,15 @@
 #include <winrt/base.h>
 
 #include <algorithm>
+#include <limits>
+#include <new>
 #include <vector>
+
+#include "obs_mirror_ipc.h"
 
 #pragma comment(lib, "d3d11.lib")
 
 #include <tchar.h>
-
-#define BUF_SIZE 256
-WCHAR szName[] = L"OpenXROBSMirrorSurface";
-HANDLE hMapFile = NULL;
-HANDLE sharedHandle;
 
 #define blog(log_level, message, ...) \
 	blog(log_level, "[win_openxr_mirror] " message, ##__VA_ARGS__)
@@ -42,24 +41,6 @@ HANDLE sharedHandle;
 #define warn(message, ...)                 \
 	blog(LOG_WARNING, "[%s] " message, \
 	     obs_source_get_name(context->source), ##__VA_ARGS__)
-
-struct MirrorSurfaceData {
-	uint32_t lastProcessedIndex = 0;
-	uint32_t frameNumber = 0;
-	uint32_t eyeIndex = 0;
-	float overlap = 50;
-	float blend = 10;
-	float blendPos = 10;
-	HANDLE sharedHandle[3] = {NULL};
-
-	void reset()
-	{
-		for (int i = 0; i < 3; ++i)
-			sharedHandle[i] = NULL;
-	}
-};
-
-MirrorSurfaceData *pMirrorSurfaceData;
 
 struct crop {
 	double top;
@@ -77,6 +58,10 @@ std::vector<croppreset> croppresets;
 
 struct win_openxrmirror {
 	obs_source_t *source;
+	HANDLE map_file = nullptr;
+	obs_mirror_ipc::MirrorSurfaceData *surface = nullptr;
+	std::uint64_t shared_handle = 0;
+	std::uint32_t current_frame = 0;
 
 	int captureeye = 1; // left = 0, right = 1, both = 2
 	int croppreset;
@@ -108,11 +93,6 @@ struct win_openxrmirror {
 	bool initialized;
 	bool active;
 
-	// Set in win_openxrmirror_properties, null until then.
-	obs_property_t *crop_left;
-	obs_property_t *crop_right;
-	obs_property_t *crop_top;
-	obs_property_t *crop_bottom;
 };
 
 struct DxgiFormatInfo {
@@ -182,31 +162,6 @@ bool GetFormatInfo(DXGI_FORMAT format, DxgiFormatInfo &out)
 #undef DEF_FMT_UNORM
 }
 
-// Update the crop sliders with the correct maximum values or hide them if
-// we do not know.
-static void win_openxrmirror_update_properties(void *data)
-{
-	struct win_openxrmirror *context = (win_openxrmirror *)data;
-	if ((context->crop_left && context->crop_right && context->crop_top &&
-	     context->crop_bottom)) {
-		const bool visible = context->device_width > 0 &&
-				     context->device_height > 0;
-		obs_property_set_visible(context->crop_left, visible);
-		obs_property_set_visible(context->crop_right, visible);
-		obs_property_set_visible(context->crop_top, visible);
-		obs_property_set_visible(context->crop_bottom, visible);
-
-		obs_property_float_set_limits(context->crop_left, 0,
-					    100, 0.1);
-		obs_property_float_set_limits(context->crop_right, 0,
-					    100, 0.1);
-		obs_property_float_set_limits(context->crop_top, 0,
-					    100, 0.1);
-		obs_property_float_set_limits(context->crop_bottom, 0,
-					    100, 0.1);
-	}
-}
-
 static void win_openxrmirror_deinit(void *data)
 {
 	struct win_openxrmirror *context = (win_openxrmirror *)data;
@@ -220,11 +175,6 @@ static void win_openxrmirror_deinit(void *data)
 		context->texture = NULL;
 	}
 
-	if (hMapFile) {
-		CloseHandle(hMapFile);
-		hMapFile = NULL;
-	}
-
 	context->texCrop = nullptr;
 	context->mirror_textures.clear();
 	context->copy_tex_resource_mirrors.clear();
@@ -233,10 +183,17 @@ static void win_openxrmirror_deinit(void *data)
 
 	context->device_width = 0;
 	context->device_height = 0;
-	context->crop_left = nullptr;
-	context->crop_right = nullptr;
-	context->crop_top = nullptr;
-	context->crop_bottom = nullptr;
+	context->shared_handle = 0;
+	context->current_frame = 0;
+
+	if (context->surface) {
+		UnmapViewOfFile(context->surface);
+		context->surface = nullptr;
+	}
+	if (context->map_file) {
+		CloseHandle(context->map_file);
+		context->map_file = nullptr;
+	}
 }
 
 static void win_openxrmirror_init(void *data, bool forced = false)
@@ -256,93 +213,102 @@ static void win_openxrmirror_init(void *data, bool forced = false)
 
 	context->lastCheckTick = GetTickCount64();
 
-	hMapFile = OpenFileMappingW(FILE_MAP_WRITE |
-					    FILE_MAP_READ, // read/write access
-				    FALSE,   // do not inherit the name
-				    szName); // name of mapping object
+	context->map_file = OpenFileMappingW(
+		FILE_MAP_WRITE | FILE_MAP_READ, false,
+		obs_mirror_ipc::kSharedMemoryName);
 
-	if (hMapFile == NULL) {
+	if (context->map_file == nullptr) {
 		warn("win_openxrmirror_init: Could not open file mapping object:  %d",
 		     GetLastError());
 		return;
 	}
 
-	pMirrorSurfaceData = (MirrorSurfaceData *)MapViewOfFile(
-		hMapFile,                       // handle to map object
+	context->surface =
+		(obs_mirror_ipc::MirrorSurfaceData *)MapViewOfFile(
+		context->map_file,              // handle to map object
 		FILE_MAP_WRITE | FILE_MAP_READ, // read permission
-		0, 0, sizeof(MirrorSurfaceData));
+		0, 0, sizeof(obs_mirror_ipc::MirrorSurfaceData));
 
-	if (pMirrorSurfaceData == nullptr) {
+	if (context->surface == nullptr) {
 		warn("win_openxrmirror_init: Could not map view of file.");
+		CloseHandle(context->map_file);
+                context->map_file = nullptr;
+                return;
+        }
 
-		CloseHandle(hMapFile);
+        context->surface->eyeIndex = context->captureeye;
+        context->surface->blend = context->blend;
+        context->surface->blendPos = context->blendPos;
+        context->surface->overlap = context->overlap;
 
-		return;
-	}
+        HRESULT hr;
+        obs_enter_graphics();
+        if (gs_get_device_type() == GS_DEVICE_DIRECT3D_11) {
+            context->dev11.copy_from(static_cast<ID3D11Device*>(gs_get_device_obj()));
+        }
+        obs_leave_graphics();
+        if (!context->dev11) {
+            warn("win_openxrmirror_init: OBS is not using a D3D11 graphics device");
+            return;
+        }
+        context->dev11->GetImmediateContext(context->ctx11.put());
+        if (!context->ctx11) {
+            warn("win_openxrmirror_init: Could not get OBS's D3D11 immediate context");
+            return;
+        }
 
-	pMirrorSurfaceData->eyeIndex = context->captureeye;
-	pMirrorSurfaceData->blend = context->blend;
-	pMirrorSurfaceData->blendPos = context->blendPos;
-	pMirrorSurfaceData->overlap = context->overlap;
+        context->mirror_textures = std::vector<winrt::com_ptr<ID3D11Texture2D>>();
+        context->copy_tex_resource_mirrors = std::vector<winrt::com_ptr<IDXGIResource>>();
+        const std::uint64_t published_handle = context->surface->sharedHandle[0];
+        if (published_handle == 0) {
+            warn("win_openxrmirror_init: Mirror surface is not ready");
+            return;
+        }
+        MemoryBarrier();
 
-	HRESULT hr;
-	D3D_FEATURE_LEVEL featureLevel[] = {D3D_FEATURE_LEVEL_11_1,
-					    D3D_FEATURE_LEVEL_11_0};
-	hr = D3D11CreateDevice(NULL, D3D_DRIVER_TYPE_HARDWARE, 0,
-#ifdef _DEBUG
-			       D3D11_CREATE_DEVICE_DEBUG |
-#endif
-				       D3D11_CREATE_DEVICE_BGRA_SUPPORT,
-			       0, 0, D3D11_SDK_VERSION, context->dev11.put(),
-			       featureLevel, context->ctx11.put());
-	if (FAILED(hr)) {
-		warn("win_openxrmirror_init: D3D11CreateDevice failed");
-		return;
-	}
+        for (UINT i = 0; i < 3; ++i) {
+            const std::uint64_t shared_handle = i == 0 ? published_handle : context->surface->sharedHandle[i];
 
-	context->mirror_textures = std::vector<winrt::com_ptr<ID3D11Texture2D>>();
-	context->copy_tex_resource_mirrors = std::vector<winrt::com_ptr<IDXGIResource>>();
+            if (shared_handle == 0) {
+                warn("win_openxrmirror_init: Mirror surface handle is null");
+                return;
+            }
 
-	for (UINT i = 0; i < 3; ++i) {
-		sharedHandle = pMirrorSurfaceData->sharedHandle[i];
+            winrt::com_ptr<IDXGIResource> copy_tex_resource_mirror = nullptr;
+            hr =
+                context->dev11->OpenSharedResource(reinterpret_cast<HANDLE>(static_cast<std::uintptr_t>(shared_handle)),
+                                                   __uuidof(IDXGIResource),
+                                                   copy_tex_resource_mirror.put_void());
+            if (FAILED(hr) || !copy_tex_resource_mirror) {
+                warn("win_openxrmirror_init: OpenSharedResource failed");
+                return;
+            }
+            context->copy_tex_resource_mirrors.push_back(copy_tex_resource_mirror);
 
-		if (sharedHandle == NULL) {
-			warn("win_openxrmirror_init: Mirror surface handle is null");
-			return;
-		}
+            winrt::com_ptr<ID3D11Texture2D> mirror_texture;
+            hr = context->copy_tex_resource_mirrors[i]->QueryInterface(__uuidof(ID3D11Texture2D),
+                                                                       mirror_texture.put_void());
+            if (FAILED(hr) || !mirror_texture) {
+                warn("win_openxrmirror_init: copy_tex_resource_mirror->QueryInterface failed");
+                return;
+            }
+            context->mirror_textures.push_back(mirror_texture);
+        }
+        MemoryBarrier();
+        if (context->surface->sharedHandle[0] != published_handle) {
+            warn("win_openxrmirror_init: Mirror surface changed during initialization");
+            return;
+        }
+        context->shared_handle = published_handle;
 
-		winrt::com_ptr<IDXGIResource> copy_tex_resource_mirror = nullptr;
-		hr = context->dev11->OpenSharedResource(
-			sharedHandle, __uuidof(IDXGIResource),
-			copy_tex_resource_mirror.put_void());
-		if (FAILED(hr) || !copy_tex_resource_mirror) {
-
-			warn("win_openxrmirror_init: OpenSharedResource failed");
-			return;
-		}
-		context->copy_tex_resource_mirrors.push_back(copy_tex_resource_mirror);
-
-		winrt::com_ptr<ID3D11Texture2D> mirror_texture;
-		hr = context->copy_tex_resource_mirrors[i]->QueryInterface(
-			__uuidof(ID3D11Texture2D),
-			mirror_texture.put_void());
-		if (FAILED(hr) || !mirror_texture) {
-			warn("win_openxrmirror_init: copy_tex_resource_mirror->QueryInterface failed");
-			return;
-		}
-		context->mirror_textures.push_back(mirror_texture);
-	}
-	sharedHandle = pMirrorSurfaceData->sharedHandle[0];
-
-	D3D11_TEXTURE2D_DESC desc;
-	context->mirror_textures[0]->GetDesc(&desc);
-	if (desc.Width == 0 || desc.Height == 0) {
-		warn("win_openxrmirror_init: device width or height is 0");
-		return;
-	}
-	context->device_width = desc.Width;
+        D3D11_TEXTURE2D_DESC desc;
+        context->mirror_textures[0]->GetDesc(&desc);
+        if (desc.Width == 0 || desc.Height == 0) {
+            warn("win_openxrmirror_init: device width or height is 0");
+            return;
+        }
+        context->device_width = desc.Width;
 	context->device_height = desc.Height;
-	win_openxrmirror_update_properties(data);
 
 	// Apply wanted cropping to size
 	const crop &crop = context->crop;
@@ -361,7 +327,11 @@ static void win_openxrmirror_init(void *data, bool forced = false)
 	// Create cropped, linear texture
 	// Using linear here will cause correct sRGB gamma to be applied
 	DxgiFormatInfo info{};
-	GetFormatInfo(desc.Format, info);
+	if (!GetFormatInfo(desc.Format, info)) {
+		warn("win_openxrmirror_init: Unsupported DXGI texture format: %d",
+		     desc.Format);
+		return;
+	}
 	desc.Format = info.linear;
 	info("Texture format: %d", desc.Format);
 	info("Texture width: %d", desc.Width);
@@ -389,13 +359,21 @@ static void win_openxrmirror_init(void *data, bool forced = false)
 		return;
 	}
 
+	const std::uintptr_t handle_value = reinterpret_cast<std::uintptr_t>(handle);
+	if (handle_value > std::numeric_limits<std::uint32_t>::max()) {
+		warn("win_openxrmirror_init: Shared texture handle does not fit OBS's 32-bit handle API");
+		return;
+	}
+
 	obs_enter_graphics();
 	gs_texture_destroy(context->texture);
-
-#pragma warning(suppress : 4311 4302)
-	context->texture = gs_texture_open_shared(reinterpret_cast<uint32_t>(handle));
-
+	context->texture =
+		gs_texture_open_shared(static_cast<std::uint32_t>(handle_value));
 	obs_leave_graphics();
+	if (!context->texture) {
+		warn("win_openxrmirror_init: OBS could not open the shared texture");
+		return;
+	}
 
 	context->initialized = true;
 
@@ -404,28 +382,37 @@ static void win_openxrmirror_init(void *data, bool forced = false)
 static const char *win_openxrmirror_get_name(void *unused)
 {
 	UNUSED_PARAMETER(unused);
-	return "OpenXR Mirror Capture";
+	return obs_module_text("OpenXRMirrorCapture");
 }
 
 static void win_openxrmirror_update(void *data, obs_data_t *settings)
 {
 	struct win_openxrmirror *context = (win_openxrmirror *)data;
-	context->captureeye = static_cast<int>(obs_data_get_int(settings, "captureeye"));
+	context->captureeye = std::clamp(
+		static_cast<int>(obs_data_get_int(settings, "captureeye")), 0, 2);
+	const double crop_left =
+		std::clamp(obs_data_get_double(settings, "cropleft"), 0.0, 100.0);
+	const double crop_right =
+		std::clamp(obs_data_get_double(settings, "cropright"), 0.0, 100.0);
 
 	if (context->captureeye == 1) {
-		context->crop.left = obs_data_get_double(settings, "cropleft");
-		context->crop.right = obs_data_get_double(settings, "cropright");
+		context->crop.left = crop_left;
+		context->crop.right = crop_right;
 	} else {
-		context->crop.left = obs_data_get_double(settings, "cropright");
-		context->crop.right = obs_data_get_double(settings, "cropleft");
+		context->crop.left = crop_right;
+		context->crop.right = crop_left;
 	}
-	context->crop.top = obs_data_get_double(settings, "croptop");
-	context->crop.bottom = obs_data_get_double(settings, "cropbottom");
+	context->crop.top =
+		std::clamp(obs_data_get_double(settings, "croptop"), 0.0, 100.0);
+	context->crop.bottom =
+		std::clamp(obs_data_get_double(settings, "cropbottom"), 0.0, 100.0);
 
-	context->overlap = static_cast<float>(obs_data_get_double(settings, "eyeoverlap"));
-	context->blend = static_cast<float>(obs_data_get_double(settings, "eyeblend"));
-	context->blendPos =
-		static_cast<float>(obs_data_get_double(settings, "eyeblendpos"));
+	context->overlap = static_cast<float>(
+		std::clamp(obs_data_get_double(settings, "eyeoverlap"), 0.0, 100.0));
+	context->blend = static_cast<float>(
+		std::clamp(obs_data_get_double(settings, "eyeblend"), 0.0, 100.0));
+	context->blendPos = static_cast<float>(
+		std::clamp(obs_data_get_double(settings, "eyeblendpos"), 0.0, 100.0));
 
 	if (context->initialized) {
 		win_openxrmirror_deinit(data);
@@ -470,7 +457,10 @@ static void win_openxrmirror_hide(void *data)
 
 static void *win_openxrmirror_create(obs_data_t *settings, obs_source_t *source)
 {
-	struct win_openxrmirror *context = (win_openxrmirror *)bzalloc(sizeof(win_openxrmirror));
+	struct win_openxrmirror *context =
+		new (std::nothrow) win_openxrmirror{};
+	if (!context)
+		return nullptr;
 	context->source = source;
 
 	context->initialized = false;
@@ -493,18 +483,17 @@ static void win_openxrmirror_destroy(void *data)
 	struct win_openxrmirror *context = (win_openxrmirror *)data;
 
 	win_openxrmirror_deinit(data);
-	bfree(context);
+	delete context;
 }
 
 static void win_openxrmirror_render(void *data, gs_effect_t *effect)
 {
-	if (pMirrorSurfaceData)
-		pMirrorSurfaceData->frameNumber++;
-
 	struct win_openxrmirror *context = (win_openxrmirror *)data;
+	if (context->surface)
+		context->surface->frameNumber++;
 
-	if (context->initialized && pMirrorSurfaceData &&
-	    sharedHandle != pMirrorSurfaceData->sharedHandle[0]) {
+	if (context->initialized && context->surface &&
+	    context->shared_handle != context->surface->sharedHandle[0]) {
 		win_openxrmirror_deinit(data);
 	}
 
@@ -528,20 +517,20 @@ static void win_openxrmirror_render(void *data, gs_effect_t *effect)
 		1,
 	};
 
-	static uint32_t currFrame = 0;
-	uint32_t latestFrame = currFrame;
+	uint32_t latestFrame = context->current_frame;
 
-	if (pMirrorSurfaceData)
-		latestFrame = pMirrorSurfaceData->lastProcessedIndex;
+	if (context->surface)
+		latestFrame = context->surface->lastProcessedIndex;
 
-	if (currFrame > latestFrame || latestFrame - currFrame > 2) {
+	if (context->current_frame > latestFrame ||
+	    latestFrame - context->current_frame > 2) {
 		//blog(LOG_INFO, "Resetting currFrame");
-		currFrame = latestFrame;
+		context->current_frame = latestFrame;
 	}
 
-	if (latestFrame - currFrame > 1) {
+	if (latestFrame - context->current_frame > 1) {
 		//blog(LOG_INFO, "Skipping frame");
-		currFrame++;
+		context->current_frame++;
 	}
 
 	context->ctx11->CopySubresourceRegion(context->texCrop.get(), 0, 0, 0, 0,
@@ -549,7 +538,7 @@ static void win_openxrmirror_render(void *data, gs_effect_t *effect)
 					      0, &poksi);
 	context->ctx11->Flush();
 
-	currFrame++;
+	context->current_frame++;
 
 	// Draw from shared mirror texture
 	effect = obs_get_base_effect(OBS_EFFECT_OPAQUE);
@@ -594,9 +583,9 @@ static bool crop_preset_manual(obs_properties_t *props, obs_property_t *p,
 	UNUSED_PARAMETER(props);
 	UNUSED_PARAMETER(p);
 
-	if (obs_data_get_double(s, "croppreset") != 0.0) {
+	if (obs_data_get_int(s, "croppreset") != 0) {
 		// Slider moved manually, disable preset
-		obs_data_set_double(s, "croppreset", 0);
+		obs_data_set_int(s, "croppreset", 0);
 		return true;
 	}
 	return false;
@@ -607,11 +596,11 @@ static bool crop_preset_flip(obs_properties_t *props, obs_property_t *p,
 {
 	bool flip = obs_data_get_int(s, "captureeye") == 1;
 	obs_property_set_description(obs_properties_get(props, "cropleft"),
-		flip ? obs_module_text("Crop Left Percentage")
-		     : obs_module_text("Crop Right Percentage"));
+		flip ? obs_module_text("CropLeftPercentage")
+		     : obs_module_text("CropRightPercentage"));
 	obs_property_set_description(obs_properties_get(props, "cropright"),
-		flip ? obs_module_text("Crop Right Percentage")
-		     : obs_module_text("Crop Left Percentage"));
+		flip ? obs_module_text("CropRightPercentage")
+		     : obs_module_text("CropLeftPercentage"));
 	return true;
 }
 
@@ -632,37 +621,35 @@ static bool button_reset_callback(obs_properties_t *props, obs_property_t *p,
 
 static obs_properties_t *win_openxrmirror_properties(void *data)
 {
-	win_openxrmirror *context = (win_openxrmirror *)data;
-
 	obs_properties_t *props = obs_properties_create();
 	obs_property_t *p;
 
 	p = obs_properties_add_list(props, "captureeye",
-				    obs_module_text("Eye Capture"),
+				    obs_module_text("EyeCapture"),
 				    OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
 
-	obs_property_list_add_int(p, "Left", 0);
-	obs_property_list_add_int(p, "Right", 1);
-	obs_property_list_add_int(p, "Both", 2);
+	obs_property_list_add_int(p, obs_module_text("EyeLeft"), 0);
+	obs_property_list_add_int(p, obs_module_text("EyeRight"), 1);
+	obs_property_list_add_int(p, obs_module_text("EyeBoth"), 2);
 
 	obs_property_set_modified_callback(p, crop_preset_flip);
 
 	p = obs_properties_add_float_slider(props, "eyeoverlap",
-					    obs_module_text("Eye Overlap"), 0.0,
+					    obs_module_text("EyeOverlap"), 0.0,
 					    100.0, 0.1);
 
 	p = obs_properties_add_float_slider(props, "eyeblend",
-					    obs_module_text("Eye Blend"), 0.0,
+					    obs_module_text("EyeBlend"), 0.0,
 					    100.0, 0.1);
 
 	p = obs_properties_add_float_slider(props, "eyeblendpos",
-					    obs_module_text("Eye Blend Pos"), 0.0,
+					    obs_module_text("EyeBlendPosition"), 0.0,
 					    100.0, 0.1);
 
 	p = obs_properties_add_list(props, "croppreset",
-				    obs_module_text("Preset"),
+				    obs_module_text("CropPreset"),
 				    OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
-	obs_property_list_add_int(p, "none", 0);
+	obs_property_list_add_int(p, obs_module_text("CropPresetNone"), 0);
 	int i = 1;
 	for (const auto &c : croppresets) {
 		obs_property_list_add_int(p, c.name, i++);
@@ -670,43 +657,47 @@ static obs_properties_t *win_openxrmirror_properties(void *data)
 	obs_property_set_modified_callback(p, crop_preset_changed);
 
 	p = obs_properties_add_float_slider(
-		props, "croptop", obs_module_text("Crop Top Percentage"), 0.0, 100.0, 0.1);
-	context->crop_top = p;
+		props, "croptop", obs_module_text("CropTopPercentage"), 0.0, 100.0, 0.1);
 	obs_property_set_modified_callback(p, crop_preset_manual);
 	p = obs_properties_add_float_slider(
-		props, "cropbottom", obs_module_text("Crop Bottom Percentage"), 0.0, 100.0, 0.1);
-	context->crop_bottom = p;
+		props, "cropbottom", obs_module_text("CropBottomPercentage"), 0.0, 100.0, 0.1);
 	obs_property_set_modified_callback(p, crop_preset_manual);
 	p = obs_properties_add_float_slider(
-		props, "cropleft", obs_module_text("Crop Left Percentage"), 0.0, 100.0, 0.1);
-	context->crop_left = p;
+		props, "cropleft", obs_module_text("CropLeftPercentage"), 0.0, 100.0, 0.1);
 	obs_property_set_modified_callback(p, crop_preset_manual);
 	p = obs_properties_add_float_slider(
-		props, "cropright", obs_module_text("Crop Right Percentage"), 0.0, 100.0, 0.1);
-	context->crop_right = p;
+		props, "cropright", obs_module_text("CropRightPercentage"), 0.0, 100.0, 0.1);
 	obs_property_set_modified_callback(p, crop_preset_manual);
 
 	p = obs_properties_add_button(props, "resetsteamvr",
-				      "Reinitialize OpenXR Mirror Source",
+				      obs_module_text("ReinitializeSource"),
 				      button_reset_callback);
-
-	win_openxrmirror_update_properties(data);
 
 	return props;
 }
 
 static void load_presets(void)
 {
+	croppresets.clear();
 	char *presets_file = NULL;
 	presets_file = obs_module_file("win_openxrmirror-presets.ini");
 	if (presets_file) {
 		FILE *f = fopen(presets_file, "rb");
 		if (f) {
-			croppreset p = {0};
-			while (fscanf(f, "%lf,%lf,%lf,%lf,%[^\n]\n", &p.crop.top,
-				      &p.crop.bottom, &p.crop.left,
-				      &p.crop.right, p.name) > 0) {
-				croppresets.push_back(p);
+			char line[512];
+			unsigned int line_number = 0;
+			while (fgets(line, sizeof(line), f)) {
+				line_number++;
+				croppreset p = {};
+				if (sscanf(line, "%lf,%lf,%lf,%lf,%127[^\r\n]",
+					   &p.crop.top, &p.crop.bottom, &p.crop.left,
+					   &p.crop.right, p.name) == 5) {
+					croppresets.push_back(p);
+				} else {
+					blog(LOG_WARNING,
+					     "Ignoring malformed crop preset on line %u",
+					     line_number);
+				}
 			}
 			fclose(f);
 		} else {

@@ -1,34 +1,81 @@
 # OpenXR OBS Mirror
 
-An OpenXR API Layer to mirror what you see in VR to OBS. (Currently DX11 support only)
+An OpenXR API layer that mirrors a VR application's rendered view into an OBS
+source. The current implementation supports Direct3D 11 OpenXR applications.
 
-OpenXR Layer API template was used as the basis for this and can be found here:
-https://github.com/mbucchia/OpenXR-Layer-Template
+The OpenXR layer template was based on
+[OpenXR-Layer-Template](https://github.com/mbucchia/OpenXR-Layer-Template).
 
-Note: For smooth recording in OBS run as Admin:
-https://obsproject.com/forum/threads/obs-studio-24-0-3-gpu-priority-fix-testing.111669/
+## Install a release
 
-# Installation instructions:
+1. Download and extract the newest compatible release.
+2. Close OBS.
+3. Copy the release's `OBS_Plugin/data` and `OBS_Plugin/obs-plugins`
+   directories into the OBS installation directory (normally
+   `C:\Program Files\obs-studio`).
+4. Run `Install-Layer.ps1` from the extracted layer directory.
+5. Restart OBS and add an **OpenXR Mirror Capture** source.
 
-## Install the OpenXR Layer
-Get the latest release from the releases section on the right.
+The install script defaults to a current-user OpenXR registration and does not
+need elevation. Use `-Scope AllUsers` from an elevated PowerShell session only
+when a machine-wide registration is required. The matching uninstall command
+is:
 
-Extract the files to a folder in Program Files e.g. C:\Program Files\OpenXR-OBSMirror\
+```powershell
+pwsh -File .\Uninstall-Layer.ps1 -Scope CurrentUser
+```
 
-You may need to unblock the files by right click > properties > check unblock
+Do not loosen the machine or user PowerShell execution policy. If Windows has
+marked a downloaded archive as blocked, unblock the archive before extracting
+it or invoke the individual trusted script with `pwsh -ExecutionPolicy Bypass`.
 
-<img width="269" alt="image" src="https://user-images.githubusercontent.com/2940221/210623325-e47bb303-e3d0-427a-abaa-845a2fd116eb.png">
+## Build and install from source
 
-If you have isntalled a previous version you should uninstall that first.
+Initialize submodules and restore the native NuGet packages:
 
-To install the OpenXR Layer right click on Install-Layer.ps1 and select "Run with PowerShell"
+```powershell
+git submodule update --init --recursive
+nuget restore .\OpenXR-Layer-OBSMirror.sln `
+  -Source https://api.nuget.org/v3/index.json
+```
 
-To uninstall OpenXR Layer right click on Uninstall-Layer.ps1 and select "Run with PowerShell"
+Build the x64 layer with Visual Studio 2022:
 
+```powershell
+msbuild .\OpenXR-Layer-OBSMirror.sln /m `
+  /p:Configuration=Release /p:Platform=x64
+```
 
-## Install the OBS plugin:
-Copy the directories data and obs-plugins from the OBS_Plugin dir to your OBS install dir e.g. C:\Program Files\obs-studio\
+The OBS plugin must be compiled against source matching the installed OBS
+version. For example, for OBS 32.2.1:
 
-The plugin should appear in the OBS sources list:
+```powershell
+git clone --depth 1 --branch 32.2.1 `
+  https://github.com/obsproject/obs-studio.git C:\src\obs-studio-32.2.1
+pwsh -File .\scripts\Build-OBSPlugin.ps1 `
+  -OBSSourcePath C:\src\obs-studio-32.2.1
+```
 
-<img width="170" alt="image" src="https://user-images.githubusercontent.com/2940221/210623787-e66728e4-c92d-476e-9ad3-82028c0d2a1c.png">
+With OBS closed, install both freshly built components for the current user:
+
+```powershell
+pwsh -File .\scripts\Setup-OBS.ps1
+```
+
+To stage a first-time install without interrupting an active OBS recording, add
+`-AllowRunningOBS`; the new source will become available after OBS restarts.
+
+This places the layer under `%LOCALAPPDATA%\OpenXR-OBSMirror`, registers its
+manifest under `HKCU\Software\Khronos\OpenXR\1\ApiLayers\Implicit`, and
+installs the plugin under OBS's Windows discovery path at
+`%ProgramData%\obs-studio\plugins\win-openxr\bin\64bit`.
+
+## Runtime notes
+
+- Start the OpenXR application after installing the layer.
+- OBS can load the source before the VR application starts; the source retries
+  its IPC connection once the application creates the shared mirror surface.
+- Running OBS elevated may improve GPU scheduling priority on some systems, but
+  the plugin itself does not require administrator privileges.
+- The OpenXR application and OBS must run on the same Windows desktop and use a
+  compatible D3D11 adapter for the shared textures to open.
