@@ -6,7 +6,7 @@ OBS Studio while preserving the headset's normal runtime, view, and tracking.
 ## Recommended: Windows installer
 
 1. Close OBS Studio and any running OpenXR application.
-2. Run `OpenXR-OBSMirror-0.3.0-beta.1-Setup.exe`.
+2. Run the downloaded `OpenXR-OBSMirror-...-Setup.exe`.
 3. Accept the Windows administrator prompt. It is used only to place the OBS
    source in OBS Studio's shared plugin directory.
 4. Leave **Open Control Center** selected and finish setup.
@@ -28,8 +28,9 @@ runtime. If Control Center reports an inherited simulator override, use
 5. Restart OBS Studio and add an **OpenXR Mirror Capture** source.
 
 The portable Control Center is self-contained; a separate .NET installation is
-not required. Keep the extracted folder intact because it contains the native
-layer, OBS source, scripts, and app runtime.
+not required, and its installation actions use Windows PowerShell included
+with Windows (PowerShell 7 is optional). Keep the extracted folder intact
+because it contains the native layer, OBS source, scripts, and app runtime.
 
 ## Recording controls
 

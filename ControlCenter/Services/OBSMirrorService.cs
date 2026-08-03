@@ -489,7 +489,7 @@ public sealed class OBSMirrorService
 
     private static async Task<string> RunPowerShellAsync(string scriptPath, IEnumerable<string> scriptArguments)
     {
-        var startInfo = new ProcessStartInfo("pwsh")
+        var startInfo = new ProcessStartInfo(ResolvePowerShellExecutable())
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -515,6 +515,45 @@ public sealed class OBSMirrorService
         if (process.ExitCode != 0)
             throw new InvalidOperationException(string.IsNullOrEmpty(error) ? output : error);
         return string.IsNullOrWhiteSpace(output) ? "Completed successfully." : output;
+    }
+
+    private static string ResolvePowerShellExecutable()
+    {
+        // Windows PowerShell is part of supported Windows installations and is
+        // also the host used by the installer. PowerShell 7 (`pwsh`) is optional
+        // and must not be a prerequisite for Control Center actions.
+        var systemDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System);
+        if (!string.IsNullOrWhiteSpace(systemDirectory))
+        {
+            var windowsPowerShell = Path.Combine(
+                systemDirectory,
+                "WindowsPowerShell",
+                "v1.0",
+                "powershell.exe");
+            if (File.Exists(windowsPowerShell))
+                return windowsPowerShell;
+        }
+
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        if (!string.IsNullOrWhiteSpace(programFiles))
+        {
+            var powerShell7 = Path.Combine(programFiles, "PowerShell", "7", "pwsh.exe");
+            if (File.Exists(powerShell7))
+                return powerShell7;
+        }
+
+        foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+                     .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var powerShell7 = Path.Combine(directory.Trim('"'), "pwsh.exe");
+            if (File.Exists(powerShell7))
+                return powerShell7;
+        }
+
+        throw new FileNotFoundException(
+            "Neither Windows PowerShell nor PowerShell 7 could be found. " +
+            "Windows PowerShell is normally available at " +
+            @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe.");
     }
 
     private static string FindRepoRoot()
