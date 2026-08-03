@@ -74,7 +74,8 @@ installs the plugin under OBS's Windows discovery path at
 
 The dark WinUI 3 Control Center provides one place to inspect layer, plugin,
 runtime, and OBS status; install or update both components; register the layer;
-configure recording overscan; control camera smoothing; and read live logs.
+configure recording overscan; control camera smoothing; show or hide OpenXR
+quad-layer UI in the recording; and read live logs.
 It is headset-first: the dashboard shows the effective runtime, warns when a
 simulator override is active, and provides **Use headset runtime** to clear
 per-user simulator selectors and return to the machine-wide OpenXR runtime.
@@ -87,7 +88,8 @@ pwsh -File .\scripts\Build-ControlCenter.ps1
 
 Run `bin\x64\Release\ControlCenter\OBSMirror.ControlCenter.exe`. Overscan
 changes apply when the OpenXR application next starts. Camera-smoothing changes
-are picked up live by an active OBS Mirror source.
+are picked up live by an active OBS Mirror source. Quad-layer visibility is
+picked up live by the updated OpenXR layer after it has been loaded once.
 
 ## Runtime notes
 
@@ -169,3 +171,24 @@ Notes:
 - Positional smoothing uses a flat reprojection plane at 2 m; very close
   geometry can shimmer slightly during strong positional motion.
 - Cost is one textured-quad draw per eye on the mirror device — negligible.
+
+## OpenXR quad-layer UI
+
+The Control Center's **UI layers** page controls whether separately submitted
+OpenXR quad layers appear in the OBS mirror. **Show in recording** preserves the
+default composite. **Hide from recording** records the projection image without
+`XR_COMPOSITION_LAYER_QUAD` content. The layer polls this preference live, and
+the headset submission is never modified, so the headset continues to show all
+of its original layers.
+
+This filter can separate only UI submitted as a genuine OpenXR composition quad
+layer. UI drawn into the projection eye texture, including world-space UI and
+post-processed overlays, is already part of the projection image and cannot be
+removed independently. After installing a build containing this feature,
+restart the OpenXR application once so it loads the updated layer; later
+show/hide changes apply live.
+
+Layer updates are installed as hash-versioned binaries. This allows the Control
+Center to stage a new build even while the previous DLL is loaded; the running
+session keeps its existing code, and the next OpenXR launch follows the updated
+manifest automatically.

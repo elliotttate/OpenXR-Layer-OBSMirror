@@ -17,6 +17,7 @@ public sealed partial class MainWindow : Window
     private SystemSnapshot? _snapshot;
     private bool _loadingControls;
     private bool _loadingSmoothingControls;
+    private bool _loadingQuadLayerControls;
 
     public MainWindow()
     {
@@ -103,10 +104,10 @@ public sealed partial class MainWindow : Window
     private void RenderSnapshot(SystemSnapshot snapshot)
     {
         SetStatus(LayerDot, LayerStatusText,
-            snapshot.LayerRegistered && snapshot.LayerFilesInstalled,
-            snapshot.LayerRegistered ? "Registered" : "Not registered");
+            snapshot.LayerRegistered && snapshot.LayerFilesInstalled && snapshot.LayerCurrent,
+            !snapshot.LayerRegistered ? "Not registered" : snapshot.LayerCurrent ? "Registered" : "Update ready");
         LayerDetailText.Text = snapshot.LayerFilesInstalled
-            ? $"Installed • {ShortHash(snapshot.LayerHash)}"
+            ? snapshot.LayerCurrent ? $"Installed • {ShortHash(snapshot.LayerHash)}" : "New layer build is ready"
             : "Release files are not installed";
 
         SetStatus(PluginDot, PluginStatusText,
@@ -168,6 +169,11 @@ public sealed partial class MainWindow : Window
         _loadingSmoothingControls = false;
         UpdateSmoothingPreview();
 
+        _loadingQuadLayerControls = true;
+        MirrorQuadLayersToggle.IsOn = snapshot.MirrorQuadLayers;
+        _loadingQuadLayerControls = false;
+        UpdateMirrorQuadLayersPreview();
+
         if (!snapshot.PluginInstalled)
         {
             SmoothingAvailabilityInfoBar.Severity = InfoBarSeverity.Warning;
@@ -187,8 +193,27 @@ public sealed partial class MainWindow : Window
             SmoothingAvailabilityInfoBar.Message = "The installed OBS source polls these settings four times per second. Saved values are used on the next session too.";
         }
 
+        if (!snapshot.LayerFilesInstalled)
+        {
+            QuadLayersAvailabilityInfoBar.Severity = InfoBarSeverity.Warning;
+            QuadLayersAvailabilityInfoBar.Title = "Install the OpenXR layer";
+            QuadLayersAvailabilityInfoBar.Message = "The preference can be saved now, but the updated layer must be installed before it can filter the recording.";
+        }
+        else if (!snapshot.LayerCurrent)
+        {
+            QuadLayersAvailabilityInfoBar.Severity = InfoBarSeverity.Warning;
+            QuadLayersAvailabilityInfoBar.Title = "Layer update required";
+            QuadLayersAvailabilityInfoBar.Message = "Save the preference now, then install the available layer update and restart the VR application once.";
+        }
+        else
+        {
+            QuadLayersAvailabilityInfoBar.Severity = InfoBarSeverity.Informational;
+            QuadLayersAvailabilityInfoBar.Title = "Applies live";
+            QuadLayersAvailabilityInfoBar.Message = "The updated OpenXR layer polls this setting while recording. Restart the VR application once after installing the update.";
+        }
+
         InstallLayerStatusText.Text = snapshot.LayerFilesInstalled
-            ? snapshot.LayerRegistered ? "Installed and registered" : "Installed, registration missing"
+            ? !snapshot.LayerRegistered ? "Installed, registration missing" : snapshot.LayerCurrent ? "Installed and current" : "Installed, update available"
             : "Not installed";
         InstallLayerPathText.Text = snapshot.LayerManifestPath;
         InstallPluginStatusText.Text = snapshot.PluginInstalled
@@ -210,10 +235,11 @@ public sealed partial class MainWindow : Window
         DashboardPage.Visibility = tag == "dashboard" ? Visibility.Visible : Visibility.Collapsed;
         OverscanPage.Visibility = tag == "overscan" ? Visibility.Visible : Visibility.Collapsed;
         SmoothingPage.Visibility = tag == "smoothing" ? Visibility.Visible : Visibility.Collapsed;
+        QuadLayersPage.Visibility = tag == "quadlayers" ? Visibility.Visible : Visibility.Collapsed;
         InstallationPage.Visibility = tag == "installation" ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsPage.Visibility = tag == "diagnostics" ? Visibility.Visible : Visibility.Collapsed;
 
-        foreach (var button in new[] { DashboardNavButton, OverscanNavButton, SmoothingNavButton, InstallationNavButton, DiagnosticsNavButton })
+        foreach (var button in new[] { DashboardNavButton, OverscanNavButton, SmoothingNavButton, QuadLayersNavButton, InstallationNavButton, DiagnosticsNavButton })
         {
             button.Background = new SolidColorBrush(Colors.Transparent);
             button.Foreground = GetBrush("MutedTextBrush");
@@ -274,6 +300,49 @@ public sealed partial class MainWindow : Window
         SmoothingCropValueText.Text = $"{crop:0.0}%";
         SmoothingResponseText.Text = smoothing == 0 || crop == 0 ? "Off" : $"{responseMs:0} ms";
         SmoothingVisibleText.Text = $"{100.0 - crop:0.0}%";
+    }
+
+    private void MirrorQuadLayers_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (!_loadingQuadLayerControls && MirrorQuadLayersSummaryText is not null)
+            UpdateMirrorQuadLayersPreview();
+    }
+
+    private void UpdateMirrorQuadLayersPreview()
+    {
+        MirrorQuadLayersSummaryText.Text = MirrorQuadLayersToggle.IsOn
+            ? "Projection + quad-layer UI"
+            : "Projection only";
+    }
+
+    private async void QuadLayerPreset_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string tag } || !bool.TryParse(tag, out var visible))
+            return;
+
+        MirrorQuadLayersToggle.IsOn = visible;
+        await SaveMirrorQuadLayersAsync();
+    }
+
+    private async void ApplyMirrorQuadLayers_Click(object sender, RoutedEventArgs e) =>
+        await SaveMirrorQuadLayersAsync();
+
+    private async Task SaveMirrorQuadLayersAsync()
+    {
+        try
+        {
+            var visible = MirrorQuadLayersToggle.IsOn;
+            _service.ApplyMirrorQuadLayers(visible);
+            ShowMessage(
+                visible ? "Quad-layer UI shown" : "Quad-layer UI hidden",
+                "The OBS mirror picks up this recording-only setting live when the updated layer is active. The headset remains unchanged.",
+                InfoBarSeverity.Success);
+            await RefreshSnapshotAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowMessage("Could not save the UI-layer setting", ex.Message, InfoBarSeverity.Error);
+        }
     }
 
     private void SmoothingPreset_Click(object sender, RoutedEventArgs e)

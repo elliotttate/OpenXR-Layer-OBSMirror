@@ -57,6 +57,9 @@
                         <Button x:Name="SmoothingNavButton" Tag="smoothing" Click="SidebarNav_Click" Style="{StaticResource SidebarButtonStyle}">
                             <StackPanel Orientation="Horizontal" Spacing="12"><SymbolIcon Symbol="Video" /><TextBlock Text="Camera smoothing" FontWeight="SemiBold" /></StackPanel>
                         </Button>
+                        <Button x:Name="QuadLayersNavButton" Tag="quadlayers" Click="SidebarNav_Click" Style="{StaticResource SidebarButtonStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="12"><SymbolIcon Symbol="Page" /><TextBlock Text="UI layers" FontWeight="SemiBold" /></StackPanel>
+                        </Button>
                         <Button x:Name="InstallationNavButton" Tag="installation" Click="SidebarNav_Click" Style="{StaticResource SidebarButtonStyle}">
                             <StackPanel Orientation="Horizontal" Spacing="12"><SymbolIcon Symbol="Download" /><TextBlock Text="Installation" FontWeight="SemiBold" /></StackPanel>
                         </Button>
@@ -371,6 +374,71 @@
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
                                 <Button Click="ReleaseSmoothing_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Use OBS source settings" />
                                 <Button Click="ApplySmoothing_Click" Style="{StaticResource PrimaryButtonStyle}" Content="Apply smoothing" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- OpenXR quad-layer UI -->
+                    <ScrollViewer x:Name="QuadLayersPage" Grid.Row="0" Padding="34,28,34,34" Visibility="Collapsed">
+                        <StackPanel Spacing="24" MaxWidth="1050" HorizontalAlignment="Stretch">
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="RECORDING UI" Style="{StaticResource EyebrowStyle}" />
+                                <TextBlock Text="Choose whether UI layers appear in the recording." Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock Text="OpenXR composition quad layers can be included in or removed from the OBS mirror without changing what appears in the headset." Style="{StaticResource MutedTextStyle}" />
+                            </StackPanel>
+
+                            <Border Style="{StaticResource CardStyle}">
+                                <StackPanel Spacing="22">
+                                    <Grid ColumnSpacing="24">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="5">
+                                            <TextBlock Text="OpenXR quad-layer UI" FontSize="20" FontWeight="SemiBold" />
+                                            <TextBlock Text="Controls UI submitted separately from the main projection image." Style="{StaticResource MutedTextStyle}" />
+                                        </StackPanel>
+                                        <ToggleSwitch x:Name="MirrorQuadLayersToggle" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                      IsOn="True" OnContent="Shown" OffContent="Hidden" Toggled="MirrorQuadLayers_Toggled" />
+                                    </Grid>
+
+                                    <Grid ColumnSpacing="14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0" CornerRadius="14" Padding="18" Background="#80333A4A">
+                                            <StackPanel Spacing="7">
+                                                <TextBlock Text="OBS RECORDING" Style="{StaticResource EyebrowStyle}" />
+                                                <TextBlock x:Name="MirrorQuadLayersSummaryText" Text="Projection + quad-layer UI" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource BrandBrush}" />
+                                                <TextBlock Text="The filter is applied while the layer builds the mirror image." Style="{StaticResource MutedTextStyle}" FontSize="12" />
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Grid.Column="1" CornerRadius="14" Padding="18" Background="#80333A4A">
+                                            <StackPanel Spacing="7">
+                                                <TextBlock Text="HEADSET" Style="{StaticResource EyebrowStyle}" />
+                                                <TextBlock Text="Always unchanged" FontSize="20" FontWeight="SemiBold" />
+                                                <TextBlock Text="Every layer is still submitted to the active OpenXR runtime." Style="{StaticResource MutedTextStyle}" FontSize="12" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <InfoBar x:Name="QuadLayersAvailabilityInfoBar" IsOpen="True" IsClosable="False" Severity="Informational"
+                                             Title="Applies live" Message="The updated OpenXR layer polls this setting while recording. Restart the VR application once after installing the update." />
+
+                                    <Border CornerRadius="12" Padding="15" Background="#66171B24">
+                                        <StackPanel Spacing="5">
+                                            <TextBlock Text="WHAT THIS CAN SEPARATE" Style="{StaticResource EyebrowStyle}" />
+                                            <TextBlock Text="This affects XR_COMPOSITION_LAYER_QUAD content only. UI drawn directly into the projection eye image, including world-space or post-processed UI, is part of that image and cannot be hidden independently." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                                <Button Tag="false" Click="QuadLayerPreset_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Hide from recording" />
+                                <Button Tag="true" Click="QuadLayerPreset_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Show in recording" />
+                                <Button Click="ApplyMirrorQuadLayers_Click" Style="{StaticResource PrimaryButtonStyle}" Content="Apply UI setting" />
                             </StackPanel>
                         </StackPanel>
                     </ScrollViewer>

@@ -866,6 +866,7 @@ namespace {
                     _projectionViews[0].subImage.imageRect.extent.width = _xrViewsList[0].recommendedImageRectWidth;
                     _projectionViews[0].subImage.imageRect.extent.height = _xrViewsList[0].recommendedImageRectHeight;
 
+                    const bool includeQuadLayers = mirrorQuadLayers();
                     uint32_t count = frameEndInfo->layerCount;
                     for (uint32_t i = 0; i < count; ++i) {
                         const XrCompositionLayerBaseHeader* hdr = frameEndInfo->layers[i];
@@ -904,7 +905,7 @@ namespace {
                                     }
                                 }
                             }
-                        } else if (hdr->type == XR_TYPE_COMPOSITION_LAYER_QUAD) {
+                        } else if (hdr->type == XR_TYPE_COMPOSITION_LAYER_QUAD && includeQuadLayers) {
                             const XrCompositionLayerQuad* quadLayer =
                                 reinterpret_cast<const XrCompositionLayerQuad*>(hdr);
                             if (isSwapchainHandled(quadLayer->subImage.swapchain)) {
@@ -979,6 +980,21 @@ namespace {
         bool overscanActive() const {
             return _overscanRequested && _overscanScalesComputed &&
                    (_overscanHScale > 1.001f || _overscanVScale > 1.001f);
+        }
+
+        bool mirrorQuadLayers() {
+            const ULONGLONG now = GetTickCount64();
+            if (_quadLayerConfigInitialized && now - _lastQuadLayerConfigCheckTick < 250)
+                return _mirrorQuadLayers;
+
+            _lastQuadLayerConfigCheckTick = now;
+            const bool visible = readConfigDword(L"MirrorQuadLayers", 1) != 0;
+            if (!_quadLayerConfigInitialized || visible != _mirrorQuadLayers) {
+                Log("Recording OpenXR quad layers: %s\n", visible ? "included" : "hidden");
+            }
+            _quadLayerConfigInitialized = true;
+            _mirrorQuadLayers = visible;
+            return _mirrorQuadLayers;
         }
 
         void computeOverscanScales(const XrViewConfigurationView* views, uint32_t viewCount) {
@@ -1251,6 +1267,11 @@ namespace {
         bool _depthPatchWarned = false;
         bool _overscanSubmissionLogged = false;
         std::vector<XrFovf> _originalViewFovs;
+        // Recording-only OpenXR quad-layer visibility. Polled periodically so
+        // Control Center changes apply live without touching headset submission.
+        bool _mirrorQuadLayers = true;
+        bool _quadLayerConfigInitialized = false;
+        ULONGLONG _lastQuadLayerConfigCheckTick = 0;
         // Per-frame scratch for the patched runtime submission.
         std::vector<const XrCompositionLayerBaseHeader*> _patchedLayerPtrs;
         std::vector<XrCompositionLayerProjection> _patchedProjLayers;

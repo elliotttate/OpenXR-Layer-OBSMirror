@@ -37,9 +37,19 @@ $pluginDataDirectory = Join-Path $pluginInstall 'data'
 New-Item -ItemType Directory -Path $layerInstall, $pluginBinDirectory, $pluginDataDirectory -Force |
     Out-Null
 
-foreach ($file in @($layerDll, $layerManifest)) {
-    Copy-Item -LiteralPath $file -Destination $layerInstall -Force
-}
+$layerSourceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $layerDll).Hash
+$versionedLayerName = "XR_APILAYER_NOVENDOR_OBSMirror.$($layerSourceHash.Substring(0, 12).ToLowerInvariant()).dll"
+$versionedLayerPath = Join-Path $layerInstall $versionedLayerName
+Copy-Item -LiteralPath $layerDll -Destination $versionedLayerPath -Force
+
+# OpenXR applications keep their loaded layer DLL open. Install immutable,
+# hash-versioned binaries and point the manifest at the new one so an update can
+# be staged safely without interrupting the current headset session.
+$installedManifest = Join-Path $layerInstall 'XR_APILAYER_NOVENDOR_OBSMirror.json'
+$manifestData = Get-Content -LiteralPath $layerManifest -Raw | ConvertFrom-Json
+$manifestData.api_layer.library_path = ".\$versionedLayerName"
+$manifestData | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $installedManifest -Encoding utf8
+
 foreach ($scriptName in @('Install-Layer.ps1', 'Uninstall-Layer.ps1')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $scriptName) -Destination $layerInstall -Force
 }
@@ -59,13 +69,13 @@ if ($pluginAlreadyCurrent) {
 Copy-Item -Path (Join-Path $repoRoot 'OBSPlugin\win-openxr\data\*') `
     -Destination $pluginDataDirectory -Recurse -Force
 
-$installedManifest = Join-Path $layerInstall 'XR_APILAYER_NOVENDOR_OBSMirror.json'
 & (Join-Path $PSScriptRoot 'Install-Layer.ps1') -Scope CurrentUser `
     -ManifestPath $installedManifest
 
 [pscustomobject]@{
     LayerManifest = $installedManifest
-    LayerSHA256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $layerInstall 'XR_APILAYER_NOVENDOR_OBSMirror.dll')).Hash
+    LayerBinary = $versionedLayerPath
+    LayerSHA256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $versionedLayerPath).Hash
     OBSPlugin = $pluginDestination
     PluginSHA256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $pluginDestination).Hash
 }

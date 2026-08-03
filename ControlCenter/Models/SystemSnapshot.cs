@@ -3,6 +3,7 @@ namespace OBSMirror.ControlCenter.Models;
 public sealed record SystemSnapshot(
     bool LayerRegistered,
     bool LayerFilesInstalled,
+    bool LayerCurrent,
     bool PluginInstalled,
     bool PluginCurrent,
     bool ObsRunning,
@@ -16,6 +17,7 @@ public sealed record SystemSnapshot(
     string SystemRuntimePath,
     string LayerManifestPath,
     string LayerHash,
+    string SourceLayerHash,
     string PluginHash,
     string SourcePluginHash,
     bool OverscanEnabled,
@@ -24,6 +26,7 @@ public sealed record SystemSnapshot(
     bool CameraSmoothingManaged,
     int CameraSmoothing,
     double SmoothingCrop,
+    bool MirrorQuadLayers,
     string LastCaptureSummary,
     string MetaXrExecutable,
     DateTime CapturedAt);

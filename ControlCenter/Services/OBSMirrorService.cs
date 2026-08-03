@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.Win32;
 using OBSMirror.ControlCenter.Models;
 
@@ -28,7 +29,8 @@ public sealed class OBSMirrorService
         "XR_APILAYER_NOVENDOR_OBSMirror.log");
 
     public string InstalledManifestPath => Path.Combine(InstallDirectory, LayerManifestName);
-    public string InstalledLayerPath => Path.Combine(InstallDirectory, "XR_APILAYER_NOVENDOR_OBSMirror.dll");
+    public string InstalledLayerPath => ResolveManifestLibraryPath(InstalledManifestPath);
+    public string ReleaseLayerPath => Path.Combine(RepoRoot, "bin", "x64", "Release", "XR_APILAYER_NOVENDOR_OBSMirror.dll");
     public string ReleasePluginPath => Path.Combine(RepoRoot, "bin", "x64", "Release", "OBS_Plugin", "win-openxr.dll");
     public string SetupScriptPath => Path.Combine(RepoRoot, "scripts", "Setup-OBS.ps1");
     public string InstallScriptPath => Path.Combine(RepoRoot, "scripts", "Install-Layer.ps1");
@@ -38,11 +40,14 @@ public sealed class OBSMirrorService
     {
         var (enabled, horizontal, vertical) = ReadOverscan();
         var (smoothingManaged, cameraSmoothing, smoothingCrop) = ReadCameraSmoothing();
+        var mirrorQuadLayers = ReadMirrorQuadLayers();
         var runtime = ResolveRuntimeSelection();
         var systemRuntimePath = ResolveSystemRuntimePath();
         var runtimeName = FriendlyRuntimeName(runtime.Path);
         var systemRuntimeName = FriendlyRuntimeName(systemRuntimePath);
         var registeredManifest = FindRegisteredLayerManifest();
+        var sourceLayerHash = HashFile(ReleaseLayerPath);
+        var layerHash = HashFile(InstalledLayerPath);
         var sourcePluginHash = HashFile(ReleasePluginPath);
         var pluginHash = HashFile(PluginPath);
         var metaExe = FindMetaXrExecutable(runtime.Path);
@@ -50,6 +55,8 @@ public sealed class OBSMirrorService
         return new SystemSnapshot(
             LayerRegistered: !string.IsNullOrWhiteSpace(registeredManifest),
             LayerFilesInstalled: File.Exists(InstalledManifestPath) && File.Exists(InstalledLayerPath),
+            LayerCurrent: !string.IsNullOrEmpty(sourceLayerHash) &&
+                          string.Equals(sourceLayerHash, layerHash, StringComparison.OrdinalIgnoreCase),
             PluginInstalled: File.Exists(PluginPath),
             PluginCurrent: !string.IsNullOrEmpty(sourcePluginHash) &&
                            string.Equals(sourcePluginHash, pluginHash, StringComparison.OrdinalIgnoreCase),
@@ -63,7 +70,8 @@ public sealed class OBSMirrorService
             SystemRuntimeName: systemRuntimeName,
             SystemRuntimePath: systemRuntimePath,
             LayerManifestPath: registeredManifest ?? InstalledManifestPath,
-            LayerHash: HashFile(InstalledLayerPath),
+            LayerHash: layerHash,
+            SourceLayerHash: sourceLayerHash,
             PluginHash: pluginHash,
             SourcePluginHash: sourcePluginHash,
             OverscanEnabled: enabled,
@@ -72,6 +80,7 @@ public sealed class OBSMirrorService
             CameraSmoothingManaged: smoothingManaged,
             CameraSmoothing: cameraSmoothing,
             SmoothingCrop: smoothingCrop,
+            MirrorQuadLayers: mirrorQuadLayers,
             LastCaptureSummary: FindLastCaptureSummary(),
             MetaXrExecutable: metaExe,
             CapturedAt: DateTime.Now);
@@ -99,6 +108,13 @@ public sealed class OBSMirrorService
         key.SetValue("CameraSmoothingManaged", managed ? 1 : 0, RegistryValueKind.DWord);
         key.SetValue("CameraSmoothing", smoothing, RegistryValueKind.DWord);
         key.SetValue("SmoothingCropTenths", (int)Math.Round(crop * 10.0), RegistryValueKind.DWord);
+    }
+
+    public void ApplyMirrorQuadLayers(bool visible)
+    {
+        using var key = Registry.CurrentUser.CreateSubKey(ConfigKey, writable: true)
+            ?? throw new InvalidOperationException("Could not open the per-user OBSMirror settings key.");
+        key.SetValue("MirrorQuadLayers", visible ? 1 : 0, RegistryValueKind.DWord);
     }
 
     public async Task<string> SetupAsync(bool allowRunningObs)
@@ -217,6 +233,12 @@ public sealed class OBSMirrorService
         var smoothing = Math.Clamp(Convert.ToInt32(key?.GetValue("CameraSmoothing", 35) ?? 35), 0, 100);
         var cropTenths = Math.Clamp(Convert.ToInt32(key?.GetValue("SmoothingCropTenths", 80) ?? 80), 0, 250);
         return (managed, smoothing, cropTenths / 10.0);
+    }
+
+    private bool ReadMirrorQuadLayers()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(ConfigKey);
+        return Convert.ToInt32(key?.GetValue("MirrorQuadLayers", 1) ?? 1) != 0;
     }
 
     private string? FindRegisteredLayerManifest()
@@ -360,6 +382,37 @@ public sealed class OBSMirrorService
         catch
         {
             return string.Empty;
+        }
+    }
+
+    private static string ResolveManifestLibraryPath(string manifestPath)
+    {
+        var fallback = Path.Combine(
+            Path.GetDirectoryName(manifestPath) ?? string.Empty,
+            "XR_APILAYER_NOVENDOR_OBSMirror.dll");
+        if (!File.Exists(manifestPath))
+            return fallback;
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            var libraryPath = document.RootElement
+                .GetProperty("api_layer")
+                .GetProperty("library_path")
+                .GetString();
+            if (string.IsNullOrWhiteSpace(libraryPath))
+                return fallback;
+
+            var normalized = libraryPath.Replace('/', Path.DirectorySeparatorChar)
+                .Replace('\\', Path.DirectorySeparatorChar);
+            return Path.GetFullPath(
+                Path.IsPathRooted(normalized)
+                    ? normalized
+                    : Path.Combine(Path.GetDirectoryName(manifestPath) ?? string.Empty, normalized));
+        }
+        catch
+        {
+            return fallback;
         }
     }
 
