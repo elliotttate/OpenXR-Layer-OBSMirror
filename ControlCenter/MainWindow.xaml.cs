@@ -27,6 +27,7 @@ public sealed partial class MainWindow : Window
 
         ConfigureOverscanSlider(HorizontalSlider, 115);
         ConfigureOverscanSlider(VerticalSlider, 108);
+        ConfigureSlider(BoundaryCompensationStrengthSlider, 0, 100, 1, 100);
         ConfigureSlider(SmoothingSlider, 0, 100, 1, 35);
         ConfigureSlider(SmoothingCropSlider, 0, 25, 0.5, 8);
         ExtendsContentIntoTitleBar = true;
@@ -177,6 +178,8 @@ public sealed partial class MainWindow : Window
         OverscanToggle.IsOn = snapshot.OverscanEnabled;
         HorizontalSlider.Value = snapshot.HorizontalPercent;
         VerticalSlider.Value = snapshot.VerticalPercent;
+        BoundaryCompensationToggle.IsOn = snapshot.OverscanBoundaryCompensation;
+        BoundaryCompensationStrengthSlider.Value = snapshot.OverscanBoundaryCompensationStrength;
         _loadingControls = false;
         UpdateOverscanPreview();
 
@@ -293,6 +296,12 @@ public sealed partial class MainWindow : Window
         PixelCostText.Text = $"+{pixelCost * 100:0.0}%";
         ScaleSummaryText.Text = $"{horizontal / 100.0:0.00}× horizontal  •  {vertical / 100.0:0.00}× vertical";
         ExpectedTextureText.Text = $"{horizontal / 100.0:0.00}×  ×  {vertical / 100.0:0.00}×";
+        var boundaryStrength = (int)Math.Round(BoundaryCompensationStrengthSlider.Value);
+        BoundaryCompensationStrengthText.Text = $"{boundaryStrength}%";
+        BoundaryCompensationStrengthSlider.IsEnabled = BoundaryCompensationToggle.IsOn;
+        BoundaryCompensationSummaryText.Text = BoundaryCompensationToggle.IsOn
+            ? "Matches projection-baked fullscreen effects across the extra recording perimeter."
+            : "Off — the overscan perimeter is copied exactly as rendered.";
     }
 
     private void SmoothingControl_Changed(object sender, RoutedEventArgs e)
@@ -440,7 +449,13 @@ public sealed partial class MainWindow : Window
                 OverscanToggle.IsOn,
                 (int)Math.Round(HorizontalSlider.Value),
                 (int)Math.Round(VerticalSlider.Value));
-            ShowMessage("Overscan settings saved", "Restart the VR application for the new FOV and render size to take effect.", InfoBarSeverity.Success);
+            _service.ApplyOverscanBoundaryCompensation(
+                BoundaryCompensationToggle.IsOn,
+                (int)Math.Round(BoundaryCompensationStrengthSlider.Value));
+            ShowMessage(
+                "Overscan settings saved",
+                "FOV and render-size changes apply after restarting the VR application. Guard-band matching then updates live.",
+                InfoBarSeverity.Success);
             await RefreshSnapshotAsync();
         }
         catch (Exception ex)

@@ -31,7 +31,12 @@ if ($Disable) {
 }
 
 if ($PSCmdlet.ShouldProcess($registryPath, "Enable recording overscan ${HorizontalPercent}% x ${VerticalPercent}%")) {
-    New-Item -Path $registryPath -Force | Out-Null
+    # Do not recreate an existing key with -Force: the Registry provider can
+    # clear sibling values owned by the Control Center (camera smoothing,
+    # quad-layer visibility, and guard-band matching).
+    if (-not (Test-Path -LiteralPath $registryPath)) {
+        New-Item -Path $registryPath | Out-Null
+    }
     Set-ItemProperty -LiteralPath $registryPath -Name 'RecordingOverscan' -Value 1 -Type DWord
     Set-ItemProperty -LiteralPath $registryPath -Name 'OverscanHorizontalPercent' -Value $HorizontalPercent -Type DWord
     Set-ItemProperty -LiteralPath $registryPath -Name 'OverscanVerticalPercent' -Value $VerticalPercent -Type DWord

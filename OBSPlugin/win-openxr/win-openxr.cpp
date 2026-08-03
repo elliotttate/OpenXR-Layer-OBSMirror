@@ -66,6 +66,7 @@ struct win_openxrmirror {
 	HANDLE map_file = nullptr;
 	obs_mirror_ipc::MirrorSurfaceData *surface = nullptr;
 	std::uint64_t shared_handle = 0;
+	std::uint32_t surface_generation = 0;
 
 	int captureeye = 1; // left = 0, right = 1, both = 2
 	int croppreset;
@@ -169,6 +170,7 @@ static void win_openxrmirror_deinit(void *data)
 	context->device_width = 0;
 	context->device_height = 0;
 	context->shared_handle = 0;
+	context->surface_generation = 0;
 
 	if (context->surface) {
 		UnmapViewOfFile(context->surface);
@@ -249,8 +251,10 @@ static void win_openxrmirror_init(void *data, bool forced = false)
         }
 
         context->mirror_textures = std::vector<winrt::com_ptr<ID3D11Texture2D>>();
+        const std::uint32_t published_generation =
+            context->surface->surfaceGeneration.load(std::memory_order_acquire);
         const std::uint64_t published_handle = context->surface->sharedHandle[0];
-        if (published_handle == 0) {
+        if (published_generation == 0 || published_handle == 0) {
 			// The layer publishes handles after the application's first usable
 			// swapchain image. This is an expected transient state, not an error.
             return;
@@ -284,11 +288,13 @@ static void win_openxrmirror_init(void *data, bool forced = false)
             context->mirror_textures.push_back(mirror_texture);
         }
         MemoryBarrier();
-        if (context->surface->sharedHandle[0] != published_handle) {
+        if (context->surface->sharedHandle[0] != published_handle ||
+            context->surface->surfaceGeneration.load(std::memory_order_acquire) != published_generation) {
             warn("win_openxrmirror_init: Mirror surface changed during initialization");
             return;
         }
         context->shared_handle = published_handle;
+        context->surface_generation = published_generation;
 
         D3D11_TEXTURE2D_DESC desc;
         context->mirror_textures[0]->GetDesc(&desc);
@@ -506,7 +512,11 @@ static void win_openxrmirror_render(void *data, gs_effect_t *effect)
 	struct win_openxrmirror *context = (win_openxrmirror *)data;
 
 	if (context->initialized && context->surface &&
-	    context->shared_handle != context->surface->sharedHandle[0]) {
+	    (context->shared_handle != context->surface->sharedHandle[0] ||
+	     context->surface_generation !=
+	         context->surface->surfaceGeneration.load(std::memory_order_acquire))) {
+		info("Mirror surface changed; reconnecting to generation %u",
+		     context->surface->surfaceGeneration.load(std::memory_order_relaxed));
 		win_openxrmirror_deinit(data);
 	}
 

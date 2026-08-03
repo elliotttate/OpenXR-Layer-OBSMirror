@@ -29,15 +29,21 @@ namespace obs_mirror_ipc {
         // Tan-space crop percentage the smoother may pan within (0-25).
         float smoothCrop = 8.0f;
         std::uint64_t sharedHandle[kMirrorTextureCount] = {};
+        // Published last whenever the layer replaces the shared texture ring.
+        // Handles can be numerically reused by Windows across application
+        // processes, so OBS must not rely on handle equality alone to detect a
+        // new capture session.
+        std::atomic<std::uint32_t> surfaceGeneration{0};
 
         void reset() {
             for (auto& handle : sharedHandle)
                 handle = 0;
+            surfaceGeneration.fetch_add(1, std::memory_order_release);
         }
     };
 
     static_assert(std::atomic<std::uint32_t>::is_always_lock_free,
                   "Cross-process signalling requires lock-free 32-bit atomics");
-    static_assert(sizeof(MirrorSurfaceData) == 56, "The OpenXR layer and OBS plugin must use the same IPC layout");
+    static_assert(sizeof(MirrorSurfaceData) == 64, "The OpenXR layer and OBS plugin must use the same IPC layout");
 
 } // namespace obs_mirror_ipc
