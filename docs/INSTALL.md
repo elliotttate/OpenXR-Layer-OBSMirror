@@ -61,6 +61,11 @@ Center, OBS source, current-user OpenXR layer registration, and installed layer
 files. Close OBS Studio and any OpenXR application first so loaded files can be
 removed immediately.
 
+To temporarily disable capture integration without uninstalling anything, turn
+off the **Layer** switch on the dashboard or **Enable for the current user** on
+the Installation page. Turning it back on restores the current-user OpenXR
+registration; both switches always show the same live state.
+
 ## Troubleshooting
 
 - A black OBS source normally means no active OpenXR session has published a

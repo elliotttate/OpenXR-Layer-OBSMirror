@@ -18,6 +18,7 @@ public sealed partial class MainWindow : Window
     private bool _loadingControls;
     private bool _loadingSmoothingControls;
     private bool _loadingQuadLayerControls;
+    private bool _loadingLayerRegistrationControls;
 
     public MainWindow()
     {
@@ -124,7 +125,7 @@ public sealed partial class MainWindow : Window
     {
         SetStatus(LayerDot, LayerStatusText,
             snapshot.LayerRegistered && snapshot.LayerFilesInstalled && snapshot.LayerCurrent,
-            !snapshot.LayerRegistered ? "Not registered" : snapshot.LayerCurrent ? "Registered" : "Update ready");
+            !snapshot.LayerRegistered ? "Disabled" : snapshot.LayerCurrent ? "Enabled" : "Update ready");
         LayerDetailText.Text = snapshot.LayerFilesInstalled
             ? snapshot.LayerCurrent ? $"Installed • {ShortHash(snapshot.LayerHash)}" : "New layer build is ready"
             : "Release files are not installed";
@@ -173,6 +174,8 @@ public sealed partial class MainWindow : Window
         MetaProcessText.Text = snapshot.MetaXrRunning ? "RUNNING" : "IDLE";
         MetaProcessText.Foreground = GetBrush(snapshot.MetaXrRunning ? "GoodBrush" : "MutedTextBrush");
         LaunchMetaButton.IsEnabled = !string.IsNullOrWhiteSpace(snapshot.MetaXrExecutable);
+
+        RenderLayerRegistrationControls(snapshot);
 
         _loadingControls = true;
         OverscanToggle.IsOn = snapshot.OverscanEnabled;
@@ -234,7 +237,7 @@ public sealed partial class MainWindow : Window
         }
 
         InstallLayerStatusText.Text = snapshot.LayerFilesInstalled
-            ? !snapshot.LayerRegistered ? "Installed, registration missing" : snapshot.LayerCurrent ? "Installed and current" : "Installed, update available"
+            ? !snapshot.LayerRegistered ? "Installed, disabled" : snapshot.LayerCurrent ? "Installed and enabled" : "Installed, update available"
             : "Not installed";
         InstallLayerPathText.Text = snapshot.LayerManifestPath;
         InstallPluginStatusText.Text = snapshot.PluginInstalled
@@ -484,34 +487,53 @@ public sealed partial class MainWindow : Window
         });
     }
 
-    private async void RegisterLayer_Click(object sender, RoutedEventArgs e)
+    private async void LayerRegistrationToggle_Toggled(object sender, RoutedEventArgs e)
     {
-        await RunActionAsync("Registering the OpenXR layer", async () =>
-        {
-            var output = await _service.RegisterLayerAsync();
-            ShowMessage("Layer registered", LastLine(output), InfoBarSeverity.Success);
-        });
-    }
-
-    private async void UnregisterLayer_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new ContentDialog
-        {
-            XamlRoot = AppTitleBar.XamlRoot,
-            Title = "Unregister the OpenXR layer?",
-            Content = "This removes the current-user OpenXR registration. Installed files and the OBS plugin remain in place.",
-            PrimaryButtonText = "Unregister",
-            CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Close
-        };
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+        if (_loadingLayerRegistrationControls || sender is not ToggleSwitch toggle)
             return;
 
-        await RunActionAsync("Unregistering the OpenXR layer", async () =>
+        var enable = toggle.IsOn;
+        await RunActionAsync(enable ? "Enabling the OpenXR layer" : "Disabling the OpenXR layer", async () =>
         {
-            var output = await _service.UnregisterLayerAsync();
-            ShowMessage("Layer unregistered", LastLine(output), InfoBarSeverity.Success);
+            if (enable)
+            {
+                var output = await _service.RegisterLayerAsync();
+                ShowMessage("OpenXR layer enabled", LastLine(output), InfoBarSeverity.Success);
+            }
+            else
+            {
+                var output = await _service.UnregisterLayerAsync();
+                ShowMessage(
+                    "OpenXR layer disabled",
+                    LastLine(output) + " Installed files and the OBS source were left in place.",
+                    InfoBarSeverity.Success);
+            }
         });
+
+        // RunActionAsync refreshes successful changes. If an action failed,
+        // restore both switches from the last confirmed snapshot.
+        if (_snapshot is not null && _snapshot.LayerRegistered != enable)
+            RenderLayerRegistrationControls(_snapshot);
+    }
+
+    private void RenderLayerRegistrationControls(SystemSnapshot snapshot)
+    {
+        _loadingLayerRegistrationControls = true;
+        try
+        {
+            DashboardLayerRegistrationToggle.IsOn = snapshot.LayerRegistered;
+            InstallationLayerRegistrationToggle.IsOn = snapshot.LayerRegistered;
+
+            // An existing registration can always be disabled. Enabling needs
+            // the installed manifest and layer binary to be present.
+            var canChangeRegistration = snapshot.LayerRegistered || snapshot.LayerFilesInstalled;
+            DashboardLayerRegistrationToggle.IsEnabled = canChangeRegistration;
+            InstallationLayerRegistrationToggle.IsEnabled = canChangeRegistration;
+        }
+        finally
+        {
+            _loadingLayerRegistrationControls = false;
+        }
     }
 
     private void LaunchObs_Click(object sender, RoutedEventArgs e)

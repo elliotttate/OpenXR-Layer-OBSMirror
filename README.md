@@ -120,7 +120,7 @@ portable ZIP, and checksums in one reproducible command:
 
 ```powershell
 pwsh -File .\scripts\Build-Release.ps1 `
-  -Version 0.3.0-beta.2 `
+  -Version 0.3.0-beta.3 `
   -OBSSourcePath E:\Github\obs-studio
 ```
 
@@ -148,8 +148,8 @@ overscan boundary matching.
   and 32-bit per-user selectors. Restart any launcher that was already running
   while the old environment override was active.
 - Some simulator versions refresh OpenXR API-layer registration while testing.
-  If the layer status changes after a simulator session, press
-  **Register layer now** before the next OpenXR application launch.
+  If the layer status changes after a simulator session, turn the **Layer**
+  switch back on before the next OpenXR application launch.
 
 ## Recording overscan (experimental)
 
