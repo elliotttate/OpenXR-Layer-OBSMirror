@@ -38,6 +38,7 @@ public sealed partial class MainWindow : Window
         var windowId = Win32Interop.GetWindowIdFromWindow(hwnd);
         var appWindow = AppWindow.GetFromWindowId(windowId);
         App.LogStartup("AppWindow acquired");
+        SetWindowIcon(appWindow);
         var scale = GetDpiForWindow(hwnd) / 96.0;
         App.LogStartup($"Window DPI scale is {scale:0.00}");
         appWindow.Resize(new SizeInt32(
@@ -52,6 +53,23 @@ public sealed partial class MainWindow : Window
 
         Activated += MainWindow_Activated;
         App.LogStartup("MainWindow constructor completed");
+    }
+
+    private static void SetWindowIcon(AppWindow appWindow)
+    {
+        var iconPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "Assets",
+            "OBSMirror.ControlCenter.ico");
+
+        if (!File.Exists(iconPath))
+        {
+            App.LogStartup($"Window icon was not found: {iconPath}");
+            return;
+        }
+
+        appWindow.SetIcon(iconPath);
+        App.LogStartup($"Window icon loaded from {iconPath}");
     }
 
     private static void ConfigureOverscanSlider(Slider slider, double value)

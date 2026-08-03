@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="surface" x1="155" y1="109" x2="855" y2="925" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#182131"/>
+      <stop offset="1" stop-color="#090D15"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="228" y1="286" x2="802" y2="744" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5CE1E6"/>
+      <stop offset="1" stop-color="#8B7CFF"/>
+    </linearGradient>
+    <radialGradient id="lens" cx="0" cy="0" r="1" gradientTransform="translate(452 449) rotate(46) scale(176)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E8FFFF"/>
+      <stop offset="0.32" stop-color="#5CE1E6"/>
+      <stop offset="1" stop-color="#756BEE"/>
+    </radialGradient>
+    <filter id="brandGlow" x="142" y="194" width="740" height="688" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+  </defs>
+
+  <rect x="54" y="54" width="916" height="916" rx="224" fill="url(#surface)"/>
+  <rect x="68" y="68" width="888" height="888" rx="210" fill="none" stroke="#354158" stroke-width="28"/>
+
+  <path d="M294 286H730C775.287 286 812 322.713 812 368V656C812 701.287 775.287 738 730 738H294C248.713 738 212 701.287 212 656V368C212 322.713 248.713 286 294 286Z"
+        fill="none" stroke="url(#brand)" stroke-width="74" opacity="0.24" filter="url(#brandGlow)"/>
+  <path d="M294 286H730C775.287 286 812 322.713 812 368V656C812 701.287 775.287 738 730 738H294C248.713 738 212 701.287 212 656V368C212 322.713 248.713 286 294 286Z"
+        fill="#0A0F18" stroke="url(#brand)" stroke-width="64"/>
+
+  <path d="M296 412V366H358" fill="none" stroke="#D9FFFF" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M728 612V658H666" fill="none" stroke="#C7C0FF" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <circle cx="512" cy="512" r="130" fill="url(#lens)"/>
+  <circle cx="512" cy="512" r="77" fill="#0A101B"/>
+  <circle cx="512" cy="512" r="35" fill="#DFFFFF"/>
+  <path d="M435 431C457 408 482 396 512 395" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" opacity="0.72"/>
+</svg>

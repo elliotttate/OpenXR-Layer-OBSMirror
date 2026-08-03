@@ -15,12 +15,21 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>OBSMirror.ControlCenter</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\OBSMirror.ControlCenter.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260508005" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1839" />
     <Manifest Include="$(ApplicationManifest)" />
+    <Content Include="Assets\OBSMirror.ControlCenter.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Assets\OBSMirror.ControlCenter.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
   <Target Name="CopyWinUIResourcesToPublish" AfterTargets="Publish" Condition="'$(WindowsPackageType)' == 'None'">
