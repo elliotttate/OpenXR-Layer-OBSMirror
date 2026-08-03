@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$Version = '0.3.0-beta.1',
-    [string]$FileVersion = '0.3.0.1',
+    [string]$Version = '0.3.0-beta.2',
+    [string]$FileVersion = '0.3.0.2',
     [string]$OBSSourcePath = 'E:\Github\obs-studio',
     [string]$OBSInstallPath = 'C:\Program Files\obs-studio'
 )
@@ -10,7 +10,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
-    throw "Version must look like 0.3.0 or 0.3.0-beta.1: $Version"
+    throw "Version must look like 0.3.0 or 0.3.0-beta.2: $Version"
 }
 if ($FileVersion -notmatch '^\d+\.\d+\.\d+\.\d+$') {
     throw "FileVersion must contain four numeric components: $FileVersion"

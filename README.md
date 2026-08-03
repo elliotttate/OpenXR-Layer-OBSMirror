@@ -120,7 +120,7 @@ portable ZIP, and checksums in one reproducible command:
 
 ```powershell
 pwsh -File .\scripts\Build-Release.ps1 `
-  -Version 0.3.0-beta.1 `
+  -Version 0.3.0-beta.2 `
   -OBSSourcePath E:\Github\obs-studio
 ```
 
