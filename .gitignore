@@ -4,6 +4,7 @@ bin/
 **/x64/
 **/obj/
 **/__pycache__/
+artifacts/
 *.pyc
 *.vcxproj.user
 *.csproj.user

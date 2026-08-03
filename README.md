@@ -1,33 +1,52 @@
 # OpenXR OBS Mirror
 
-An OpenXR API layer that mirrors a VR application's rendered view into an OBS
-source. The current implementation supports Direct3D 11 OpenXR applications.
+**Capture the application-rendered OpenXR view directly in OBS Studio, with a
+wider, steadier recording camera while the headset continues to look and track
+normally.**
+
+OpenXR OBS Mirror combines a native OpenXR API layer, an OBS source, and a
+self-contained dark WinUI 3 Control Center. It supports Direct3D 11 and
+Direct3D 12 OpenXR applications on Windows x64 and keeps the machine's normal
+headset runtime as the default.
+
+Key recording controls include:
+
+- recording-only FOV overscan with an unchanged headset center crop;
+- live camera smoothing and crop margin;
+- optional matching for fullscreen-effect edges exposed by overscan;
+- independent show/hide control for OpenXR composition quad layers;
+- live runtime, layer, plugin, hash, and diagnostic-log status.
 
 The OpenXR layer template was based on
 [OpenXR-Layer-Template](https://github.com/mbucchia/OpenXR-Layer-Template).
 
-## Install a release
+## Quick install
 
-1. Download and extract the newest compatible release.
-2. Close OBS.
-3. Copy the release's `OBS_Plugin/data` and `OBS_Plugin/obs-plugins`
-   directories into the OBS installation directory (normally
-   `C:\Program Files\obs-studio`).
-4. Run `Install-Layer.ps1` from the extracted layer directory.
-5. Restart OBS and add an **OpenXR Mirror Capture** source.
+1. Open the [latest GitHub release](https://github.com/elliotttate/OpenXR-Layer-OBSMirror/releases/latest).
+2. Close OBS Studio and any running OpenXR application.
+3. Download and run the `OpenXR-OBSMirror-...-Setup.exe` installer.
+4. Open OBS Studio, add an **OpenXR Mirror Capture** source, and start the
+   OpenXR application normally through your headset software.
 
-The install script defaults to a current-user OpenXR registration and does not
-need elevation. Use `-Scope AllUsers` from an elevated PowerShell session only
-when a machine-wide registration is required. The matching uninstall command
-is:
+Setup installs the matching OBS source, registers the layer for the current
+user, adds Start menu integration, and opens Control Center. It does **not**
+select a simulator or replace the system OpenXR runtime. The administrator
+prompt is used to place the OBS source in OBS Studio's shared plugin folder.
+
+Prefer a portable install? Extract the complete portable ZIP, double-click
+`Launch OpenXR OBS Mirror.cmd`, then use **Install / update** in Control Center.
+The app includes its .NET and Windows App SDK runtime files.
+
+See [docs/INSTALL.md](docs/INSTALL.md) for complete setup, update, uninstall,
+recording-control, and troubleshooting instructions. Verify downloads against
+the release's `SHA256SUMS.txt`; current builds are unsigned and may trigger a
+Windows SmartScreen warning.
+
+Manual current-user layer unregistration is also available:
 
 ```powershell
-pwsh -File .\Uninstall-Layer.ps1 -Scope CurrentUser
+pwsh -File .\scripts\Uninstall-Layer.ps1 -Scope CurrentUser
 ```
-
-Do not loosen the machine or user PowerShell execution policy. If Windows has
-marked a downloaded archive as blocked, unblock the archive before extracting
-it or invoke the individual trusted script with `pwsh -ExecutionPolicy Bypass`.
 
 ## Build and install from source
 
@@ -62,8 +81,9 @@ With OBS closed, install both freshly built components for the current user:
 pwsh -File .\scripts\Setup-OBS.ps1
 ```
 
-To stage a first-time install without interrupting an active OBS recording, add
-`-AllowRunningOBS`; the new source will become available after OBS restarts.
+To update the hash-versioned layer without interrupting active OBS, add
+`-AllowRunningOBS`. If the plugin binary also changed, close OBS and run setup
+again so the new source can be copied safely.
 
 This places the layer under `%LOCALAPPDATA%\OpenXR-OBSMirror`, registers its
 manifest under `HKCU\Software\Khronos\OpenXR\1\ApiLayers\Implicit`, and
@@ -74,8 +94,8 @@ installs the plugin under OBS's Windows discovery path at
 
 The dark WinUI 3 Control Center provides one place to inspect layer, plugin,
 runtime, and OBS status; install or update both components; register the layer;
-configure recording overscan; control camera smoothing; show or hide OpenXR
-quad-layer UI in the recording; and read live logs.
+configure recording overscan and guard-band matching; control camera smoothing;
+show or hide OpenXR quad-layer UI in the recording; and read live logs.
 It is headset-first: the dashboard shows the effective runtime, warns when a
 simulator override is active, and provides **Use headset runtime** to clear
 per-user simulator selectors and return to the machine-wide OpenXR runtime.
@@ -86,10 +106,20 @@ Build a self-contained x64 copy:
 pwsh -File .\scripts\Build-ControlCenter.ps1
 ```
 
+Build the native layer, matching OBS 32.2.1 source, Control Center, installer,
+portable ZIP, and checksums in one reproducible command:
+
+```powershell
+pwsh -File .\scripts\Build-Release.ps1 `
+  -Version 0.3.0-beta.1 `
+  -OBSSourcePath E:\Github\obs-studio
+```
+
 Run `bin\x64\Release\ControlCenter\OBSMirror.ControlCenter.exe`. Overscan
 changes apply when the OpenXR application next starts. Camera-smoothing changes
 are picked up live by an active OBS Mirror source. Quad-layer visibility is
-picked up live by the updated OpenXR layer after it has been loaded once.
+picked up live by the updated OpenXR layer after it has been loaded once, as is
+overscan boundary matching.
 
 ## Runtime notes
 
@@ -142,6 +172,14 @@ after changing it. Caveats:
 - Applications that ignore `xrLocateViews` FOVs or the recommended render resolution
   fall back to normal behaviour automatically (their submissions pass through
   unmodified).
+- A projection-baked fullscreen blur, tint, vignette, or fade can be authored as
+  a finite surface that covers only the headset-native FOV. This reveals a hard
+  edge in the added recording perimeter even though the headset looks uniform.
+  Turn on **Match fullscreen effects at the FOV boundary** in Control Center to
+  sample the color change across that known boundary and extend it into the
+  recording guard band. The strength is adjustable, applies live, and never
+  changes the image submitted to the headset. Leave it off when an application
+  does not need the compatibility correction.
 
 ## Camera smoothing (experimental)
 

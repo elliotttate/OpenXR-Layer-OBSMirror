@@ -27,7 +27,7 @@
 namespace layer_OBSMirror {
 
     const std::string LayerName = "XR_APILAYER_NOVENDOR_OBSMirror";
-    const std::string VersionString = "(v0.2.5)";
+    const std::string VersionString = "v0.3.0-beta.1";
 
     // Singleton accessor.
     OpenXrApi* GetInstance();

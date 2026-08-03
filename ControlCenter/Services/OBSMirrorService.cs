@@ -39,6 +39,7 @@ public sealed class OBSMirrorService
     public SystemSnapshot GetSnapshot()
     {
         var (enabled, horizontal, vertical) = ReadOverscan();
+        var (boundaryCompensation, boundaryCompensationStrength) = ReadOverscanBoundaryCompensation();
         var (smoothingManaged, cameraSmoothing, smoothingCrop) = ReadCameraSmoothing();
         var mirrorQuadLayers = ReadMirrorQuadLayers();
         var runtime = ResolveRuntimeSelection();
@@ -77,6 +78,8 @@ public sealed class OBSMirrorService
             OverscanEnabled: enabled,
             HorizontalPercent: horizontal,
             VerticalPercent: vertical,
+            OverscanBoundaryCompensation: boundaryCompensation,
+            OverscanBoundaryCompensationStrength: boundaryCompensationStrength,
             CameraSmoothingManaged: smoothingManaged,
             CameraSmoothing: cameraSmoothing,
             SmoothingCrop: smoothingCrop,
@@ -108,6 +111,16 @@ public sealed class OBSMirrorService
         key.SetValue("CameraSmoothingManaged", managed ? 1 : 0, RegistryValueKind.DWord);
         key.SetValue("CameraSmoothing", smoothing, RegistryValueKind.DWord);
         key.SetValue("SmoothingCropTenths", (int)Math.Round(crop * 10.0), RegistryValueKind.DWord);
+    }
+
+    public void ApplyOverscanBoundaryCompensation(bool enabled, int strength)
+    {
+        strength = Math.Clamp(strength, 0, 100);
+
+        using var key = Registry.CurrentUser.CreateSubKey(ConfigKey, writable: true)
+            ?? throw new InvalidOperationException("Could not open the per-user OBSMirror settings key.");
+        key.SetValue("OverscanBoundaryCompensation", enabled ? 1 : 0, RegistryValueKind.DWord);
+        key.SetValue("OverscanBoundaryCompensationStrength", strength, RegistryValueKind.DWord);
     }
 
     public void ApplyMirrorQuadLayers(bool visible)
@@ -233,6 +246,17 @@ public sealed class OBSMirrorService
         var smoothing = Math.Clamp(Convert.ToInt32(key?.GetValue("CameraSmoothing", 35) ?? 35), 0, 100);
         var cropTenths = Math.Clamp(Convert.ToInt32(key?.GetValue("SmoothingCropTenths", 80) ?? 80), 0, 250);
         return (managed, smoothing, cropTenths / 10.0);
+    }
+
+    private (bool Enabled, int Strength) ReadOverscanBoundaryCompensation()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(ConfigKey);
+        var enabled = Convert.ToInt32(key?.GetValue("OverscanBoundaryCompensation", 0) ?? 0) != 0;
+        var strength = Math.Clamp(
+            Convert.ToInt32(key?.GetValue("OverscanBoundaryCompensationStrength", 100) ?? 100),
+            0,
+            100);
+        return (enabled, strength);
     }
 
     private bool ReadMirrorQuadLayers()
@@ -498,8 +522,16 @@ public sealed class OBSMirrorService
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            if (File.Exists(Path.Combine(current.FullName, "scripts", "Setup-OBS.ps1")) &&
-                File.Exists(Path.Combine(current.FullName, "OpenXR-Layer-OBSMirror.sln")))
+            var setupScript = Path.Combine(current.FullName, "scripts", "Setup-OBS.ps1");
+            var sourceMarker = Path.Combine(current.FullName, "OpenXR-Layer-OBSMirror.sln");
+            var releaseMarker = Path.Combine(
+                current.FullName,
+                "bin",
+                "x64",
+                "Release",
+                "XR_APILAYER_NOVENDOR_OBSMirror.dll");
+            if (File.Exists(setupScript) &&
+                (File.Exists(sourceMarker) || File.Exists(releaseMarker)))
                 return current.FullName;
             current = current.Parent;
         }

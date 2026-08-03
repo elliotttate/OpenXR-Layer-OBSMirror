@@ -874,15 +874,22 @@ namespace {
                             projLayer = reinterpret_cast<const XrCompositionLayerProjection*>(hdr);
                             if (projLayer->viewCount >= 2) {
                                 if (_mirror->getEyeIndex() < 2) {
-                                    projView = &projLayer->views[_mirror->getEyeIndex()];
+                                    const uint32_t eyeIndex = _mirror->getEyeIndex();
+                                    projView = &projLayer->views[eyeIndex];
                                     if (isSwapchainHandled(projView->subImage.swapchain)) {
                                         auto& swapchainState = _swapchains[projView->subImage.swapchain];
                                         if (swapchainState._dx11LastTexture || swapchainState._dx12LastTexture) {
+                                            const XrFovf& mirrorFov = eyeIndex < _projectionViews.size()
+                                                                                ? _projectionViews[eyeIndex].fov
+                                                                                : _projectionViews[0].fov;
+                                            const XrFovf* nativeFov =
+                                                eyeIndex < _originalViewFovs.size() ? &_originalViewFovs[eyeIndex] : nullptr;
                                             _mirror->Blend(projView,
-                                                           _projectionViews[0].fov,
+                                                           mirrorFov,
                                                            (DXGI_FORMAT)swapchainState._createInfo.format,
                                                            projLayer->space,
-                                                           frameEndInfo->displayTime);
+                                                           frameEndInfo->displayTime,
+                                                           nativeFov);
                                         }
                                     }
                                 } else if (_projectionViews.size() >= 2) {
@@ -900,7 +907,9 @@ namespace {
                                                            _projectionViews[1].fov,
                                                            (DXGI_FORMAT)swapchainState._createInfo.format,
                                                            projLayer->space,
-                                                           frameEndInfo->displayTime);
+                                                           frameEndInfo->displayTime,
+                                                           _originalViewFovs.size() > 0 ? &_originalViewFovs[0] : nullptr,
+                                                           _originalViewFovs.size() > 1 ? &_originalViewFovs[1] : nullptr);
                                         }
                                     }
                                 }

@@ -4,8 +4,8 @@
     "name": "XR_APILAYER_NOVENDOR_OBSMirror",
     "library_path": ".\\XR_APILAYER_NOVENDOR_OBSMirror_32.dll",
     "api_version": "1.0",
-    "implementation_version": "1",
-    "description": "OpenXR API layer to provide output for OBS OpenXR Plugin (32-bit)",
+    "implementation_version": "3",
+    "description": "Headset-safe OpenXR mirror capture for OBS Studio (32-bit)",
     "functions": {
       "xrNegotiateLoaderApiLayerInterface": "_xrNegotiateLoaderApiLayerInterface@12"
     },

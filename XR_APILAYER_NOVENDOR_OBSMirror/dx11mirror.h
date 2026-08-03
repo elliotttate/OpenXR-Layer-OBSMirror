@@ -64,7 +64,8 @@ namespace Mirror
                    const XrFovf& hmdFov,
                    const DXGI_FORMAT format,
                    const XrSpace space,
-                   const XrTime displayTime);
+                   const XrTime displayTime,
+                   const XrFovf* nativeFov = nullptr);
 
         void Blend(const XrCompositionLayerProjectionView* view1,
                    const XrFovf& hmdFov1,
@@ -72,7 +73,9 @@ namespace Mirror
                    const XrFovf& hmdFov2,
                    const DXGI_FORMAT format,
                    const XrSpace viewSpace,
-                   const XrTime displayTime);
+                   const XrTime displayTime,
+                   const XrFovf* nativeFov1 = nullptr,
+                   const XrFovf* nativeFov2 = nullptr);
 
         void copyPerspectiveTex(const XrRect2Di& imgRect,
                                 const uint32_t arraySlice,
@@ -118,11 +121,13 @@ namespace Mirror
         /// Reprojects one eye image from the smoothed camera with a slight
         /// tan-space crop, absorbing high-frequency head motion.
         void drawSmoothedEye(const XrCompositionLayerProjectionView* view,
+                             const XrFovf& hmdFov,
                              const SourceData& src,
                              const XrRect2Di& targetRect,
                              const bool seamBlend,
                              const float alphaOverride,
-                             const XrTime displayTime);
+                             const XrTime displayTime,
+                             const XrFovf* nativeFov = nullptr);
 
         static XrFovf scaleFovTan(const XrFovf& fov, const float scale);
 
@@ -136,7 +141,21 @@ namespace Mirror
 
         UVRect writeQuadUVs(const XrRect2Di& imgRect, const D3D11_TEXTURE2D_DESC& srcDesc);
 
-        void writeBlendConstants(float blendStartX, float blendEndX, float texIndex, float alphaOverride);
+        void writeBlendConstants(float blendStartX,
+                                 float blendEndX,
+                                 float texIndex,
+                                 float alphaOverride,
+                                 const UVRect& uv,
+                                 const D3D11_TEXTURE2D_DESC& srcDesc,
+                                 const XrFovf* renderedFov = nullptr,
+                                 const XrFovf* headsetFov = nullptr);
+
+        bool computeOverscanBounds(const XrFovf& renderedFov,
+                                   const XrFovf& headsetFov,
+                                   const UVRect& uv,
+                                   DirectX::XMFLOAT4& bounds) const;
+
+        void refreshOverscanCompensationConfig();
 
         void bindQuadPipeline(const SourceData& srcData);
 
@@ -195,5 +214,13 @@ namespace Mirror
         DirectX::XMFLOAT3 _smoothPos{0.0f, 0.0f, 0.0f};
         DirectX::XMFLOAT4 _smoothRelQuat{0.0f, 0.0f, 0.0f, 1.0f};
         DirectX::XMFLOAT3 _smoothRelPos{0.0f, 0.0f, 0.0f};
+
+        // Recording-only correction for finite, projection-baked fullscreen
+        // effects that stop at the runtime-native FOV when overscan is active.
+        bool _overscanCompensation = false;
+        float _overscanCompensationStrength = 1.0f;
+        bool _overscanCompensationConfigInitialized = false;
+        bool _overscanCompensationAppliedLogged = false;
+        ULONGLONG _lastOverscanCompensationConfigCheckTick = 0;
     };
 }

@@ -89,6 +89,10 @@ namespace Mirror {
         float blendEndX;
         float texIndex; // Ignored by the non-array shader
         float alphaOverride;
+        XMFLOAT4 overscanBounds; // left, right, top, bottom in source UVs
+        XMFLOAT2 sourceTexelSize;
+        float overscanCompensation;
+        float overscanSampleRadius;
     };
 
     constexpr char quad_vs_code[] = R"_(
@@ -127,6 +131,10 @@ cbuffer PSConstants : register(b1) // Use a different register for PS constants
     float blendEndX;
     float texIndex; // Unused here; keeps the layout shared with the array shader
     float alphaOverride;
+    float4 overscanBounds;
+    float2 sourceTexelSize;
+    float overscanCompensation;
+    float overscanSampleRadius;
 };
 
 Texture2D shaderTexture : register(t0);
@@ -138,9 +146,73 @@ struct psIn {
 	float2 tex : TEXCOORD0;
 };
 
+float3 boundaryAverage(float2 uv, float2 alongStep)
+{
+    float3 sum = 0.0;
+    [unroll]
+    for (int i = -2; i <= 2; ++i)
+        sum += shaderTexture.Sample(SampleType, saturate(uv + alongStep * i)).rgb;
+    return sum / 5.0;
+}
+
+float3 matchOverscanGuardBand(float2 uv, float3 color)
+{
+    if (overscanCompensation <= 0.001)
+        return color;
+
+    float leftPx = (overscanBounds.x - uv.x) / max(sourceTexelSize.x, 0.000001);
+    float rightPx = (uv.x - overscanBounds.y) / max(sourceTexelSize.x, 0.000001);
+    float topPx = (overscanBounds.z - uv.y) / max(sourceTexelSize.y, 0.000001);
+    float bottomPx = (uv.y - overscanBounds.w) / max(sourceTexelSize.y, 0.000001);
+
+    int edge = -1;
+    float nearestPx = 1000000.0;
+    if (leftPx > 0.0 && leftPx < nearestPx) { edge = 0; nearestPx = leftPx; }
+    if (rightPx > 0.0 && rightPx < nearestPx) { edge = 1; nearestPx = rightPx; }
+    if (topPx > 0.0 && topPx < nearestPx) { edge = 2; nearestPx = topPx; }
+    if (bottomPx > 0.0 && bottomPx < nearestPx) { edge = 3; nearestPx = bottomPx; }
+    if (edge < 0)
+        return color;
+
+    float radius = max(overscanSampleRadius, 1.0);
+    float2 outerUv;
+    float2 innerUv;
+    float2 alongStep;
+    if (edge < 2) {
+        float safeY = clamp(uv.y,
+                            overscanBounds.z + sourceTexelSize.y * 6.0,
+                            overscanBounds.w - sourceTexelSize.y * 6.0);
+        float boundaryX = edge == 0 ? overscanBounds.x : overscanBounds.y;
+        float direction = edge == 0 ? 1.0 : -1.0;
+        outerUv = float2(boundaryX - direction * sourceTexelSize.x * radius, safeY);
+        innerUv = float2(boundaryX + direction * sourceTexelSize.x * radius, safeY);
+        alongStep = float2(0.0, sourceTexelSize.y * 2.0);
+    } else {
+        float safeX = clamp(uv.x,
+                            overscanBounds.x + sourceTexelSize.x * 6.0,
+                            overscanBounds.y - sourceTexelSize.x * 6.0);
+        float boundaryY = edge == 2 ? overscanBounds.z : overscanBounds.w;
+        float direction = edge == 2 ? 1.0 : -1.0;
+        outerUv = float2(safeX, boundaryY - direction * sourceTexelSize.y * radius);
+        innerUv = float2(safeX, boundaryY + direction * sourceTexelSize.y * radius);
+        alongStep = float2(sourceTexelSize.x * 2.0, 0.0);
+    }
+
+    float3 outsideColor = boundaryAverage(outerUv, alongStep);
+    float3 insideColor = boundaryAverage(innerUv, alongStep);
+    const float epsilon = 0.02;
+    float3 channelGain = clamp((insideColor + epsilon) / (outsideColor + epsilon), 0.60, 1.40);
+    float outsideLuma = dot(outsideColor, float3(0.2126, 0.7152, 0.0722));
+    float insideLuma = dot(insideColor, float3(0.2126, 0.7152, 0.0722));
+    float lumaGain = clamp((insideLuma + epsilon) / (outsideLuma + epsilon), 0.60, 1.40);
+    float3 stableGain = lerp(lumaGain.xxx, channelGain, 0.50);
+    return color * lerp(1.0.xxx, stableGain, saturate(overscanCompensation));
+}
+
 float4 ps_quad(psIn inputPS) : SV_TARGET
 {
 	float4 textureColor = shaderTexture.Sample(SampleType, inputPS.tex);
+	textureColor.rgb = matchOverscanGuardBand(inputPS.tex, textureColor.rgb);
 
     // Calculate the horizontal blend factor based on texture coordinate x
     // smoothstep provides a nice S-curve interpolation between the start and end points.
@@ -165,6 +237,10 @@ cbuffer PSConstants : register(b1) // Use a different register for PS constants
     float blendEndX;
     float texIndex;
     float alphaOverride;
+    float4 overscanBounds;
+    float2 sourceTexelSize;
+    float overscanCompensation;
+    float overscanSampleRadius;
 };
 
 Texture2DArray shaderTexture : register(t0);
@@ -175,12 +251,76 @@ struct psIn {
 	float2 tex : TEXCOORD0;
 };
 
+float3 boundaryAverage(float2 uv, float2 alongStep)
+{
+    float3 sum = 0.0;
+    [unroll]
+    for (int i = -2; i <= 2; ++i)
+        sum += shaderTexture.Sample(SampleType, float3(saturate(uv + alongStep * i), texIndex)).rgb;
+    return sum / 5.0;
+}
+
+float3 matchOverscanGuardBand(float2 uv, float3 color)
+{
+    if (overscanCompensation <= 0.001)
+        return color;
+
+    float leftPx = (overscanBounds.x - uv.x) / max(sourceTexelSize.x, 0.000001);
+    float rightPx = (uv.x - overscanBounds.y) / max(sourceTexelSize.x, 0.000001);
+    float topPx = (overscanBounds.z - uv.y) / max(sourceTexelSize.y, 0.000001);
+    float bottomPx = (uv.y - overscanBounds.w) / max(sourceTexelSize.y, 0.000001);
+
+    int edge = -1;
+    float nearestPx = 1000000.0;
+    if (leftPx > 0.0 && leftPx < nearestPx) { edge = 0; nearestPx = leftPx; }
+    if (rightPx > 0.0 && rightPx < nearestPx) { edge = 1; nearestPx = rightPx; }
+    if (topPx > 0.0 && topPx < nearestPx) { edge = 2; nearestPx = topPx; }
+    if (bottomPx > 0.0 && bottomPx < nearestPx) { edge = 3; nearestPx = bottomPx; }
+    if (edge < 0)
+        return color;
+
+    float radius = max(overscanSampleRadius, 1.0);
+    float2 outerUv;
+    float2 innerUv;
+    float2 alongStep;
+    if (edge < 2) {
+        float safeY = clamp(uv.y,
+                            overscanBounds.z + sourceTexelSize.y * 6.0,
+                            overscanBounds.w - sourceTexelSize.y * 6.0);
+        float boundaryX = edge == 0 ? overscanBounds.x : overscanBounds.y;
+        float direction = edge == 0 ? 1.0 : -1.0;
+        outerUv = float2(boundaryX - direction * sourceTexelSize.x * radius, safeY);
+        innerUv = float2(boundaryX + direction * sourceTexelSize.x * radius, safeY);
+        alongStep = float2(0.0, sourceTexelSize.y * 2.0);
+    } else {
+        float safeX = clamp(uv.x,
+                            overscanBounds.x + sourceTexelSize.x * 6.0,
+                            overscanBounds.y - sourceTexelSize.x * 6.0);
+        float boundaryY = edge == 2 ? overscanBounds.z : overscanBounds.w;
+        float direction = edge == 2 ? 1.0 : -1.0;
+        outerUv = float2(safeX, boundaryY - direction * sourceTexelSize.y * radius);
+        innerUv = float2(safeX, boundaryY + direction * sourceTexelSize.y * radius);
+        alongStep = float2(sourceTexelSize.x * 2.0, 0.0);
+    }
+
+    float3 outsideColor = boundaryAverage(outerUv, alongStep);
+    float3 insideColor = boundaryAverage(innerUv, alongStep);
+    const float epsilon = 0.02;
+    float3 channelGain = clamp((insideColor + epsilon) / (outsideColor + epsilon), 0.60, 1.40);
+    float outsideLuma = dot(outsideColor, float3(0.2126, 0.7152, 0.0722));
+    float insideLuma = dot(insideColor, float3(0.2126, 0.7152, 0.0722));
+    float lumaGain = clamp((insideLuma + epsilon) / (outsideLuma + epsilon), 0.60, 1.40);
+    float3 stableGain = lerp(lumaGain.xxx, channelGain, 0.50);
+    return color * lerp(1.0.xxx, stableGain, saturate(overscanCompensation));
+}
+
 float4 ps_quad(psIn inputPS) : SV_TARGET
 {
     // Combine UV coords with the desired array slice index
     float3 sampleCoord = float3(inputPS.tex.x, inputPS.tex.y, texIndex);
 
 	float4 textureColor = shaderTexture.Sample(SampleType, sampleCoord);
+	textureColor.rgb = matchOverscanGuardBand(inputPS.tex, textureColor.rgb);
 
     // Calculate the horizontal blend factor based on texture coordinate x
     // smoothstep provides a nice S-curve interpolation between the start and end points.
@@ -683,11 +823,13 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
     }
 
     void D3D11Mirror::drawSmoothedEye(const XrCompositionLayerProjectionView* view,
+                                      const XrFovf& hmdFov,
                                       const SourceData& src,
                                       const XrRect2Di& targetRect,
                                       const bool seamBlend,
                                       const float alphaOverride,
-                                      const XrTime displayTime) {
+                                      const XrTime displayTime,
+                                      const XrFovf* nativeFov) {
         D3D11_TEXTURE2D_DESC srcDesc;
         src._texture->GetDesc(&srcDesc);
 
@@ -707,7 +849,7 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
             blendEndX = std::min(uv.endX, uv.startX + ((_pMirrorSurfaceData->blendPos + blendOffset) * blendWidth));
         }
         const float texIndex = srcDesc.ArraySize > 1 ? static_cast<float>(view->subImage.imageArrayIndex) : 0.0f;
-        writeBlendConstants(blendStartX, blendEndX, texIndex, alphaOverride);
+        writeBlendConstants(blendStartX, blendEndX, texIndex, alphaOverride, uv, srcDesc, &view->fov, nativeFov);
         bindQuadPipeline(src);
         setTargetRect(targetRect);
 
@@ -820,12 +962,124 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         return uv;
     }
 
-    void D3D11Mirror::writeBlendConstants(float blendStartX, float blendEndX, float texIndex, float alphaOverride) {
-        quad_blend_buffer_t psCB1;
+    void D3D11Mirror::refreshOverscanCompensationConfig() {
+        const ULONGLONG now = GetTickCount64();
+        if (_overscanCompensationConfigInitialized &&
+            now - _lastOverscanCompensationConfigCheckTick < 250)
+            return;
+        _lastOverscanCompensationConfigCheckTick = now;
+
+        DWORD enabled = 0;
+        DWORD strength = 100;
+        HKEY key = nullptr;
+        if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\OpenXR-OBSMirror", 0, KEY_QUERY_VALUE, &key) ==
+            ERROR_SUCCESS) {
+            DWORD size = sizeof(DWORD);
+            RegQueryValueExW(key,
+                             L"OverscanBoundaryCompensation",
+                             nullptr,
+                             nullptr,
+                             reinterpret_cast<BYTE*>(&enabled),
+                             &size);
+            size = sizeof(DWORD);
+            RegQueryValueExW(key,
+                             L"OverscanBoundaryCompensationStrength",
+                             nullptr,
+                             nullptr,
+                             reinterpret_cast<BYTE*>(&strength),
+                             &size);
+            RegCloseKey(key);
+        }
+
+        const bool active = enabled != 0;
+        const float normalizedStrength = static_cast<float>(std::clamp<DWORD>(strength, 0, 100)) / 100.0f;
+        if (!_overscanCompensationConfigInitialized || active != _overscanCompensation ||
+            fabsf(normalizedStrength - _overscanCompensationStrength) > 0.001f) {
+            Log("Recording overscan boundary matching: %s at %.0f%% strength\n",
+                active ? "enabled" : "disabled",
+                normalizedStrength * 100.0f);
+            _overscanCompensationAppliedLogged = false;
+        }
+        _overscanCompensation = active;
+        _overscanCompensationStrength = normalizedStrength;
+        _overscanCompensationConfigInitialized = true;
+    }
+
+    bool D3D11Mirror::computeOverscanBounds(const XrFovf& renderedFov,
+                                            const XrFovf& headsetFov,
+                                            const UVRect& uv,
+                                            XMFLOAT4& bounds) const {
+        const float renderedLeft = tanf(renderedFov.angleLeft);
+        const float renderedRight = tanf(renderedFov.angleRight);
+        const float renderedDown = tanf(renderedFov.angleDown);
+        const float renderedUp = tanf(renderedFov.angleUp);
+        const float headsetLeft = tanf(headsetFov.angleLeft);
+        const float headsetRight = tanf(headsetFov.angleRight);
+        const float headsetDown = tanf(headsetFov.angleDown);
+        const float headsetUp = tanf(headsetFov.angleUp);
+
+        const float spanX = renderedRight - renderedLeft;
+        const float spanY = renderedUp - renderedDown;
+        if (spanX <= 0.0001f || spanY <= 0.0001f)
+            return false;
+
+        // The game-rendered FOV must contain the runtime-native headset FOV.
+        // If it does not, this is a normal non-overscan projection and the
+        // correction stays out of the way.
+        constexpr float containmentEpsilon = 0.001f;
+        if (renderedLeft > headsetLeft + containmentEpsilon ||
+            renderedRight < headsetRight - containmentEpsilon ||
+            renderedDown > headsetDown + containmentEpsilon ||
+            renderedUp < headsetUp - containmentEpsilon)
+            return false;
+
+        const float left = std::clamp((headsetLeft - renderedLeft) / spanX, 0.0f, 1.0f);
+        const float right = std::clamp((headsetRight - renderedLeft) / spanX, 0.0f, 1.0f);
+        const float top = std::clamp((renderedUp - headsetUp) / spanY, 0.0f, 1.0f);
+        const float bottom = std::clamp((renderedUp - headsetDown) / spanY, 0.0f, 1.0f);
+        if (left < 0.0005f && right > 0.9995f && top < 0.0005f && bottom > 0.9995f)
+            return false;
+
+        const float uvWidth = uv.endX - uv.startX;
+        const float uvHeight = uv.endY - uv.startY;
+        bounds = {uv.startX + left * uvWidth,
+                  uv.startX + right * uvWidth,
+                  uv.startY + top * uvHeight,
+                  uv.startY + bottom * uvHeight};
+        return bounds.x < bounds.y && bounds.z < bounds.w;
+    }
+
+    void D3D11Mirror::writeBlendConstants(float blendStartX,
+                                          float blendEndX,
+                                          float texIndex,
+                                          float alphaOverride,
+                                          const UVRect& uv,
+                                          const D3D11_TEXTURE2D_DESC& srcDesc,
+                                          const XrFovf* renderedFov,
+                                          const XrFovf* headsetFov) {
+        refreshOverscanCompensationConfig();
+
+        quad_blend_buffer_t psCB1{};
         psCB1.blendStartX = blendStartX;
         psCB1.blendEndX = blendEndX;
         psCB1.texIndex = texIndex;
         psCB1.alphaOverride = alphaOverride;
+        psCB1.overscanBounds = {uv.startX, uv.endX, uv.startY, uv.endY};
+        psCB1.sourceTexelSize = {1.0f / static_cast<float>(std::max(srcDesc.Width, 1u)),
+                                 1.0f / static_cast<float>(std::max(srcDesc.Height, 1u))};
+        psCB1.overscanSampleRadius = 3.0f;
+        if (_overscanCompensation && _overscanCompensationStrength > 0.0f && renderedFov && headsetFov &&
+            computeOverscanBounds(*renderedFov, *headsetFov, uv, psCB1.overscanBounds)) {
+            psCB1.overscanCompensation = _overscanCompensationStrength;
+            if (!_overscanCompensationAppliedLogged) {
+                Log("Recording overscan boundary matching applied: UV %.4f,%.4f x %.4f,%.4f\n",
+                    psCB1.overscanBounds.x,
+                    psCB1.overscanBounds.y,
+                    psCB1.overscanBounds.z,
+                    psCB1.overscanBounds.w);
+                _overscanCompensationAppliedLogged = true;
+            }
+        }
 
         D3D11_MAPPED_SUBRESOURCE mapped{};
         CHECK_DX(_d3d11MirrorContext->Map(_quadConstantBlendBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped));
@@ -903,8 +1157,13 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         if (!lock.acquired())
             return;
 
-        writeQuadUVs(quad->subImage.imageRect, srcDesc);
-        writeBlendConstants(0.0f, 0.0f, static_cast<float>(quad->subImage.imageArrayIndex), 0.0f);
+        const UVRect quadUv = writeQuadUVs(quad->subImage.imageRect, srcDesc);
+        writeBlendConstants(0.0f,
+                            0.0f,
+                            static_cast<float>(quad->subImage.imageArrayIndex),
+                            0.0f,
+                            quadUv,
+                            srcDesc);
         bindQuadPipeline(it->second);
 
         XrRect2Di rect = {{0, 0}, {static_cast<int32_t>(_comp_desc.Width), static_cast<int32_t>(_comp_desc.Height)}};
@@ -969,13 +1228,18 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
                             const XrFovf& hmdFov,
                             const DXGI_FORMAT format,
                             const XrSpace viewSpace,
-                            const XrTime displayTime) {
+                            const XrTime displayTime,
+                            const XrFovf* nativeFov) {
         if (!_initialized)
             return;
 
         const bool smoothing = smoothingActive();
+        XMFLOAT4 compensationBounds{};
+        const bool compensateOverscan =
+            _overscanCompensation && nativeFov &&
+            computeOverscanBounds(view->fov, *nativeFov, {0.0f, 1.0f, 0.0f, 1.0f}, compensationBounds);
 
-        if (!smoothing && XMScalarNearEqual(hmdFov.angleDown, view->fov.angleDown, 0.001f) &&
+        if (!smoothing && !compensateOverscan && XMScalarNearEqual(hmdFov.angleDown, view->fov.angleDown, 0.001f) &&
             XMScalarNearEqual(hmdFov.angleUp, view->fov.angleUp, 0.001f) &&
             XMScalarNearEqual(hmdFov.angleLeft, view->fov.angleLeft, 0.001f) &&
             XMScalarNearEqual(hmdFov.angleRight, view->fov.angleRight, 0.001f))
@@ -996,7 +1260,7 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
 
         if (smoothing) {
             const XrRect2Di rect = {{0, 0}, view->subImage.imageRect.extent};
-            drawSmoothedEye(view, it->second, rect, false, 1.0f, displayTime);
+            drawSmoothedEye(view, hmdFov, it->second, rect, false, 1.0f, displayTime, nativeFov);
             return;
         }
 
@@ -1008,10 +1272,10 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         if (!lock.acquired())
             return;
 
-        writeQuadUVs(view->subImage.imageRect, srcDesc);
+        const UVRect uv = writeQuadUVs(view->subImage.imageRect, srcDesc);
 
         const float texIndex = srcDesc.ArraySize > 1 ? static_cast<float>(view->subImage.imageArrayIndex) : 0.0f;
-        writeBlendConstants(0.0f, 0.0f, texIndex, 1.0f);
+        writeBlendConstants(0.0f, 0.0f, texIndex, 1.0f, uv, srcDesc, &view->fov, nativeFov);
         bindQuadPipeline(it->second);
 
         XrRect2Di rect = {{0, 0}, view->subImage.imageRect.extent};
@@ -1027,7 +1291,9 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
                             const XrFovf& hmdFov2,
                             const DXGI_FORMAT format,
                             const XrSpace viewSpace,
-                            const XrTime displayTime) {
+                            const XrTime displayTime,
+                            const XrFovf* nativeFov1,
+                            const XrFovf* nativeFov2) {
         if (!_initialized)
             return;
 
@@ -1047,13 +1313,17 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
             return;
 
         const bool smoothing = smoothingActive();
+        XMFLOAT4 compensationBounds{};
+        const bool compensateOverscan1 =
+            _overscanCompensation && nativeFov1 &&
+            computeOverscanBounds(view1->fov, *nativeFov1, {0.0f, 1.0f, 0.0f, 1.0f}, compensationBounds);
 
         // First eye
         if (smoothing) {
             const XrRect2Di rect = {{0, 0}, view1->subImage.imageRect.extent};
-            drawSmoothedEye(view1, it1->second, rect, false, 0.0f, displayTime);
+            drawSmoothedEye(view1, hmdFov1, it1->second, rect, false, 0.0f, displayTime, nativeFov1);
         }
-        else if (XMScalarNearEqual(hmdFov1.angleDown, view1->fov.angleDown, 0.001f) &&
+        else if (!compensateOverscan1 && XMScalarNearEqual(hmdFov1.angleDown, view1->fov.angleDown, 0.001f) &&
             XMScalarNearEqual(hmdFov1.angleUp, view1->fov.angleUp, 0.001f) &&
             XMScalarNearEqual(hmdFov1.angleLeft, view1->fov.angleLeft, 0.001f) &&
             XMScalarNearEqual(hmdFov1.angleRight, view1->fov.angleRight, 0.001f))
@@ -1069,11 +1339,11 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
             syncToSource(it1->second);
             ScopedKeyedMutex lock(it1->second._keyedMutex.Get());
             if (lock.acquired()) {
-                writeQuadUVs(view1->subImage.imageRect, srcDesc);
+                const UVRect uv = writeQuadUVs(view1->subImage.imageRect, srcDesc);
 
                 const float texIndex =
                     srcDesc.ArraySize > 1 ? static_cast<float>(view1->subImage.imageArrayIndex) : 0.0f;
-                writeBlendConstants(0.0f, 0.0f, texIndex, 0.0f);
+                writeBlendConstants(0.0f, 0.0f, texIndex, 0.0f, uv, srcDesc, &view1->fov, nativeFov1);
                 bindQuadPipeline(it1->second);
 
                 XrRect2Di rect = {{0, 0}, view1->subImage.imageRect.extent};
@@ -1089,7 +1359,7 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
             XrRect2Di rect = {{0, 0}, view2->subImage.imageRect.extent};
             rect.offset.x =
                 rect.offset.x + static_cast<int32_t>((rect.extent.width * _pMirrorSurfaceData->overlap) / 100);
-            drawSmoothedEye(view2, it2->second, rect, true, 1.0f, displayTime);
+            drawSmoothedEye(view2, hmdFov2, it2->second, rect, true, 1.0f, displayTime, nativeFov2);
         } else {
             D3D11_TEXTURE2D_DESC srcDesc;
             it2->second._texture->GetDesc(&srcDesc);
@@ -1108,7 +1378,7 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
             const float blendEndX =
                 std::min(uv.endX, uv.startX + ((_pMirrorSurfaceData->blendPos + blendOffset) * blendWidth));
             const float texIndex = srcDesc.ArraySize > 1 ? static_cast<float>(view2->subImage.imageArrayIndex) : 0.0f;
-            writeBlendConstants(blendStartX, blendEndX, texIndex, 1.0f);
+            writeBlendConstants(blendStartX, blendEndX, texIndex, 1.0f, uv, srcDesc, &view2->fov, nativeFov2);
             bindQuadPipeline(it2->second);
 
             XrRect2Di rect = {{0, 0}, view2->subImage.imageRect.extent};
@@ -1209,6 +1479,11 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         if (!needsRebuild)
             return;
 
+        uint32_t nextGeneration =
+            _pMirrorSurfaceData->surfaceGeneration.load(std::memory_order_relaxed) + 1;
+        if (nextGeneration == 0)
+            nextGeneration = 1;
+
         // Handle zero is the generation marker. Clear it before releasing or
         // replacing resources, then publish it last after all three handles exist.
         _pMirrorSurfaceData->sharedHandle[0] = 0;
@@ -1278,8 +1553,10 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
             _pMirrorSurfaceData->sharedHandle[i] = newSharedHandles[i];
         MemoryBarrier();
         _pMirrorSurfaceData->sharedHandle[0] = newSharedHandles[0];
+        _pMirrorSurfaceData->surfaceGeneration.store(nextGeneration, std::memory_order_release);
 
-        Log("Compositor texture description: %d x %d Format %d\n",
+        Log("Compositor texture generation %u: %d x %d Format %d\n",
+            nextGeneration,
             _comp_desc.Width,
             _comp_desc.Height,
             _comp_desc.Format);
@@ -1313,6 +1590,12 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
             _obsRunning = false;
             return;
         }
+
+        // Keep recording-only controls live even while the OBS heartbeat is
+        // reconnecting (for example after the VR application restarts). If
+        // this refresh only happens in writeBlendConstants(), a stale
+        // heartbeat prevents the draw that would have refreshed the setting.
+        refreshOverscanCompensationConfig();
 
         const uint32_t frameNumber = _pMirrorSurfaceData->frameNumber;
         if (_lastOBSFrameNumber == frameNumber) {

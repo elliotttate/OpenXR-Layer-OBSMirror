@@ -259,6 +259,29 @@
                                             <TextBlock Text="Adds room above and below the headset crop." Style="{StaticResource MutedTextStyle}" FontSize="12" />
                                         </StackPanel>
 
+                                        <Border CornerRadius="14" Padding="16" Background="#80333A4A">
+                                            <StackPanel Spacing="10">
+                                                <Grid>
+                                                    <StackPanel Margin="0,0,88,0">
+                                                        <TextBlock Text="Match fullscreen effects at the FOV boundary" FontWeight="SemiBold" />
+                                                        <TextBlock x:Name="BoundaryCompensationSummaryText"
+                                                                   Text="Off — the overscan perimeter is copied exactly as rendered."
+                                                                   Style="{StaticResource MutedTextStyle}" FontSize="12" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <ToggleSwitch x:Name="BoundaryCompensationToggle" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                                  Toggled="OverscanToggle_Toggled" />
+                                                </Grid>
+                                                <Grid>
+                                                    <TextBlock Text="Match strength" Style="{StaticResource MutedTextStyle}" />
+                                                    <TextBlock x:Name="BoundaryCompensationStrengthText" Text="100%" HorizontalAlignment="Right"
+                                                               Foreground="{StaticResource BrandBrush}" FontWeight="SemiBold" />
+                                                </Grid>
+                                                <Slider x:Name="BoundaryCompensationStrengthSlider" ValueChanged="OverscanSlider_ValueChanged" />
+                                                <TextBlock Text="Recording only. Useful when a projection-baked blur, tint, vignette, or fade ends at the headset's native FOV."
+                                                           Style="{StaticResource MutedTextStyle}" FontSize="12" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Border>
+
                                         <StackPanel Spacing="9">
                                             <TextBlock Text="PRESETS" Style="{StaticResource EyebrowStyle}" />
                                             <StackPanel Orientation="Horizontal" Spacing="9">
