@@ -17,6 +17,15 @@ Key recording controls include:
 - independent show/hide control for OpenXR composition quad layers;
 - live runtime, layer, plugin, hash, and diagnostic-log status.
 
+## See it in action
+
+| Wider FOV + smoothed camera | Control Center walkthrough |
+| :---: | :---: |
+| [![Halo Large FOV Smoothed Footage](https://img.youtube.com/vi/0Aa91IXBh3c/maxresdefault.jpg)](https://youtu.be/0Aa91IXBh3c) | [![OBS OpenXR Recording UI](https://img.youtube.com/vi/0CDRNip2I10/maxresdefault.jpg)](https://www.youtube.com/watch?v=0CDRNip2I10) |
+| Recording-only FOV overscan and camera smoothing in action. | A guided tour of installation, status, and recording controls. |
+
+Click either preview to watch on YouTube.
+
 The OpenXR layer template was based on
 [OpenXR-Layer-Template](https://github.com/mbucchia/OpenXR-Layer-Template).
 
