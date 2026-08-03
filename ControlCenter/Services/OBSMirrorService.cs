@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using Microsoft.Win32;
 using OBSMirror.ControlCenter.Models;
@@ -9,8 +10,12 @@ public sealed class OBSMirrorService
 {
     private const string ConfigKey = @"Software\OpenXR-OBSMirror";
     private const string LayerRegistryKey = @"Software\Khronos\OpenXR\1\ApiLayers\Implicit";
-    private const string ActiveRuntimeKey = @"Software\Khronos\OpenXR\1\ActiveRuntime";
+    private const string OpenXrRegistryKey = @"Software\Khronos\OpenXR\1";
+    private const string LegacyActiveRuntimeKey = @"Software\Khronos\OpenXR\1\ActiveRuntime";
+    private const string ActiveRuntimeValue = "ActiveRuntime";
     private const string LayerManifestName = "XR_APILAYER_NOVENDOR_OBSMirror.json";
+    private const uint WmSettingChange = 0x001A;
+    private static readonly IntPtr HwndBroadcast = new(0xffff);
 
     public string RepoRoot { get; } = FindRepoRoot();
     public string InstallDirectory { get; } = Path.Combine(
@@ -33,12 +38,14 @@ public sealed class OBSMirrorService
     {
         var (enabled, horizontal, vertical) = ReadOverscan();
         var (smoothingManaged, cameraSmoothing, smoothingCrop) = ReadCameraSmoothing();
-        var runtimePath = ResolveRuntimePath();
-        var runtimeName = FriendlyRuntimeName(runtimePath);
+        var runtime = ResolveRuntimeSelection();
+        var systemRuntimePath = ResolveSystemRuntimePath();
+        var runtimeName = FriendlyRuntimeName(runtime.Path);
+        var systemRuntimeName = FriendlyRuntimeName(systemRuntimePath);
         var registeredManifest = FindRegisteredLayerManifest();
         var sourcePluginHash = HashFile(ReleasePluginPath);
         var pluginHash = HashFile(PluginPath);
-        var metaExe = FindMetaXrExecutable(runtimePath);
+        var metaExe = FindMetaXrExecutable(runtime.Path);
 
         return new SystemSnapshot(
             LayerRegistered: !string.IsNullOrWhiteSpace(registeredManifest),
@@ -49,7 +56,12 @@ public sealed class OBSMirrorService
             ObsRunning: IsProcessRunning("obs64"),
             MetaXrRunning: IsProcessRunning("MetaXRSimulator"),
             RuntimeName: runtimeName,
-            RuntimePath: runtimePath,
+            RuntimePath: runtime.Path,
+            RuntimeSource: runtime.Source,
+            RuntimeOverrideActive: runtime.IsOverride,
+            SimulatorRuntimeOverrideActive: runtime.IsOverride && IsSimulatorRuntime(runtime.Path),
+            SystemRuntimeName: systemRuntimeName,
+            SystemRuntimePath: systemRuntimePath,
             LayerManifestPath: registeredManifest ?? InstalledManifestPath,
             LayerHash: HashFile(InstalledLayerPath),
             PluginHash: pluginHash,
@@ -115,21 +127,45 @@ public sealed class OBSMirrorService
     {
         const string obsPath = @"C:\Program Files\obs-studio\bin\64bit\obs64.exe";
         EnsureFile(obsPath, "OBS executable");
-        Process.Start(new ProcessStartInfo(obsPath)
+        var startInfo = new ProcessStartInfo(obsPath)
         {
             WorkingDirectory = Path.GetDirectoryName(obsPath)!,
-            UseShellExecute = true
-        });
+            UseShellExecute = false
+        };
+        // A stale simulator override inherited by Control Center must never be
+        // forwarded to applications that it launches.
+        startInfo.Environment.Remove("XR_RUNTIME_JSON");
+        Process.Start(startInfo);
     }
 
     public void LaunchMetaXr(string path)
     {
         EnsureFile(path, "Meta XR Simulator executable");
-        Process.Start(new ProcessStartInfo(path)
+        var startInfo = new ProcessStartInfo(path)
         {
             WorkingDirectory = Path.GetDirectoryName(path)!,
-            UseShellExecute = true
-        });
+            UseShellExecute = false
+        };
+        // Opening the testing tool must not perpetuate an inherited runtime
+        // override. Runtime selection remains an explicit action in that tool.
+        startInfo.Environment.Remove("XR_RUNTIME_JSON");
+        Process.Start(startInfo);
+    }
+
+    public string RestoreSystemRuntime()
+    {
+        Environment.SetEnvironmentVariable("XR_RUNTIME_JSON", null, EnvironmentVariableTarget.Process);
+        Environment.SetEnvironmentVariable("XR_RUNTIME_JSON", null, EnvironmentVariableTarget.User);
+
+        foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
+        {
+            DeleteRegistryValue(RegistryHive.CurrentUser, view, OpenXrRegistryKey, ActiveRuntimeValue);
+            // Older simulator builds also used a default value in this subkey.
+            DeleteRegistryValue(RegistryHive.CurrentUser, view, LegacyActiveRuntimeKey, string.Empty);
+        }
+
+        BroadcastEnvironmentChange();
+        return ResolveSystemRuntimePath();
     }
 
     public void OpenPath(string path)
@@ -191,25 +227,48 @@ public sealed class OBSMirrorService
             Convert.ToInt32(key.GetValue(name, 1) ?? 1) == 0);
     }
 
-    private static string ResolveRuntimePath()
+    private static RuntimeSelection ResolveRuntimeSelection()
     {
+        var systemRuntimePath = ResolveSystemRuntimePath();
         var candidates = new[]
         {
-            Environment.GetEnvironmentVariable("XR_RUNTIME_JSON"),
-            Environment.GetEnvironmentVariable("XR_RUNTIME_JSON", EnvironmentVariableTarget.User),
-            ReadRegistryString(RegistryHive.CurrentUser, ActiveRuntimeKey),
-            ReadRegistryString(RegistryHive.LocalMachine, ActiveRuntimeKey)
+            new RuntimeSelection(Environment.GetEnvironmentVariable("XR_RUNTIME_JSON") ?? string.Empty,
+                "Process environment override", true),
+            new RuntimeSelection(Environment.GetEnvironmentVariable("XR_RUNTIME_JSON", EnvironmentVariableTarget.User) ?? string.Empty,
+                "User environment override", true),
+            new RuntimeSelection(ReadActiveRuntime(RegistryHive.CurrentUser, RegistryView.Registry64) ?? string.Empty,
+                "Current-user runtime override", true),
+            new RuntimeSelection(ReadActiveRuntime(RegistryHive.CurrentUser, RegistryView.Registry32) ?? string.Empty,
+                "Current-user 32-bit runtime override", true),
+            new RuntimeSelection(systemRuntimePath, "System headset runtime", false)
         };
-        return candidates.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? "Not configured";
+        var selected = candidates.FirstOrDefault(candidate => !string.IsNullOrWhiteSpace(candidate.Path))
+                       ?? new RuntimeSelection("Not configured", "No runtime configured", false);
+        return selected.IsOverride && RuntimePathsEqual(selected.Path, systemRuntimePath)
+            ? selected with { Source = $"{selected.Source} (matches system)", IsOverride = false }
+            : selected;
     }
 
-    private static string? ReadRegistryString(RegistryHive hive, string path)
+    private static string ResolveSystemRuntimePath()
+    {
+        return ReadActiveRuntime(RegistryHive.LocalMachine, RegistryView.Registry64)
+               ?? ReadActiveRuntime(RegistryHive.LocalMachine, RegistryView.Registry32)
+               ?? "Not configured";
+    }
+
+    private static string? ReadActiveRuntime(RegistryHive hive, RegistryView view)
+    {
+        return ReadRegistryString(hive, view, OpenXrRegistryKey, ActiveRuntimeValue)
+               ?? ReadRegistryString(hive, view, LegacyActiveRuntimeKey, null);
+    }
+
+    private static string? ReadRegistryString(RegistryHive hive, RegistryView view, string path, string? valueName)
     {
         try
         {
-            using var root = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
+            using var root = RegistryKey.OpenBaseKey(hive, view);
             using var key = root.OpenSubKey(path);
-            return key?.GetValue(null) as string;
+            return key?.GetValue(valueName) as string;
         }
         catch
         {
@@ -229,6 +288,32 @@ public sealed class OBSMirrorService
         if (path.Equals("Not configured", StringComparison.Ordinal))
             return path;
         return Path.GetFileNameWithoutExtension(path).Replace('_', ' ');
+    }
+
+    private static bool IsSimulatorRuntime(string path) =>
+        path.Contains("simulator", StringComparison.OrdinalIgnoreCase) ||
+        path.Contains("xrsim", StringComparison.OrdinalIgnoreCase);
+
+    private static bool RuntimePathsEqual(string left, string right) =>
+        string.Equals(
+            left.Trim().Trim('"').Replace('/', '\\'),
+            right.Trim().Trim('"').Replace('/', '\\'),
+            StringComparison.OrdinalIgnoreCase);
+
+    private static void DeleteRegistryValue(RegistryHive hive, RegistryView view, string path, string valueName)
+    {
+        using var root = RegistryKey.OpenBaseKey(hive, view);
+        using var key = root.OpenSubKey(path, writable: true);
+        key?.DeleteValue(valueName, throwOnMissingValue: false);
+    }
+
+    private static void BroadcastEnvironmentChange()
+    {
+        _ = SendNotifyMessage(
+            HwndBroadcast,
+            WmSettingChange,
+            UIntPtr.Zero,
+            "Environment");
     }
 
     private static string FindMetaXrExecutable(string runtimePath)
@@ -367,4 +452,13 @@ public sealed class OBSMirrorService
         }
         return Directory.GetCurrentDirectory();
     }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool SendNotifyMessage(
+        IntPtr hWnd,
+        uint message,
+        UIntPtr wParam,
+        string lParam);
+
+    private sealed record RuntimeSelection(string Path, string Source, bool IsOverride);
 }

@@ -114,9 +114,32 @@ public sealed partial class MainWindow : Window
             !snapshot.PluginInstalled ? "Not installed" : snapshot.PluginCurrent ? "Current" : "Update ready");
         PluginDetailText.Text = snapshot.ObsRunning ? "OBS is running" : "OBS is not running";
 
-        var runtimeOkay = !snapshot.RuntimeName.Equals("Not configured", StringComparison.OrdinalIgnoreCase);
-        SetStatus(RuntimeDot, RuntimeStatusText, runtimeOkay, snapshot.RuntimeName);
-        RuntimeDetailText.Text = snapshot.RuntimePath;
+        var runtimeConfigured = !snapshot.RuntimeName.Equals("Not configured", StringComparison.OrdinalIgnoreCase);
+        var runtimeOkay = runtimeConfigured && !snapshot.SimulatorRuntimeOverrideActive;
+        SetStatus(RuntimeDot, RuntimeStatusText, runtimeOkay,
+            snapshot.SimulatorRuntimeOverrideActive ? "Simulator override" : snapshot.RuntimeName);
+        RuntimeDetailText.Text = snapshot.SimulatorRuntimeOverrideActive
+            ? $"Restore {snapshot.SystemRuntimeName} for a headset"
+            : snapshot.RuntimeSource;
+
+        if (snapshot.SimulatorRuntimeOverrideActive)
+        {
+            RuntimeModeInfoBar.Severity = InfoBarSeverity.Warning;
+            RuntimeModeInfoBar.Title = "Simulator override is active";
+            RuntimeModeInfoBar.Message = $"OpenXR applications will bypass the normal headset runtime. Use headset runtime restores {snapshot.SystemRuntimeName} and clears the per-user override.";
+        }
+        else if (!runtimeConfigured)
+        {
+            RuntimeModeInfoBar.Severity = InfoBarSeverity.Error;
+            RuntimeModeInfoBar.Title = "No OpenXR runtime is configured";
+            RuntimeModeInfoBar.Message = "Set your headset software as the active OpenXR runtime, then refresh this page.";
+        }
+        else
+        {
+            RuntimeModeInfoBar.Severity = InfoBarSeverity.Success;
+            RuntimeModeInfoBar.Title = "Headset runtime selected";
+            RuntimeModeInfoBar.Message = $"OpenXR applications will use {snapshot.RuntimeName}. Simulator testing is optional and isolated under Installation.";
+        }
 
         SetStatus(OverscanDot, OverscanStatusText, snapshot.OverscanEnabled,
             snapshot.OverscanEnabled ? "Enabled" : "Disabled", useWarningWhenFalse: false);
@@ -174,7 +197,7 @@ public sealed partial class MainWindow : Window
         InstallPluginPathText.Text = _service.PluginPath;
 
         DiagnosticRuntimeNameText.Text = snapshot.RuntimeName;
-        DiagnosticRuntimePathText.Text = snapshot.RuntimePath;
+        DiagnosticRuntimePathText.Text = $"{snapshot.RuntimeSource}\n{snapshot.RuntimePath}\nSystem default: {snapshot.SystemRuntimeName} — {snapshot.SystemRuntimePath}";
         DiagnosticLayerHashText.Text = $"Layer   {DisplayHash(snapshot.LayerHash)}";
         DiagnosticPluginHashText.Text = $"Plugin  {DisplayHash(snapshot.PluginHash)}";
     }
@@ -407,21 +430,39 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async void RestoreHeadsetRuntime_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var systemRuntimeName = _snapshot?.SystemRuntimeName ?? "the system OpenXR runtime";
+            var runtimePath = await Task.Run(_service.RestoreSystemRuntime);
+            ShowMessage(
+                "Headset runtime restored",
+                $"Per-user simulator overrides were cleared. New OpenXR applications will use {systemRuntimeName} ({runtimePath}). Restart any launcher that was already open while the simulator override was active.",
+                InfoBarSeverity.Success);
+            await RefreshSnapshotAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowMessage("Could not restore the headset runtime", ex.Message, InfoBarSeverity.Error);
+        }
+    }
+
     private void LaunchMeta_Click(object sender, RoutedEventArgs e)
     {
         try
         {
             if (_snapshot?.MetaXrRunning == true)
             {
-                ShowMessage("MetaXR is already running", "Register the layer now before launching the OpenXR application.", InfoBarSeverity.Informational);
+                ShowMessage("Simulator testing tool is already running", "The manager has not changed your active OpenXR runtime.", InfoBarSeverity.Informational);
                 return;
             }
             _service.LaunchMetaXr(_snapshot?.MetaXrExecutable ?? string.Empty);
-            ShowMessage("Meta XR Simulator launched", "Wait for startup, then press Register layer now.", InfoBarSeverity.Success);
+            ShowMessage("Simulator testing tool launched", "It opened without inheriting a simulator runtime override. Runtime selection remains an explicit testing action.", InfoBarSeverity.Success);
         }
         catch (Exception ex)
         {
-            ShowMessage("Could not launch MetaXR", ex.Message, InfoBarSeverity.Error);
+            ShowMessage("Could not launch the simulator testing tool", ex.Message, InfoBarSeverity.Error);
         }
     }
 

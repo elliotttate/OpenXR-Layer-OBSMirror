@@ -182,15 +182,15 @@
                                             <Button Grid.Row="0" Grid.Column="1" Click="LaunchObs_Click" Style="{StaticResource SecondaryButtonStyle}" HorizontalAlignment="Stretch">
                                                 <StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Video" /><TextBlock Text="Open OBS" /></StackPanel>
                                             </Button>
-                                            <Button x:Name="LaunchMetaButton" Grid.Row="1" Grid.Column="0" Click="LaunchMeta_Click" Style="{StaticResource SecondaryButtonStyle}" HorizontalAlignment="Stretch">
-                                                <StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Play" /><TextBlock Text="Open MetaXR" /></StackPanel>
+                                            <Button Grid.Row="1" Grid.Column="0" Click="RestoreHeadsetRuntime_Click" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Stretch">
+                                                <StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="World" /><TextBlock Text="Use headset runtime" /></StackPanel>
                                             </Button>
                                             <Button Grid.Row="1" Grid.Column="1" Click="OpenLayerLog_Click" Style="{StaticResource SecondaryButtonStyle}" HorizontalAlignment="Stretch">
                                                 <StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Document" /><TextBlock Text="Open layer log" /></StackPanel>
                                             </Button>
                                         </Grid>
-                                        <InfoBar IsOpen="True" IsClosable="False" Severity="Informational" Title="Simulator startup order matters"
-                                                 Message="Start the simulator first, then register this layer before launching an OpenXR application." />
+                                        <InfoBar x:Name="RuntimeModeInfoBar" IsOpen="True" IsClosable="False" Severity="Informational"
+                                                 Title="Checking runtime selection" Message="Reading the effective and system OpenXR runtime settings." />
                                     </StackPanel>
                                 </Border>
 
@@ -205,7 +205,7 @@
                                             <TextBlock x:Name="ObsProcessText" HorizontalAlignment="Right" FontWeight="SemiBold" />
                                         </Grid>
                                         <Grid>
-                                            <TextBlock Text="MetaXR Simulator" Style="{StaticResource MutedTextStyle}" />
+                                            <TextBlock Text="Simulator testing tool" Style="{StaticResource MutedTextStyle}" />
                                             <TextBlock x:Name="MetaProcessText" HorizontalAlignment="Right" FontWeight="SemiBold" />
                                         </Grid>
                                     </StackPanel>
@@ -425,8 +425,25 @@
                                 </Grid>
                             </Border>
 
-                            <InfoBar IsOpen="True" IsClosable="False" Severity="Informational" Title="MetaXR startup refreshes API-layer registration"
-                                     Message="After starting Meta XR Simulator, press Register layer now before launching the VR application." />
+                            <InfoBar IsOpen="True" IsClosable="False" Severity="Informational" Title="Normal headset runtime is the default"
+                                     Message="The manager does not select a simulator when it starts one. Use the simulator only from the testing section below, then restore the headset runtime when testing is finished." />
+
+                            <Expander Header="Simulator testing">
+                                <Border Style="{StaticResource CardStyle}" Margin="0,8,0,0">
+                                    <Grid ColumnSpacing="24">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="5">
+                                            <TextBlock Text="Open the optional simulator tool" FontWeight="SemiBold" />
+                                            <TextBlock Text="Opening it here keeps runtime selection explicit and does not pass along a stale simulator environment override." Style="{StaticResource MutedTextStyle}" />
+                                        </StackPanel>
+                                        <Button x:Name="LaunchMetaButton" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                Click="LaunchMeta_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Open simulator (testing)" />
+                                    </Grid>
+                                </Border>
+                            </Expander>
 
                             <Expander Header="Advanced actions">
                                 <Border Style="{StaticResource CardStyle}" Margin="0,8,0,0">

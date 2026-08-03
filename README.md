@@ -75,6 +75,9 @@ installs the plugin under OBS's Windows discovery path at
 The dark WinUI 3 Control Center provides one place to inspect layer, plugin,
 runtime, and OBS status; install or update both components; register the layer;
 configure recording overscan; control camera smoothing; and read live logs.
+It is headset-first: the dashboard shows the effective runtime, warns when a
+simulator override is active, and provides **Use headset runtime** to clear
+per-user simulator selectors and return to the machine-wide OpenXR runtime.
 
 Build a self-contained x64 copy:
 
@@ -95,9 +98,17 @@ are picked up live by an active OBS Mirror source.
   the plugin itself does not require administrator privileges.
 - The OpenXR application and OBS must run on the same Windows desktop and use a
   compatible D3D11 adapter for the shared textures to open.
-- Meta XR Simulator refreshes the OpenXR API-layer registry when it starts.
-  Start the Simulator first, then rerun `Setup-OBS.ps1` or `Install-Layer.ps1`
-  before launching the OpenXR application.
+- The machine-wide OpenXR runtime selected by the headset software is the normal
+  default. The Control Center never selects a simulator merely by opening its
+  optional testing tool, and it strips inherited `XR_RUNTIME_JSON` overrides
+  from applications that it launches.
+- A simulator can leave per-user `XR_RUNTIME_JSON` or `ActiveRuntime` overrides
+  behind. Use **Use headset runtime** in the Control Center to clear both 64-bit
+  and 32-bit per-user selectors. Restart any launcher that was already running
+  while the old environment override was active.
+- Some simulator versions refresh OpenXR API-layer registration while testing.
+  If the layer status changes after a simulator session, press
+  **Register layer now** before the next OpenXR application launch.
 
 ## Recording overscan (experimental)
 
