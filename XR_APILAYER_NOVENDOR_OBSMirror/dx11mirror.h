@@ -1,29 +1,44 @@
 #pragma once
 #include "pch.h"
 #include "obs_mirror_ipc.h"
+#include "dxgi_format_info.h"
+#include <d3d11_4.h>
 #include <map>
+#include <vector>
 
 namespace Mirror
 {
-    struct DxgiFormatInfo {
-        /// The different versions of this format, set to DXGI_FORMAT_UNKNOWN if absent.
-        /// Both the SRGB and linear formats should be UNORM.
-        DXGI_FORMAT srgb, linear, typeless;
-
-        /// THe bits per pixel, bits per channel, and the number of channels
-        int bpp, bpc, channels;
-    };
-
-    bool GetFormatInfo(const DXGI_FORMAT format, DxgiFormatInfo& out);
+    // Shared with the OBS plugin so both binaries make identical format choices.
+    using obs_mirror_ipc::DxgiFormatInfo;
+    using obs_mirror_ipc::GetFormatInfo;
 
     class D3D11Mirror {
       public:
-        D3D11Mirror();
+        explicit D3D11Mirror(IDXGIAdapter* adapter = nullptr);
         ~D3D11Mirror();
 
-        void createSharedMirrorTexture(const XrSwapchain& swapchain, const ComPtr<ID3D11Texture2D>& tex, const DXGI_FORMAT format);
+        D3D11Mirror(const D3D11Mirror&) = delete;
+        D3D11Mirror& operator=(const D3D11Mirror&) = delete;
 
-        void createSharedMirrorTexture(const XrSwapchain& swapchain, const HANDLE& handle);
+        /// False when any part of initialization failed. Every entry point is a
+        /// no-op in that state so a broken mirror can never crash the host game.
+        bool initialized() const;
+
+        /// Share a game-device D3D11 texture (created with a keyed mutex) with
+        /// the mirror device.
+        void createSharedMirrorTexture(const XrSwapchain& swapchain, const ComPtr<ID3D11Texture2D>& tex);
+
+        /// Share a game D3D12 texture via its NT handle. fenceHandle (optional)
+        /// is a shared fence the game's queue signals when its copy completes.
+        void createSharedMirrorTexture(const XrSwapchain& swapchain,
+                                       const HANDLE& textureHandle,
+                                       const HANDLE& fenceHandle);
+
+        void removeSwapchain(const XrSwapchain swapchain);
+
+        /// Fence value the game's D3D12 queue will signal once its copy into
+        /// the shared texture for this swapchain has completed.
+        void notifyFenceValue(const XrSwapchain swapchain, const UINT64 value);
 
         bool enabled() const;
 
@@ -32,6 +47,8 @@ namespace Mirror
         void addSpace(const XrSpace space, const XrReferenceSpaceCreateInfo* createInfo);
 
         void removeSpace(const XrSpace space);
+
+        void clearSpaces();
 
         const XrReferenceSpaceCreateInfo* getSpaceInfo(const XrSpace space) const;
 
@@ -56,7 +73,10 @@ namespace Mirror
                    const XrSpace viewSpace,
                    const XrTime displayTime);
 
-        void copyPerspectiveTex(const XrRect2Di& imgRect, const DXGI_FORMAT format, const XrSwapchain& swapchain);
+        void copyPerspectiveTex(const XrRect2Di& imgRect,
+                                const uint32_t arraySlice,
+                                const DXGI_FORMAT format,
+                                const XrSwapchain& swapchain);
 
         void copyToMirror();
 
@@ -65,20 +85,51 @@ namespace Mirror
         uint32_t getEyeIndex() const;
 
       private:
-        void createMirrorSurface();
+        struct SourceData {
+            ComPtr<ID3D11Texture2D> _texture = nullptr;
+            ComPtr<ID3D11ShaderResourceView> _quadTextureView = nullptr;
+            ComPtr<IDXGIKeyedMutex> _keyedMutex = nullptr; // D3D11 sessions only
+            ComPtr<ID3D11Fence> _copyFence = nullptr;      // D3D12 sessions only
+            UINT64 _copyFenceValue = 0;
+            bool _isArray = false;
+        };
+
+        struct UVRect {
+            float startX;
+            float endX;
+            float startY;
+            float endY;
+        };
+
+        bool createMirrorSurface();
+
+        bool createSourceView(SourceData& srcData);
+
+        /// GPU-side wait for the game's copy into the shared texture before
+        /// the mirror device reads from it.
+        void syncToSource(const SourceData& srcData);
 
         void checkCopyTex(const uint32_t width, const uint32_t height, const DXGI_FORMAT format);
 
         void checkFOVs(const XrFovf& hmdFov, const XrFovf& viewFov);
 
-        struct SourceData {
-            ComPtr<IDXGIResource> _sharedResource = nullptr;
-            ComPtr<ID3D11Texture2D> _texture = nullptr;
-            ComPtr<ID3D11ShaderResourceView> _quadTextureView = nullptr;
-        };
+        UVRect writeQuadUVs(const XrRect2Di& imgRect, const D3D11_TEXTURE2D_DESC& srcDesc);
+
+        void writeBlendConstants(float blendStartX, float blendEndX, float texIndex, float alphaOverride);
+
+        void bindQuadPipeline(const SourceData& srcData);
+
+        void setTargetRect(const XrRect2Di& rect);
+
+        void drawOrthoQuad();
 
         ComPtr<ID3D11Device> _d3d11MirrorDevice = nullptr;
         ComPtr<ID3D11DeviceContext> _d3d11MirrorContext = nullptr;
+        ComPtr<ID3D11DeviceContext4> _d3d11MirrorContext4 = nullptr;
+
+        /// Signalled with the frame counter after each copy into the mirror
+        /// ring; lets us publish only frames whose copy has finished.
+        ComPtr<ID3D11Fence> _obsCopyFence = nullptr;
 
         std::map<XrSwapchain, SourceData> _sourceData;
         obs_mirror_ipc::MirrorSurfaceData* _pMirrorSurfaceData = nullptr;
@@ -99,9 +150,6 @@ namespace Mirror
         ComPtr<ID3D11SamplerState> _quadSampleState = nullptr;
         ComPtr<ID3D11BlendState> _quadBlendState = nullptr;
 
-        D3D11_MAPPED_SUBRESOURCE _mappedQuadVertexBuffer{};
-        D3D11_MAPPED_SUBRESOURCE _mappedQuadBlendBuffer{};
-
         ComPtr<ID3D11Texture2D> _compositorTexture = nullptr;
         D3D11_TEXTURE2D_DESC _comp_desc{};
         std::vector<ComPtr<ID3D11Texture2D>> _mirrorTextures;
@@ -110,6 +158,7 @@ namespace Mirror
         uint32_t _obsFrameCounter = 10;
         uint32_t _lastOBSFrameNumber = 0;
         bool _obsRunning = false;
+        bool _initialized = false;
 
         float _fovVertRatio = 1.f;
         float _fovHorizRatio = 1.f;
@@ -117,4 +166,3 @@ namespace Mirror
         XrFovf _viewFov{0.0f, 0.0f, 0.0f, 0.0f};
     };
 }
-

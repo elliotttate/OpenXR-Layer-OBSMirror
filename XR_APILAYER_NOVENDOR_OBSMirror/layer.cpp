@@ -33,10 +33,15 @@
 #include <d3dcompiler.h> // For compiling shaders! D3DCompile
 #include <winrt/base.h>
 #include <d3d11_1.h>
+#include <dxgi1_4.h>
+
+#include <cmath>
+#include <deque>
 
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "d3d12.lib")
+#pragma comment(lib, "dxgi.lib")
 
 namespace {
 #define CHECK_DX(expression)                                                                                           \
@@ -44,7 +49,7 @@ namespace {
         HRESULT res = (expression);                                                                                    \
         if (FAILED(res)) {                                                                                             \
             Log("DX Call failed with: 0x%08x\n", res);                                                                 \
-            Log("CHECK_DX failed on: " #expression, " DirectX error - see log for details\n");                         \
+            Log("CHECK_DX failed on: " #expression " DirectX error - see log for details\n");                         \
         }                                                                                                              \
     } while (0);
 
@@ -53,41 +58,100 @@ namespace {
     using namespace DirectX; // Matrix math
     using namespace Mirror;
 
-    void WaitForFence(ID3D12Fence* fence, UINT64 completionValue, HANDLE waitEvent) {
-        if (fence->GetCompletedValue() < completionValue) {
-            fence->SetEventOnCompletion(completionValue, waitEvent);
-            WaitForSingleObject(waitEvent, 1000);
+    // How long the game-side copy may wait for the mirror device to release
+    // the shared texture before skipping this frame's mirror update.
+    constexpr DWORD kAcquireTimeoutMs = 8;
+
+    // Owning wrapper for Win32 handles so container/struct moves stay correct.
+    class UniqueHandle {
+      public:
+        UniqueHandle() = default;
+        explicit UniqueHandle(HANDLE handle) : _handle(handle) {}
+        UniqueHandle(UniqueHandle&& other) noexcept : _handle(other._handle) {
+            other._handle = nullptr;
         }
+        UniqueHandle& operator=(UniqueHandle&& other) noexcept {
+            if (this != &other) {
+                reset(other._handle);
+                other._handle = nullptr;
+            }
+            return *this;
+        }
+        UniqueHandle(const UniqueHandle&) = delete;
+        UniqueHandle& operator=(const UniqueHandle&) = delete;
+        ~UniqueHandle() {
+            reset();
+        }
+
+        void reset(HANDLE handle = nullptr) {
+            if (_handle)
+                CloseHandle(_handle);
+            _handle = handle;
+        }
+
+        HANDLE get() const {
+            return _handle;
+        }
+
+        explicit operator bool() const {
+            return _handle != nullptr;
+        }
+
+      private:
+        HANDLE _handle = nullptr;
+    };
+
+    // Returns false when the fence did not reach completionValue in time; the
+    // caller must then skip work that reuses the associated resources.
+    bool WaitForFence(ID3D12Fence* fence, UINT64 completionValue, HANDLE waitEvent) {
+        if (fence->GetCompletedValue() >= completionValue)
+            return true;
+        if (FAILED(fence->SetEventOnCompletion(completionValue, waitEvent)))
+            return false;
+        return WaitForSingleObject(waitEvent, 1000) == WAIT_OBJECT_0;
     }
 
     using namespace xr::math;
 
-    std::vector<const char*> ParseExtensionString(char* names) {
-        std::vector<const char*> list;
-        while (*names != 0) {
-            list.push_back(names);
-            while (*(++names) != 0) {
-                if (*names == ' ') {
-                    *names++ = '\0';
-                    break;
-                }
-            }
+    // Recording overscan is latched from the registry at instance creation and
+    // must not change for the lifetime of the session (swapchain sizes and the
+    // game's FOV are derived from it).
+    constexpr wchar_t kConfigRegistryKey[] = L"Software\\OpenXR-OBSMirror";
+
+    DWORD readConfigDword(const wchar_t* name, DWORD defaultValue) {
+        DWORD value = defaultValue;
+        DWORD size = sizeof(value);
+        if (RegGetValueW(HKEY_CURRENT_USER, kConfigRegistryKey, name, RRF_RT_REG_DWORD, nullptr, &value, &size) !=
+            ERROR_SUCCESS) {
+            return defaultValue;
         }
-        return list;
+        return value;
+    }
+
+    bool fovNearEqual(const XrFovf& a, const XrFovf& b) {
+        return XMScalarNearEqual(a.angleLeft, b.angleLeft, 0.001f) &&
+               XMScalarNearEqual(a.angleRight, b.angleRight, 0.001f) &&
+               XMScalarNearEqual(a.angleUp, b.angleUp, 0.001f) &&
+               XMScalarNearEqual(a.angleDown, b.angleDown, 0.001f);
     }
 
     class OpenXrLayer : public layer_OBSMirror::OpenXrApi {
       public:
         OpenXrLayer() {
-            _mirror = std::make_unique<D3D11Mirror>();
-        }
-
-        ~OpenXrLayer() override {
-            while (_sessions.size()) {
-                cleanupSession(_sessions.begin()->second);
-                _sessions.erase(_sessions.begin());
+            _overscanRequested = readConfigDword(L"RecordingOverscan", 0) != 0;
+            if (_overscanRequested) {
+                const DWORD hPercent =
+                    std::clamp<DWORD>(readConfigDword(L"OverscanHorizontalPercent", 115), 100, 150);
+                const DWORD vPercent = std::clamp<DWORD>(readConfigDword(L"OverscanVerticalPercent", 108), 100, 150);
+                _overscanDesiredH = static_cast<float>(hPercent) / 100.0f;
+                _overscanDesiredV = static_cast<float>(vPercent) / 100.0f;
+                Log("Recording overscan requested: %.2fx horizontal, %.2fx vertical\n",
+                    _overscanDesiredH,
+                    _overscanDesiredV);
             }
         }
+
+        ~OpenXrLayer() override = default;
 
         XrResult xrCreateInstance(const XrInstanceCreateInfo* createInfo) override {
             if (createInfo->type != XR_TYPE_INSTANCE_CREATE_INFO) {
@@ -144,74 +208,141 @@ namespace {
                               TLArg(createInfo->systemId, "SystemId"),
                               TLArg(createInfo->createFlags, "CreateFlags"));
 
-            Session newSession;
-            bool handled = true;
-
-            const XrBaseInStructure* const* pprev =
-                reinterpret_cast<const XrBaseInStructure* const*>(&createInfo->next);
+            // Walk the next chain looking for a graphics binding we support.
+            // Unrelated chained structures (overlay extensions, vendor structs)
+            // are ignored rather than clearing an already-found binding.
+            XrStructureType boundApi = XR_TYPE_UNKNOWN;
             const XrBaseInStructure* entry = reinterpret_cast<const XrBaseInStructure*>(createInfo->next);
             while (entry) {
-                Log("Entry: %d\n", entry->type);
+                Log("Session create chain entry: %d\n", entry->type);
                 if (entry->type == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR) {
-                    _xrGraphicsAPI = XR_TYPE_GRAPHICS_BINDING_D3D11_KHR;
+                    boundApi = entry->type;
                     const XrGraphicsBindingD3D11KHR* d3d11Bindings =
                         reinterpret_cast<const XrGraphicsBindingD3D11KHR*>(entry);
                     _d3d11Device = d3d11Bindings->device;
                     _d3d11Device->GetImmediateContext(_d3d11Context.ReleaseAndGetAddressOf());
-
-                    handled = true;
-                    if (!_graphicsRequirementQueried) {
-                        // return XR_ERROR_GRAPHICS_REQUIREMENTS_CALL_MISSING;
-                    }
                 } else if (entry->type == XR_TYPE_GRAPHICS_BINDING_D3D12_KHR) {
-                    _xrGraphicsAPI = XR_TYPE_GRAPHICS_BINDING_D3D12_KHR;
+                    boundApi = entry->type;
                     const XrGraphicsBindingD3D12KHR* d3d12Bindings =
                         reinterpret_cast<const XrGraphicsBindingD3D12KHR*>(entry);
                     _d3d12Device = d3d12Bindings->device;
                     _d3d12CommandQueue = d3d12Bindings->queue;
-                } else {
-                    Log("Unhandled graphics API type: %d\n", entry->type);
-                    _xrGraphicsAPI = XR_TYPE_UNKNOWN;
                 }
 
                 entry = entry->next;
             }
 
+            if (boundApi != XR_TYPE_UNKNOWN) {
+                _xrGraphicsAPI = boundApi;
+            } else {
+                Log("No supported graphics binding found; mirroring disabled for this session\n");
+            }
 
             const XrResult result = OpenXrApi::xrCreateSession(instance, createInfo, session);
-            if (handled) {
-                if (XR_SUCCEEDED(result)) {
-                    // On success, record the state.
-                    newSession._xrSession = *session;
-                    _sessions.insert_or_assign(*session, newSession);
+            if (XR_SUCCEEDED(result)) {
+                Session newSession;
+                newSession._xrSession = *session;
+                _sessions.insert_or_assign(*session, newSession);
 
-                    // List off the views and store them locally for easy access
-                    XrSystemId xr_system;
-                    XrSystemGetInfo systemInfo{};
-                    systemInfo.type = XR_TYPE_SYSTEM_GET_INFO;
-                    systemInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
-                    CHECK_XRCMD(xrGetSystem(instance, &systemInfo, &xr_system));
+                if (boundApi != XR_TYPE_UNKNOWN) {
+                    ensureMirror();
+                }
 
-                    uint32_t viewCount = 0;
-                    CHECK_XRCMD(xrEnumerateViewConfigurationViews(
-                        instance, xr_system, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 0, &viewCount, nullptr));
+                // List off the views and store them locally for easy access
+                XrSystemId xr_system;
+                XrSystemGetInfo systemInfo{};
+                systemInfo.type = XR_TYPE_SYSTEM_GET_INFO;
+                systemInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
+                CHECK_XRCMD(xrGetSystem(instance, &systemInfo, &xr_system));
 
-                    _xrViewsList = std::vector<XrViewConfigurationView>(viewCount, {XR_TYPE_VIEW_CONFIGURATION_VIEW});
+                uint32_t viewCount = 0;
+                CHECK_XRCMD(xrEnumerateViewConfigurationViews(
+                    instance, xr_system, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 0, &viewCount, nullptr));
 
-                    CHECK_XRCMD(xrEnumerateViewConfigurationViews(instance,
-                                                                  xr_system,
-                                                                  XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
-                                                                  viewCount,
-                                                                  &viewCount,
-                                                                  _xrViewsList.data()));
+                _xrViewsList = std::vector<XrViewConfigurationView>(viewCount, {XR_TYPE_VIEW_CONFIGURATION_VIEW});
 
-                    assert(viewCount == _xrViewsList.size());
-                } else {
+                CHECK_XRCMD(xrEnumerateViewConfigurationViews(instance,
+                                                              xr_system,
+                                                              XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+                                                              viewCount,
+                                                              &viewCount,
+                                                              _xrViewsList.data()));
+
+                assert(viewCount == _xrViewsList.size());
+
+                TraceLoggingWrite(g_traceProvider, "xrCreateSession", TLXArg(*session, "Session"));
+            }
+
+            return result;
+        }
+
+        XrResult xrEnumerateViewConfigurationViews(XrInstance instance,
+                                                   XrSystemId systemId,
+                                                   XrViewConfigurationType viewConfigurationType,
+                                                   uint32_t viewCapacityInput,
+                                                   uint32_t* viewCountOutput,
+                                                   XrViewConfigurationView* views) override {
+            const XrResult result = OpenXrApi::xrEnumerateViewConfigurationViews(
+                instance, systemId, viewConfigurationType, viewCapacityInput, viewCountOutput, views);
+
+            if (XR_SUCCEEDED(result) && _overscanRequested &&
+                viewConfigurationType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO && views && viewCountOutput &&
+                *viewCountOutput > 0 && viewCapacityInput >= *viewCountOutput) {
+                computeOverscanScales(views, *viewCountOutput);
+
+                if (overscanActive()) {
+                    // Grow the recommended render target so pixels-per-degree
+                    // stays constant across the widened FOV.
+                    for (uint32_t i = 0; i < *viewCountOutput; ++i) {
+                        const uint32_t scaledWidth = static_cast<uint32_t>(
+                            std::lroundf(views[i].recommendedImageRectWidth * _overscanHScale));
+                        const uint32_t scaledHeight = static_cast<uint32_t>(
+                            std::lroundf(views[i].recommendedImageRectHeight * _overscanVScale));
+                        views[i].recommendedImageRectWidth =
+                            std::min(scaledWidth, views[i].maxImageRectWidth);
+                        views[i].recommendedImageRectHeight =
+                            std::min(scaledHeight, views[i].maxImageRectHeight);
+                    }
                 }
             }
 
-            if (XR_SUCCEEDED(result)) {
-                TraceLoggingWrite(g_traceProvider, "xrCreateSession", TLXArg(*session, "Session"));
+            return result;
+        }
+
+        XrResult xrDestroySession(XrSession session) override {
+            TraceLoggingWrite(g_traceProvider, "xrDestroySession", TLXArg(session, "Session"));
+            Log("xrDestroySession\n");
+
+            const XrResult result = OpenXrApi::xrDestroySession(session);
+            if (XR_SUCCEEDED(result) && isSessionHandled(session)) {
+                // Destroying a session destroys all of its child handles, so
+                // drop the swapchains and spaces that belonged to it.
+                for (auto it = _swapchains.begin(); it != _swapchains.end();) {
+                    if (it->second._xrSession == session) {
+                        if (_mirror) {
+                            _mirror->removeSwapchain(it->first);
+                        }
+                        it = _swapchains.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+                _sessions.erase(session);
+
+                if (_sessions.empty()) {
+                    if (_mirror) {
+                        _mirror->clearSpaces();
+                    }
+                    _projectionViews.clear();
+                    _originalViewFovs.clear();
+                    // Release the game's graphics objects so the layer does not
+                    // keep the game's device alive after the session ends.
+                    _d3d11Context.Reset();
+                    _d3d11Device = nullptr;
+                    _d3d12Device = nullptr;
+                    _d3d12CommandQueue = nullptr;
+                    _xrGraphicsAPI = XR_TYPE_UNKNOWN;
+                }
             }
 
             return result;
@@ -239,12 +370,9 @@ namespace {
                               TLArg(createInfo->usageFlags, "UsageFlags"));
 
             XrSwapchainCreateInfo chainCreateInfo = *createInfo;
-            Swapchain newSwapchain;
-            bool handled = false;
+            const bool handled = isSessionHandled(session);
 
-            if (isSessionHandled(session)) {
-                auto& sessionState = _sessions[session];
-
+            if (handled) {
                 Log("Creating swapchain with dimensions=%ux%u, arraySize=%u, mipCount=%u, sampleCount=%u, format=%d, "
                     "usage=0x%x\n",
                     createInfo->width,
@@ -254,29 +382,20 @@ namespace {
                     createInfo->sampleCount,
                     createInfo->format,
                     createInfo->usageFlags);
-
-                handled = true;
             }
 
             const XrResult result = OpenXrApi::xrCreateSwapchain(session, &chainCreateInfo, swapchain);
-            if (handled) {
-                if (XR_SUCCEEDED(result)) {
-                    // On success, record the state.
-                    newSwapchain._xrSwapchain = *swapchain;
-                    newSwapchain._createInfo = chainCreateInfo;
-                    newSwapchain._aquiredIndex = -1;
-                    newSwapchain._releasedIndex = -1;
-                    newSwapchain._dx11SurfaceImages.clear();
-                    newSwapchain._dx12SurfaceImages.clear();
-                    // newSwapchain._xrSession = session;
-                    auto res = _swapchains.insert_or_assign(*swapchain, newSwapchain);
-                    Log("%p %s\n", swapchain, res.second ? "inserted: " : "assigned: ");
-                } else {
-                    auto& sessionState = _sessions[session];
-                }
-            }
+            if (handled && XR_SUCCEEDED(result)) {
+                // On success, record the state.
+                Swapchain newSwapchain;
+                newSwapchain._xrSwapchain = *swapchain;
+                newSwapchain._xrSession = session;
+                newSwapchain._createInfo = chainCreateInfo;
+                _swapchains.insert_or_assign(*swapchain, std::move(newSwapchain));
+                Log("Tracking swapchain %p\n", *swapchain);
 
-            TraceLoggingWrite(g_traceProvider, "xrCreateSwapchain", TLXArg(*swapchain, "Swapchain"));
+                TraceLoggingWrite(g_traceProvider, "xrCreateSwapchain", TLXArg(*swapchain, "Swapchain"));
+            }
 
             return result;
         }
@@ -284,11 +403,12 @@ namespace {
         XrResult xrDestroySwapchain(XrSwapchain swapchain) override {
             TraceLoggingWrite(g_traceProvider, "xrDestroySwapchain", TLXArg(swapchain, "Swapchain"));
 
-            Log("xrDestroySwapchain %d\n", swapchain);
+            Log("xrDestroySwapchain %p\n", swapchain);
             const XrResult result = OpenXrApi::xrDestroySwapchain(swapchain);
             if (XR_SUCCEEDED(result) && isSwapchainHandled(swapchain)) {
-                auto& swapchainState = _swapchains[swapchain];
-                cleanupSwapchain(swapchainState);
+                if (_mirror) {
+                    _mirror->removeSwapchain(swapchain);
+                }
                 _swapchains.erase(swapchain);
             }
 
@@ -317,7 +437,7 @@ namespace {
             auto& swapchainState = _swapchains[swapchain];
             const XrResult result =
                 OpenXrApi::xrEnumerateSwapchainImages(swapchain, imageCapacityInput, imageCountOutput, images);
-            if (XR_SUCCEEDED(result) && _mirror) {
+            if (XR_SUCCEEDED(result) && _mirror && _mirror->initialized()) {
                 Mirror::DxgiFormatInfo formatInfo;
                 Mirror::GetFormatInfo((DXGI_FORMAT)swapchainState._createInfo.format, formatInfo);
                 if (formatInfo.bpc <= 10 &&
@@ -340,15 +460,15 @@ namespace {
                             swapchainState._dx11SurfaceImages[i] =
                                 reinterpret_cast<XrSwapchainImageD3D11KHR*>(images)[i];
                         }
-                        images =
-                            reinterpret_cast<XrSwapchainImageBaseHeader*>(swapchainState._dx11SurfaceImages.data());
                         if (swapchainState._dx11LastTexture) {
                             D3D11_TEXTURE2D_DESC srcDesc;
                             swapchainState._dx11LastTexture->GetDesc(&srcDesc);
                             if (srcDesc.Width != swapchainState._createInfo.width ||
                                 srcDesc.Height != swapchainState._createInfo.height ||
+                                srcDesc.ArraySize != swapchainState._createInfo.arraySize ||
                                 srcDesc.Format != (DXGI_FORMAT)swapchainState._createInfo.format) {
                                 swapchainState._dx11LastTexture = nullptr;
+                                swapchainState._dx11KeyedMutex = nullptr;
                             }
                         }
                         if (swapchainState._dx11LastTexture == nullptr) {
@@ -363,20 +483,22 @@ namespace {
                             desc.SampleDesc.Quality = 0;
                             desc.Usage = D3D11_USAGE_DEFAULT;
                             desc.CPUAccessFlags = 0;
-                            desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+                            // The keyed mutex orders the game-side copy against
+                            // the mirror device's reads.
+                            desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
                             desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 
                             CHECK_DX(_d3d11Device->CreateTexture2D(
                                 &desc, NULL, swapchainState._dx11LastTexture.ReleaseAndGetAddressOf()));
 
-                            _mirror->createSharedMirrorTexture(swapchain, swapchainState._dx11LastTexture, desc.Format);
+                            swapchainState._dx11KeyedMutex.Reset();
+                            if (swapchainState._dx11LastTexture) {
+                                swapchainState._dx11LastTexture.As(&swapchainState._dx11KeyedMutex);
+                                _mirror->createSharedMirrorTexture(swapchain, swapchainState._dx11LastTexture);
+                            }
                         }
                     } else if (_xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_D3D12_KHR) {
                         Log("XR_TYPE_GRAPHICS_BINDING_D3D12_KHR\n");
-                        for (auto event : swapchainState._frameFenceEvents) {
-                            CloseHandle(event);
-                        }
-
                         swapchainState._frameFenceEvents.clear();
                         swapchainState._frameFences.clear();
                         swapchainState._fenceValues.clear();
@@ -391,25 +513,28 @@ namespace {
                             swapchainState._dx12SurfaceImages[i] =
                                 reinterpret_cast<XrSwapchainImageD3D12KHR*>(images)[i];
 
-                            swapchainState._frameFenceEvents[i] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+                            swapchainState._frameFenceEvents[i].reset(CreateEvent(nullptr, FALSE, FALSE, nullptr));
                             swapchainState._fenceValues[i] = 0;
-                            _d3d12Device->CreateFence(
-                                0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&swapchainState._frameFences[i]));
+                            CHECK_DX(_d3d12Device->CreateFence(
+                                0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&swapchainState._frameFences[i])));
 
-                            _d3d12Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                                                 IID_PPV_ARGS(&swapchainState._commandAllocators[i]));
-                            _d3d12Device->CreateCommandList(0,
-                                                            D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                                            swapchainState._commandAllocators[i].Get(),
-                                                            nullptr,
-                                                            IID_PPV_ARGS(&swapchainState._commandLists[i]));
-                            swapchainState._commandLists[i]->Close();
+                            CHECK_DX(_d3d12Device->CreateCommandAllocator(
+                                D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                IID_PPV_ARGS(&swapchainState._commandAllocators[i])));
+                            CHECK_DX(_d3d12Device->CreateCommandList(0,
+                                                                     D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                                                     swapchainState._commandAllocators[i].Get(),
+                                                                     nullptr,
+                                                                     IID_PPV_ARGS(&swapchainState._commandLists[i])));
+                            if (swapchainState._commandLists[i]) {
+                                swapchainState._commandLists[i]->Close();
+                            }
                         }
-                        images = reinterpret_cast<XrSwapchainImageBaseHeader*>(swapchainState._dx12SurfaceImages.data());
                         if (swapchainState._dx12LastTexture) {
                             D3D12_RESOURCE_DESC srcDesc = swapchainState._dx12LastTexture->GetDesc();
                             if (srcDesc.Width != swapchainState._createInfo.width ||
                                 srcDesc.Height != swapchainState._createInfo.height ||
+                                srcDesc.DepthOrArraySize != swapchainState._createInfo.arraySize ||
                                 srcDesc.Format != (DXGI_FORMAT)swapchainState._createInfo.format) {
                                 swapchainState._dx12LastTexture = nullptr;
                             }
@@ -446,27 +571,48 @@ namespace {
                                                                       D3D12_RESOURCE_STATE_COMMON,
                                                                       &clearValue,
                                                                       IID_PPV_ARGS(&swapchainState._dx12LastTexture)));
-
-                            if (swapchainState._sharedHandle) {
-                                CloseHandle(swapchainState._sharedHandle);
-                                swapchainState._sharedHandle = NULL;
+                            if (!swapchainState._dx12LastTexture) {
+                                return result;
                             }
 
+                            swapchainState._sharedHandle.reset();
+                            HANDLE sharedHandle = nullptr;
                             CHECK_DX(_d3d12Device->CreateSharedHandle(swapchainState._dx12LastTexture.Get(),
                                                                       nullptr,
                                                                       GENERIC_ALL,
                                                                       nullptr,
-                                                                      &swapchainState._sharedHandle));
+                                                                      &sharedHandle));
+                            if (!sharedHandle) {
+                                swapchainState._dx12LastTexture = nullptr;
+                                return result;
+                            }
+                            swapchainState._sharedHandle.reset(sharedHandle);
 
-                            _mirror->createSharedMirrorTexture(swapchain, swapchainState._sharedHandle);
-                            
+                            // A shared fence lets the mirror device wait for the
+                            // game queue's copy before sampling the texture.
+                            swapchainState._copyFence.Reset();
+                            swapchainState._copyFenceHandle.reset();
+                            swapchainState._copyFenceValue = 0;
+                            if (SUCCEEDED(_d3d12Device->CreateFence(
+                                    0, D3D12_FENCE_FLAG_SHARED, IID_PPV_ARGS(&swapchainState._copyFence)))) {
+                                HANDLE fenceHandle = nullptr;
+                                if (SUCCEEDED(_d3d12Device->CreateSharedHandle(
+                                        swapchainState._copyFence.Get(), nullptr, GENERIC_ALL, nullptr, &fenceHandle))) {
+                                    swapchainState._copyFenceHandle.reset(fenceHandle);
+                                } else {
+                                    swapchainState._copyFence.Reset();
+                                }
+                            }
+
+                            _mirror->createSharedMirrorTexture(
+                                swapchain, swapchainState._sharedHandle.get(), swapchainState._copyFenceHandle.get());
                         }
                     }
-                } 
+                }
 #ifdef _DEBUG
                 else {
                     Log("Not mirroring swapchain width %d height %d format %d usage %d sample %d array %d face %d mip "
-                        "%d",
+                        "%d\n",
                         swapchainState._createInfo.width,
                         swapchainState._createInfo.height,
                         swapchainState._createInfo.format,
@@ -497,49 +643,93 @@ namespace {
             const XrResult result = OpenXrApi::xrAcquireSwapchainImage(swapchain, acquireInfo, index);
 
             if (XR_SUCCEEDED(result) && isSwapchainHandled(swapchain)) {
-                _swapchains[swapchain]._aquiredIndex = *index;
+                auto& swapchainState = _swapchains[swapchain];
+                // Apps may acquire several images before releasing any; track
+                // the queue so each release copies the image actually released.
+                swapchainState._acquiredIndices.push_back(*index);
+                swapchainState._lastAcquiredIndex = *index;
             }
 
             return result;
         }
 
-        XrResult updateSwapChainImages(XrSwapchain swapchain, const XrSwapchainImageReleaseInfo* releaseInfo, bool doXRcall) {
+        XrResult updateSwapChainImages(XrSwapchain swapchain,
+                                       const XrSwapchainImageReleaseInfo* releaseInfo,
+                                       bool doXRcall) {
             if (_mirror && _mirror->enabled() && isSwapchainHandled(swapchain)) {
                 Swapchain& swapchainState = _swapchains[swapchain];
-                uint32_t idx = swapchainState._aquiredIndex;
+
+                // The runtime releases the oldest acquired image; a refresh
+                // outside of release (quad layers) copies the newest one.
+                uint32_t idx = UINT32_MAX;
+                if (doXRcall) {
+                    if (!swapchainState._acquiredIndices.empty())
+                        idx = swapchainState._acquiredIndices.front();
+                } else {
+                    idx = swapchainState._lastAcquiredIndex;
+                }
+
                 if (_xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR &&
-                    !swapchainState._dx11SurfaceImages.empty()) {
+                    idx < swapchainState._dx11SurfaceImages.size()) {
                     auto* textPtr = swapchainState._dx11SurfaceImages[idx].texture;
                     if (swapchainState._dx11LastTexture) {
-                        _d3d11Context->CopyResource(swapchainState._dx11LastTexture.Get(), textPtr);
-                        swapchainState._releasedIndex = swapchainState._aquiredIndex;
+                        bool acquired = true;
+                        if (swapchainState._dx11KeyedMutex)
+                            acquired = swapchainState._dx11KeyedMutex->AcquireSync(0, kAcquireTimeoutMs) == S_OK;
+                        if (acquired) {
+                            _d3d11Context->CopyResource(swapchainState._dx11LastTexture.Get(), textPtr);
+                            if (swapchainState._dx11KeyedMutex)
+                                swapchainState._dx11KeyedMutex->ReleaseSync(0);
+                            swapchainState._lastCopiedIndex = idx;
+                        }
                     }
                 } else if (_xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_D3D12_KHR &&
-                           !swapchainState._dx12SurfaceImages.empty()) {
+                           idx < swapchainState._dx12SurfaceImages.size()) {
                     auto* textPtr = swapchainState._dx12SurfaceImages[idx].texture;
-                    if (swapchainState._dx12LastTexture) {
-                        WaitForFence(swapchainState._frameFences[idx].Get(),
-                                     swapchainState._fenceValues[idx],
-                                     swapchainState._frameFenceEvents[idx]);
-                        swapchainState._commandAllocators[idx]->Reset();
-                        swapchainState._commandLists[idx]->Reset(swapchainState._commandAllocators[idx].Get(), nullptr);
-                        swapchainState._commandLists[idx]->CopyResource(swapchainState._dx12LastTexture.Get(), textPtr);
-                        swapchainState._commandLists[idx]->Close();
-                        ID3D12CommandList* set[] = {swapchainState._commandLists[idx].Get()};
-                        _d3d12CommandQueue->ExecuteCommandLists(1, set);
-                        swapchainState._releasedIndex = swapchainState._aquiredIndex;
+                    if (swapchainState._dx12LastTexture && swapchainState._commandLists[idx] &&
+                        swapchainState._commandAllocators[idx] && swapchainState._frameFences[idx]) {
+                        if (WaitForFence(swapchainState._frameFences[idx].Get(),
+                                         swapchainState._fenceValues[idx],
+                                         swapchainState._frameFenceEvents[idx].get())) {
+                            swapchainState._commandAllocators[idx]->Reset();
+                            swapchainState._commandLists[idx]->Reset(swapchainState._commandAllocators[idx].Get(),
+                                                                     nullptr);
+                            swapchainState._commandLists[idx]->CopyResource(swapchainState._dx12LastTexture.Get(),
+                                                                            textPtr);
+                            swapchainState._commandLists[idx]->Close();
+                            ID3D12CommandList* set[] = {swapchainState._commandLists[idx].Get()};
+                            _d3d12CommandQueue->ExecuteCommandLists(1, set);
+
+                            // Tell the mirror device when this copy will be done.
+                            if (swapchainState._copyFence) {
+                                const UINT64 copyValue = ++swapchainState._copyFenceValue;
+                                _d3d12CommandQueue->Signal(swapchainState._copyFence.Get(), copyValue);
+                                _mirror->notifyFenceValue(swapchain, copyValue);
+                            }
+                            swapchainState._lastCopiedIndex = idx;
+                        } else {
+                            Log("Skipped mirror copy: fence wait timed out\n");
+                        }
                     }
                 }
             }
+
             XrResult result{XR_SUCCESS};
-            if (doXRcall)
+            if (doXRcall) {
                 result = OpenXrApi::xrReleaseSwapchainImage(swapchain, releaseInfo);
+                if (XR_SUCCEEDED(result) && isSwapchainHandled(swapchain)) {
+                    auto& acquiredIndices = _swapchains[swapchain]._acquiredIndices;
+                    if (!acquiredIndices.empty())
+                        acquiredIndices.pop_front();
+                }
+            }
 
             if (_mirror && _mirror->enabled() && isSwapchainHandled(swapchain) &&
                 _xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_D3D12_KHR) {
                 auto& swapchainState = _swapchains[swapchain];
-                uint32_t idx = swapchainState._aquiredIndex;
-                if (!swapchainState._dx12SurfaceImages.empty()) {
+                const uint32_t idx = swapchainState._lastCopiedIndex;
+                if (idx < swapchainState._dx12SurfaceImages.size() && swapchainState._frameFences[idx]) {
+                    // Guards command allocator reuse for this image slot.
                     const auto fenceValue = _currentFenceValue;
                     _d3d12CommandQueue->Signal(swapchainState._frameFences[idx].Get(), fenceValue);
                     swapchainState._fenceValues[idx] = fenceValue;
@@ -563,11 +753,24 @@ namespace {
             XrResult res =
                 OpenXrApi::xrLocateViews(session, viewLocateInfo, viewState, viewCapacityInput, viewCountOutput, views);
 
+            // Hand the game a widened FOV so it renders extra perimeter for the
+            // recording. The submission is cropped back in xrEndFrame, so the
+            // headset never sees the wide image.
+            if (XR_SUCCEEDED(res) && overscanActive() && views && viewCountOutput &&
+                viewLocateInfo->viewConfigurationType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO &&
+                viewCapacityInput >= *viewCountOutput) {
+                _originalViewFovs.resize(*viewCountOutput);
+                for (uint32_t nView = 0; nView < *viewCountOutput; nView++) {
+                    _originalViewFovs[nView] = views[nView].fov;
+                    views[nView].fov = widenFov(views[nView].fov);
+                }
+            }
+
             if (_mirror && _mirror->enabled() && XR_SUCCEEDED(res)) {
                 auto siPtr = _mirror->getSpaceInfo(viewLocateInfo->space);
                 if (views && siPtr) {
                     if (_projectionViews.size() != *viewCountOutput) {
-                        Log("Reference Space Type: %d", siPtr->referenceSpaceType);
+                        Log("Reference Space Type: %d\n", siPtr->referenceSpaceType);
                         _projectionViews.resize(*viewCountOutput, {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW});
                     }
                     for (uint32_t nView = 0; nView < *viewCountOutput; nView++) {
@@ -589,19 +792,41 @@ namespace {
                     }
                 }
             }
-#ifdef _DEBUG
-            if (_projectionViews.size() > 0) {
-                Log("ProjectionView fov: Down - %f   Up - %f\n",
-                    _projectionViews[0].fov.angleDown,
-                    _projectionViews[0].fov.angleUp);
-            }
-#endif
             return res;
+        }
+
+        XrResult xrGetVisibilityMaskKHR(XrSession session,
+                                        XrViewConfigurationType viewConfigurationType,
+                                        uint32_t viewIndex,
+                                        XrVisibilityMaskTypeKHR visibilityMaskType,
+                                        XrVisibilityMaskKHR* visibilityMask) override {
+            // The runtime's mask describes the displayed (original) FOV; with
+            // overscan the game would stencil away perimeter pixels that the
+            // recording needs. Report an empty mask so everything is rendered;
+            // the runtime still applies its own mask to the displayed crop.
+            if (overscanActive() && viewConfigurationType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO) {
+                if (visibilityMask) {
+                    visibilityMask->vertexCountOutput = 0;
+                    visibilityMask->indexCountOutput = 0;
+                }
+                return XR_SUCCESS;
+            }
+
+            // Resolve directly: the pointer may legitimately be absent when the
+            // app did not enable XR_KHR_visibility_mask.
+            PFN_xrGetVisibilityMaskKHR pfnGetVisibilityMask = nullptr;
+            m_xrGetInstanceProcAddr(GetXrInstance(),
+                                    "xrGetVisibilityMaskKHR",
+                                    reinterpret_cast<PFN_xrVoidFunction*>(&pfnGetVisibilityMask));
+            if (!pfnGetVisibilityMask) {
+                return XR_ERROR_FUNCTION_UNSUPPORTED;
+            }
+            return pfnGetVisibilityMask(session, viewConfigurationType, viewIndex, visibilityMaskType, visibilityMask);
         }
 
         XrResult xrCreateReferenceSpace(XrSession session,
                                         const XrReferenceSpaceCreateInfo* createInfo,
-                                        XrSpace* space) {
+                                        XrSpace* space) override {
             XrResult res = OpenXrApi::xrCreateReferenceSpace(session, createInfo, space);
             if (_mirror && XR_SUCCEEDED(res)) {
                 _mirror->addSpace(*space, createInfo);
@@ -609,7 +834,7 @@ namespace {
             return res;
         }
 
-        XrResult xrDestroySpace(XrSpace space) {
+        XrResult xrDestroySpace(XrSpace space) override {
             XrResult res = OpenXrApi::xrDestroySpace(space);
             if (_mirror && XR_SUCCEEDED(res)) {
                 _mirror->removeSpace(space);
@@ -633,8 +858,6 @@ namespace {
 
                 if (_mirror->enabled() && isSessionHandled(session) && !_projectionViews.empty() &&
                     !_xrViewsList.empty()) {
-
-                    auto& sessionState = _sessions[session];
                     const XrCompositionLayerProjectionView* projView = &_projectionViews[0];
                     const XrCompositionLayerProjection* projLayer = nullptr;
 
@@ -657,11 +880,11 @@ namespace {
                                             _mirror->Blend(projView,
                                                            _projectionViews[0].fov,
                                                            (DXGI_FORMAT)swapchainState._createInfo.format,
-                                                           projLayer ? projLayer->space : NULL,
+                                                           projLayer->space,
                                                            frameEndInfo->displayTime);
                                         }
                                     }
-                                } else {
+                                } else if (_projectionViews.size() >= 2) {
                                     projView = &projLayer->views[0];
                                     const XrCompositionLayerProjectionView* projView2 = &projLayer->views[1];
                                     if (isSwapchainHandled(projView->subImage.swapchain) &&
@@ -675,7 +898,7 @@ namespace {
                                                            projView2,
                                                            _projectionViews[1].fov,
                                                            (DXGI_FORMAT)swapchainState._createInfo.format,
-                                                           projLayer ? projLayer->space : NULL,
+                                                           projLayer->space,
                                                            frameEndInfo->displayTime);
                                         }
                                     }
@@ -686,7 +909,7 @@ namespace {
                                 reinterpret_cast<const XrCompositionLayerQuad*>(hdr);
                             if (isSwapchainHandled(quadLayer->subImage.swapchain)) {
                                 auto& swapchainState = _swapchains[quadLayer->subImage.swapchain];
-                                if (swapchainState._aquiredIndex != swapchainState._releasedIndex) {
+                                if (swapchainState._lastAcquiredIndex != swapchainState._lastCopiedIndex) {
                                     // Probably missed an update to swap chain whilst waiting for OBS plugin
                                     // Swapchains don't need to be updated every frame so just copy the last one aquired
                                     updateSwapChainImages(quadLayer->subImage.swapchain, nullptr, false);
@@ -697,7 +920,7 @@ namespace {
                                                        _projectionViews[0].fov,
                                                        quadLayer,
                                                        (DXGI_FORMAT)swapchainState._createInfo.format,
-                                                       projLayer ? projLayer->space : NULL,
+                                                       projLayer ? projLayer->space : XR_NULL_HANDLE,
                                                        frameEndInfo->displayTime);
                                     }
                                 }
@@ -708,7 +931,17 @@ namespace {
                 }
             }
 
-            return OpenXrApi::xrEndFrame(session, frameEndInfo);
+            // With overscan active, OBS has already been fed the full wide
+            // image above; now restore the original FOV and submit only the
+            // central crop to the runtime so the headset view is unchanged.
+            const XrFrameEndInfo* submitInfo = frameEndInfo;
+            XrFrameEndInfo patchedFrameEndInfo;
+            if (overscanActive() && frameEndInfo->layerCount > 0 && !_originalViewFovs.empty() &&
+                buildOverscanSubmission(frameEndInfo, patchedFrameEndInfo)) {
+                submitInfo = &patchedFrameEndInfo;
+            }
+
+            return OpenXrApi::xrEndFrame(session, submitInfo);
         }
 
       private:
@@ -718,33 +951,238 @@ namespace {
         };
 
         struct Swapchain {
-            ~Swapchain() {
-                for (auto event : _frameFenceEvents) {
-                    CloseHandle(event);
-                }
-                if (_sharedHandle)
-                    CloseHandle(_sharedHandle);
-            }
             XrSwapchain _xrSwapchain{XR_NULL_HANDLE};
+            XrSession _xrSession{XR_NULL_HANDLE};
             XrSwapchainCreateInfo _createInfo{};
             std::vector<XrSwapchainImageD3D11KHR> _dx11SurfaceImages;
             std::vector<XrSwapchainImageD3D12KHR> _dx12SurfaceImages;
-            uint32_t _aquiredIndex = -1;
-            uint32_t _releasedIndex = -1;
+            std::deque<uint32_t> _acquiredIndices;
+            uint32_t _lastAcquiredIndex = UINT32_MAX;
+            uint32_t _lastCopiedIndex = UINT32_MAX;
             ComPtr<ID3D11Texture2D> _dx11LastTexture = nullptr;
+            ComPtr<IDXGIKeyedMutex> _dx11KeyedMutex = nullptr;
             ComPtr<ID3D12Resource> _dx12LastTexture = nullptr;
             std::vector<ComPtr<ID3D12GraphicsCommandList>> _commandLists;
             std::vector<ComPtr<ID3D12CommandAllocator>> _commandAllocators;
-            std::vector<HANDLE> _frameFenceEvents;
+            std::vector<UniqueHandle> _frameFenceEvents;
             std::vector<ComPtr<ID3D12Fence>> _frameFences;
             std::vector<UINT64> _fenceValues;
-            HANDLE _sharedHandle = NULL;
+            UniqueHandle _sharedHandle;
+            // Shared with the mirror device so it can wait for our copies.
+            ComPtr<ID3D12Fence> _copyFence = nullptr;
+            UniqueHandle _copyFenceHandle;
+            UINT64 _copyFenceValue = 0;
         };
 
-        void cleanupSession(Session& sessionState) {
+        // ---- Recording overscan (experimental) ----
+
+        bool overscanActive() const {
+            return _overscanRequested && _overscanScalesComputed &&
+                   (_overscanHScale > 1.001f || _overscanVScale > 1.001f);
         }
 
-        void cleanupSwapchain(Swapchain& swapchainState) {
+        void computeOverscanScales(const XrViewConfigurationView* views, uint32_t viewCount) {
+            if (_overscanScalesComputed)
+                return;
+
+            // Never exceed what the runtime allows for swapchain sizes; if the
+            // limits remove all headroom, overscan disables itself rather than
+            // degrading pixels-per-degree in the headset.
+            float hScale = _overscanDesiredH;
+            float vScale = _overscanDesiredV;
+            for (uint32_t i = 0; i < viewCount; ++i) {
+                if (views[i].recommendedImageRectWidth > 0 && views[i].maxImageRectWidth > 0) {
+                    hScale = std::min(hScale,
+                                      static_cast<float>(views[i].maxImageRectWidth) /
+                                          static_cast<float>(views[i].recommendedImageRectWidth));
+                }
+                if (views[i].recommendedImageRectHeight > 0 && views[i].maxImageRectHeight > 0) {
+                    vScale = std::min(vScale,
+                                      static_cast<float>(views[i].maxImageRectHeight) /
+                                          static_cast<float>(views[i].recommendedImageRectHeight));
+                }
+            }
+            _overscanHScale = std::max(hScale, 1.0f);
+            _overscanVScale = std::max(vScale, 1.0f);
+            _overscanScalesComputed = true;
+
+            if (overscanActive()) {
+                Log("Recording overscan active: %.3fx horizontal, %.3fx vertical\n", _overscanHScale, _overscanVScale);
+            } else {
+                Log("Recording overscan disabled by runtime swapchain limits\n");
+            }
+        }
+
+        // Widen by scaling the tangent of each half-angle, not the angle
+        // itself, so the expansion is linear in render-target pixels.
+        XrFovf widenFov(const XrFovf& fov) const {
+            XrFovf wide;
+            wide.angleLeft = atanf(tanf(fov.angleLeft) * _overscanHScale);
+            wide.angleRight = atanf(tanf(fov.angleRight) * _overscanHScale);
+            wide.angleUp = atanf(tanf(fov.angleUp) * _overscanVScale);
+            wide.angleDown = atanf(tanf(fov.angleDown) * _overscanVScale);
+            return wide;
+        }
+
+        // Sub-rect of `rect` (rendered with fov `wide`) covering exactly `orig`.
+        static XrRect2Di computeCenterCrop(const XrRect2Di& rect, const XrFovf& wide, const XrFovf& orig) {
+            const float wideLeft = tanf(wide.angleLeft);
+            const float wideRight = tanf(wide.angleRight);
+            const float wideUp = tanf(wide.angleUp);
+            const float wideDown = tanf(wide.angleDown);
+            const float origLeft = tanf(orig.angleLeft);
+            const float origRight = tanf(orig.angleRight);
+            const float origUp = tanf(orig.angleUp);
+            const float origDown = tanf(orig.angleDown);
+
+            const float uSpan = wideRight - wideLeft;
+            const float vSpan = wideUp - wideDown;
+            if (uSpan <= 0.0f || vSpan <= 0.0f || rect.extent.width <= 0 || rect.extent.height <= 0) {
+                return rect;
+            }
+
+            const float u0 = (origLeft - wideLeft) / uSpan;
+            const float u1 = (origRight - wideLeft) / uSpan;
+            // D3D images have row 0 at the top, which maps to angleUp.
+            const float v0 = (wideUp - origUp) / vSpan;
+            const float v1 = (wideUp - origDown) / vSpan;
+
+            XrRect2Di crop;
+            crop.offset.x = rect.offset.x + static_cast<int32_t>(std::lroundf(u0 * rect.extent.width));
+            crop.offset.y = rect.offset.y + static_cast<int32_t>(std::lroundf(v0 * rect.extent.height));
+            crop.extent.width = static_cast<int32_t>(std::lroundf((u1 - u0) * rect.extent.width));
+            crop.extent.height = static_cast<int32_t>(std::lroundf((v1 - v0) * rect.extent.height));
+
+            // Keep the crop inside the source rect.
+            crop.offset.x = std::clamp(crop.offset.x, rect.offset.x, rect.offset.x + rect.extent.width - 1);
+            crop.offset.y = std::clamp(crop.offset.y, rect.offset.y, rect.offset.y + rect.extent.height - 1);
+            crop.extent.width = std::clamp(crop.extent.width, 1, rect.offset.x + rect.extent.width - crop.offset.x);
+            crop.extent.height = std::clamp(crop.extent.height, 1, rect.offset.y + rect.extent.height - crop.offset.y);
+            return crop;
+        }
+
+        // The depth subimage must receive the identical angular crop or the
+        // runtime would reproject with misaligned depth.
+        void patchDepthInfo(XrCompositionLayerProjectionView& view, const XrFovf& wide, const XrFovf& orig) {
+            const XrBaseInStructure* entry = reinterpret_cast<const XrBaseInStructure*>(view.next);
+            if (!entry)
+                return;
+
+            if (entry->type == XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR) {
+                const XrCompositionLayerDepthInfoKHR* depth =
+                    reinterpret_cast<const XrCompositionLayerDepthInfoKHR*>(entry);
+                _patchedDepthInfos.push_back(*depth);
+                XrCompositionLayerDepthInfoKHR& newDepth = _patchedDepthInfos.back();
+                newDepth.subImage.imageRect = computeCenterCrop(depth->subImage.imageRect, wide, orig);
+                view.next = &newDepth;
+                return;
+            }
+
+            // Depth chained behind another structure cannot be rewritten
+            // without cloning the whole chain; warn once so incompatibilities
+            // are diagnosable.
+            for (; entry; entry = entry->next) {
+                if (entry->type == XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR && !_depthPatchWarned) {
+                    _depthPatchWarned = true;
+                    Log("Recording overscan: depth info is not first in the view chain and was not cropped\n");
+                }
+            }
+        }
+
+        // Deep-copies the projection layers with the original FOV and central
+        // crop applied. Returns false when nothing needed patching.
+        bool buildOverscanSubmission(const XrFrameEndInfo* frameEndInfo, XrFrameEndInfo& patched) {
+            size_t projLayerCount = 0;
+            size_t viewTotal = 0;
+            for (uint32_t i = 0; i < frameEndInfo->layerCount; ++i) {
+                const XrCompositionLayerBaseHeader* hdr = frameEndInfo->layers[i];
+                if (hdr && hdr->type == XR_TYPE_COMPOSITION_LAYER_PROJECTION) {
+                    ++projLayerCount;
+                    viewTotal += reinterpret_cast<const XrCompositionLayerProjection*>(hdr)->viewCount;
+                }
+            }
+            if (projLayerCount == 0)
+                return false;
+
+            _patchedLayerPtrs.clear();
+            _patchedProjLayers.clear();
+            _patchedProjViews.clear();
+            _patchedDepthInfos.clear();
+            // Reserve up front so the pointers taken below stay stable.
+            _patchedLayerPtrs.reserve(frameEndInfo->layerCount);
+            _patchedProjLayers.reserve(projLayerCount);
+            _patchedProjViews.reserve(viewTotal);
+            _patchedDepthInfos.reserve(viewTotal);
+
+            bool anyPatched = false;
+            for (uint32_t i = 0; i < frameEndInfo->layerCount; ++i) {
+                const XrCompositionLayerBaseHeader* hdr = frameEndInfo->layers[i];
+                if (!hdr || hdr->type != XR_TYPE_COMPOSITION_LAYER_PROJECTION) {
+                    _patchedLayerPtrs.push_back(hdr);
+                    continue;
+                }
+
+                const XrCompositionLayerProjection* projLayer =
+                    reinterpret_cast<const XrCompositionLayerProjection*>(hdr);
+                _patchedProjLayers.push_back(*projLayer);
+                XrCompositionLayerProjection& newLayer = _patchedProjLayers.back();
+
+                const size_t firstView = _patchedProjViews.size();
+                for (uint32_t v = 0; v < projLayer->viewCount; ++v) {
+                    _patchedProjViews.push_back(projLayer->views[v]);
+                    XrCompositionLayerProjectionView& view = _patchedProjViews.back();
+
+                    if (v >= _originalViewFovs.size())
+                        continue;
+
+                    const XrFovf orig = _originalViewFovs[v];
+                    const XrFovf wide = widenFov(orig);
+                    // Only patch views rendered with the FOV we handed out;
+                    // anything else passes through untouched.
+                    if (!fovNearEqual(view.fov, wide))
+                        continue;
+
+                    view.subImage.imageRect = computeCenterCrop(view.subImage.imageRect, wide, orig);
+                    view.fov = orig;
+                    patchDepthInfo(view, wide, orig);
+                    anyPatched = true;
+                }
+                newLayer.views = &_patchedProjViews[firstView];
+                _patchedLayerPtrs.push_back(reinterpret_cast<const XrCompositionLayerBaseHeader*>(&newLayer));
+            }
+
+            if (!anyPatched)
+                return false;
+
+            patched = *frameEndInfo;
+            patched.layers = _patchedLayerPtrs.data();
+            return true;
+        }
+
+        // Create the mirror on the adapter the game renders with; shared
+        // resources cannot be opened across adapters on hybrid-GPU systems.
+        void ensureMirror() {
+            if (_mirror)
+                return;
+
+            ComPtr<IDXGIAdapter> adapter;
+            if (_xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR && _d3d11Device) {
+                ComPtr<IDXGIDevice> dxgiDevice;
+                if (SUCCEEDED(_d3d11Device->QueryInterface(IID_PPV_ARGS(&dxgiDevice)))) {
+                    dxgiDevice->GetAdapter(adapter.ReleaseAndGetAddressOf());
+                }
+            } else if (_xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_D3D12_KHR && _d3d12Device) {
+                const LUID luid = _d3d12Device->GetAdapterLuid();
+                ComPtr<IDXGIFactory4> factory;
+                if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) {
+                    factory->EnumAdapterByLuid(luid, IID_PPV_ARGS(adapter.ReleaseAndGetAddressOf()));
+                }
+            }
+
+            _mirror = std::make_unique<D3D11Mirror>(adapter.Get());
+            if (!_mirror->initialized()) {
+                Log("Mirror initialization failed; OBS mirroring disabled\n");
+            }
         }
 
         bool isSystemHandled(XrSystemId systemId) const {
@@ -770,9 +1208,8 @@ namespace {
 
         ID3D12Device* _d3d12Device = nullptr;
         ID3D12CommandQueue* _d3d12CommandQueue = nullptr;
-        
+
         XrSystemId _systemId{XR_NULL_SYSTEM_ID};
-        bool _graphicsRequirementQueried{false};
 
         std::vector<XrViewConfigurationView> _xrViewsList{};
         std::vector<XrCompositionLayerProjectionView> _projectionViews{};
@@ -780,13 +1217,30 @@ namespace {
         std::map<XrSession, Session> _sessions;
         std::map<XrSwapchain, Swapchain> _swapchains;
 
+        // Recording overscan state (experimental, latched at instance creation).
+        bool _overscanRequested = false;
+        float _overscanDesiredH = 1.0f;
+        float _overscanDesiredV = 1.0f;
+        float _overscanHScale = 1.0f;
+        float _overscanVScale = 1.0f;
+        bool _overscanScalesComputed = false;
+        bool _depthPatchWarned = false;
+        std::vector<XrFovf> _originalViewFovs;
+        // Per-frame scratch for the patched runtime submission.
+        std::vector<const XrCompositionLayerBaseHeader*> _patchedLayerPtrs;
+        std::vector<XrCompositionLayerProjection> _patchedProjLayers;
+        std::vector<XrCompositionLayerProjectionView> _patchedProjViews;
+        std::vector<XrCompositionLayerDepthInfoKHR> _patchedDepthInfos;
     };
-
-    std::unique_ptr<OpenXrLayer> g_instance = nullptr;
 
 } // namespace
 
 namespace layer_OBSMirror {
+    // Defined in dispatch.gen.cpp; ResetInstance() clears it on
+    // xrDestroyInstance so the layer (and its mirror) is destroyed with the
+    // instance instead of lingering for the life of the process.
+    extern std::unique_ptr<OpenXrApi> g_instance;
+
     OpenXrApi* GetInstance() {
         if (!g_instance) {
             g_instance = std::make_unique<OpenXrLayer>();
@@ -803,9 +1257,12 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         TraceLoggingRegister(layer_OBSMirror::log::g_traceProvider);
         break;
 
+    case DLL_PROCESS_DETACH:
+        TraceLoggingUnregister(layer_OBSMirror::log::g_traceProvider);
+        break;
+
     case DLL_THREAD_ATTACH:
     case DLL_THREAD_DETACH:
-    case DLL_PROCESS_DETACH:
         break;
     }
     return TRUE;

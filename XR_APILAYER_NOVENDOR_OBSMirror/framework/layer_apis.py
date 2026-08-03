@@ -1,16 +1,19 @@
 # The list of OpenXR functions our layer will override.
 override_functions = [
     "xrCreateSession",
+    "xrDestroySession",
     "xrCreateSwapchain",
     "xrDestroySwapchain",
     "xrEnumerateSwapchainImages",
     "xrAcquireSwapchainImage",
     "xrReleaseSwapchainImage",
+    "xrEnumerateViewConfigurationViews",
     "xrLocateViews",
     "xrBeginFrame",
     "xrEndFrame",
     "xrCreateReferenceSpace",
-    "xrDestroySpace"
+    "xrDestroySpace",
+    "xrGetVisibilityMaskKHR"
 ]
 
 # The list of OpenXR functions our layer will use from the runtime.
@@ -24,4 +27,4 @@ requested_functions = [
 ]
 
 # The list of OpenXR extensions our layer will either override or use.
-extensions = []
+extensions = ["XR_KHR_visibility_mask"]

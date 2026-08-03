@@ -7,7 +7,7 @@
 // https://obsproject.com/forum/resources/openvr-input-plugin.534/
 //
 
-//#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
 #define NOMINMAX
 
 #include <obs-module.h>
@@ -23,6 +23,7 @@
 #include <new>
 #include <vector>
 
+#include "dxgi_format_info.h"
 #include "obs_mirror_ipc.h"
 
 #pragma comment(lib, "d3d11.lib")
@@ -56,12 +57,15 @@ struct croppreset {
 
 std::vector<croppreset> croppresets;
 
+using obs_mirror_ipc::DxgiFormatInfo;
+using obs_mirror_ipc::GetFormatInfo;
+using obs_mirror_ipc::kMirrorTextureCount;
+
 struct win_openxrmirror {
 	obs_source_t *source;
 	HANDLE map_file = nullptr;
 	obs_mirror_ipc::MirrorSurfaceData *surface = nullptr;
 	std::uint64_t shared_handle = 0;
-	std::uint32_t current_frame = 0;
 
 	int captureeye = 1; // left = 0, right = 1, both = 2
 	int croppreset;
@@ -75,7 +79,6 @@ struct win_openxrmirror {
 	winrt::com_ptr<ID3D11Device> dev11 = nullptr;
 	winrt::com_ptr<ID3D11DeviceContext> ctx11 = nullptr;
 	std::vector<winrt::com_ptr<ID3D11Texture2D>> mirror_textures;
-	std::vector<winrt::com_ptr<IDXGIResource>> copy_tex_resource_mirrors;
 
 	winrt::com_ptr<ID3D11Texture2D> texCrop = nullptr;
 
@@ -95,73 +98,6 @@ struct win_openxrmirror {
 
 };
 
-struct DxgiFormatInfo {
-	/// The different versions of this format, set to DXGI_FORMAT_UNKNOWN if absent.
-	/// Both the SRGB and linear formats should be UNORM.
-	DXGI_FORMAT srgb, linear, typeless;
-
-	/// THe bits per pixel, bits per channel, and the number of channels
-	int bpp, bpc, channels;
-};
-
-bool GetFormatInfo(DXGI_FORMAT format, DxgiFormatInfo &out)
-{
-#define DEF_FMT_BASE(typeless, linear, srgb, bpp, bpc, channels) \
-	{                                                        \
-		out = DxgiFormatInfo{srgb, linear, typeless,     \
-				     bpp,  bpc,    channels};    \
-		return true;                                     \
-	}
-
-#define DEF_FMT_NOSRGB(name, bpp, bpc, channels)            \
-	case name##_TYPELESS:                               \
-	case name##_UNORM:                                  \
-		DEF_FMT_BASE(name##_TYPELESS, name##_UNORM, \
-			     DXGI_FORMAT_UNKNOWN, bpp, bpc, channels)
-
-#define DEF_FMT(name, bpp, bpc, channels)                                      \
-	case name##_TYPELESS:                                                  \
-	case name##_UNORM:                                                     \
-	case name##_UNORM_SRGB:                                                \
-		DEF_FMT_BASE(name##_TYPELESS, name##_UNORM, name##_UNORM_SRGB, \
-			     bpp, bpc, channels)
-
-#define DEF_FMT_UNORM(linear, bpp, bpc, channels)                              \
-	case linear:                                                           \
-		DEF_FMT_BASE(DXGI_FORMAT_UNKNOWN, linear, DXGI_FORMAT_UNKNOWN, \
-			     bpp, bpc, channels)
-
-	// Note that this *should* have pretty much all the types we'll ever see in games
-	// Filtering out the non-typeless and non-unorm/srgb types, this is all we're left with
-	// (note that types that are only typeless and don't have unorm/srgb variants are dropped too)
-	switch (format) {
-		// The relatively traditional 8bpp 32-bit types
-		DEF_FMT(DXGI_FORMAT_R8G8B8A8, 32, 8, 4)
-		DEF_FMT(DXGI_FORMAT_B8G8R8A8, 32, 8, 4)
-		DEF_FMT(DXGI_FORMAT_B8G8R8X8, 32, 8, 3)
-
-		// Some larger linear-only types
-		DEF_FMT_NOSRGB(DXGI_FORMAT_R16G16B16A16, 64, 16, 4)
-		DEF_FMT_NOSRGB(DXGI_FORMAT_R10G10B10A2, 32, 10, 4)
-
-		// A jumble of other weird types
-		DEF_FMT_UNORM(DXGI_FORMAT_B5G6R5_UNORM, 16, 5, 3)
-		DEF_FMT_UNORM(DXGI_FORMAT_B5G5R5A1_UNORM, 16, 5, 4)
-		DEF_FMT_UNORM(DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM, 32, 10, 4)
-		DEF_FMT_UNORM(DXGI_FORMAT_B4G4R4A4_UNORM, 16, 4, 4)
-		DEF_FMT(DXGI_FORMAT_BC1, 64, 16, 4)
-
-	default:
-		// Unknown type
-		return false;
-	}
-
-#undef DEF_FMT
-#undef DEF_FMT_NOSRGB
-#undef DEF_FMT_BASE
-#undef DEF_FMT_UNORM
-}
-
 static void win_openxrmirror_deinit(void *data)
 {
 	struct win_openxrmirror *context = (win_openxrmirror *)data;
@@ -177,14 +113,12 @@ static void win_openxrmirror_deinit(void *data)
 
 	context->texCrop = nullptr;
 	context->mirror_textures.clear();
-	context->copy_tex_resource_mirrors.clear();
 	context->ctx11 = nullptr;
 	context->dev11 = nullptr;
 
 	context->device_width = 0;
 	context->device_height = 0;
 	context->shared_handle = 0;
-	context->current_frame = 0;
 
 	if (context->surface) {
 		UnmapViewOfFile(context->surface);
@@ -258,7 +192,6 @@ static void win_openxrmirror_init(void *data, bool forced = false)
         }
 
         context->mirror_textures = std::vector<winrt::com_ptr<ID3D11Texture2D>>();
-        context->copy_tex_resource_mirrors = std::vector<winrt::com_ptr<IDXGIResource>>();
         const std::uint64_t published_handle = context->surface->sharedHandle[0];
         if (published_handle == 0) {
             warn("win_openxrmirror_init: Mirror surface is not ready");
@@ -266,7 +199,7 @@ static void win_openxrmirror_init(void *data, bool forced = false)
         }
         MemoryBarrier();
 
-        for (UINT i = 0; i < 3; ++i) {
+        for (UINT i = 0; i < kMirrorTextureCount; ++i) {
             const std::uint64_t shared_handle = i == 0 ? published_handle : context->surface->sharedHandle[i];
 
             if (shared_handle == 0) {
@@ -283,11 +216,9 @@ static void win_openxrmirror_init(void *data, bool forced = false)
                 warn("win_openxrmirror_init: OpenSharedResource failed");
                 return;
             }
-            context->copy_tex_resource_mirrors.push_back(copy_tex_resource_mirror);
 
             winrt::com_ptr<ID3D11Texture2D> mirror_texture;
-            hr = context->copy_tex_resource_mirrors[i]->QueryInterface(__uuidof(ID3D11Texture2D),
-                                                                       mirror_texture.put_void());
+            hr = copy_tex_resource_mirror->QueryInterface(__uuidof(ID3D11Texture2D), mirror_texture.put_void());
             if (FAILED(hr) || !mirror_texture) {
                 warn("win_openxrmirror_init: copy_tex_resource_mirror->QueryInterface failed");
                 return;
@@ -388,24 +319,36 @@ static const char *win_openxrmirror_get_name(void *unused)
 static void win_openxrmirror_update(void *data, obs_data_t *settings)
 {
 	struct win_openxrmirror *context = (win_openxrmirror *)data;
-	context->captureeye = std::clamp(
+	const int captureeye = std::clamp(
 		static_cast<int>(obs_data_get_int(settings, "captureeye")), 0, 2);
 	const double crop_left =
 		std::clamp(obs_data_get_double(settings, "cropleft"), 0.0, 100.0);
 	const double crop_right =
 		std::clamp(obs_data_get_double(settings, "cropright"), 0.0, 100.0);
 
-	if (context->captureeye == 1) {
-		context->crop.left = crop_left;
-		context->crop.right = crop_right;
+	crop newCrop;
+	if (captureeye == 1) {
+		newCrop.left = crop_left;
+		newCrop.right = crop_right;
 	} else {
-		context->crop.left = crop_right;
-		context->crop.right = crop_left;
+		newCrop.left = crop_right;
+		newCrop.right = crop_left;
 	}
-	context->crop.top =
+	newCrop.top =
 		std::clamp(obs_data_get_double(settings, "croptop"), 0.0, 100.0);
-	context->crop.bottom =
+	newCrop.bottom =
 		std::clamp(obs_data_get_double(settings, "cropbottom"), 0.0, 100.0);
+
+	// Eye selection and crop change the texture layout and need a rebuild;
+	// the blend parameters are consumed live by the layer every frame.
+	const bool needsReinit = captureeye != context->captureeye ||
+				 newCrop.top != context->crop.top ||
+				 newCrop.left != context->crop.left ||
+				 newCrop.bottom != context->crop.bottom ||
+				 newCrop.right != context->crop.right;
+
+	context->captureeye = captureeye;
+	context->crop = newCrop;
 
 	context->overlap = static_cast<float>(
 		std::clamp(obs_data_get_double(settings, "eyeoverlap"), 0.0, 100.0));
@@ -413,6 +356,13 @@ static void win_openxrmirror_update(void *data, obs_data_t *settings)
 		std::clamp(obs_data_get_double(settings, "eyeblend"), 0.0, 100.0));
 	context->blendPos = static_cast<float>(
 		std::clamp(obs_data_get_double(settings, "eyeblendpos"), 0.0, 100.0));
+
+	if (context->initialized && context->surface && !needsReinit) {
+		context->surface->blend = context->blend;
+		context->surface->blendPos = context->blendPos;
+		context->surface->overlap = context->overlap;
+		return;
+	}
 
 	if (context->initialized) {
 		win_openxrmirror_deinit(data);
@@ -470,7 +420,6 @@ static void *win_openxrmirror_create(obs_data_t *settings, obs_source_t *source)
 	context->texture = nullptr;
 	context->texCrop = nullptr;
 	context->mirror_textures.clear();
-	context->copy_tex_resource_mirrors.clear();
 
 	context->width = context->height = 100;
 
@@ -489,8 +438,6 @@ static void win_openxrmirror_destroy(void *data)
 static void win_openxrmirror_render(void *data, gs_effect_t *effect)
 {
 	struct win_openxrmirror *context = (win_openxrmirror *)data;
-	if (context->surface)
-		context->surface->frameNumber++;
 
 	if (context->initialized && context->surface &&
 	    context->shared_handle != context->surface->sharedHandle[0]) {
@@ -502,11 +449,12 @@ static void win_openxrmirror_render(void *data, gs_effect_t *effect)
 		win_openxrmirror_init(data);
 	}
 
-	if (!context->texture || !context->active) {
+	if (!context->texture || !context->active ||
+	    context->mirror_textures.size() != kMirrorTextureCount) {
 		return;
 	}
 
-	// Crop from full size mirror texture
+	// Crop from the newest fully-copied mirror texture in the ring
 	// This step is required even without cropping as the full res mirror texture is in sRGB space
 	D3D11_BOX poksi = {
 		context->x,
@@ -517,28 +465,14 @@ static void win_openxrmirror_render(void *data, gs_effect_t *effect)
 		1,
 	};
 
-	uint32_t latestFrame = context->current_frame;
+	const uint32_t latestFrame =
+		context->surface ? context->surface->lastProcessedIndex.load() : 0;
 
-	if (context->surface)
-		latestFrame = context->surface->lastProcessedIndex;
-
-	if (context->current_frame > latestFrame ||
-	    latestFrame - context->current_frame > 2) {
-		//blog(LOG_INFO, "Resetting currFrame");
-		context->current_frame = latestFrame;
-	}
-
-	if (latestFrame - context->current_frame > 1) {
-		//blog(LOG_INFO, "Skipping frame");
-		context->current_frame++;
-	}
-
-	context->ctx11->CopySubresourceRegion(context->texCrop.get(), 0, 0, 0, 0,
-			context->mirror_textures[0].get(),
-					      0, &poksi);
+	context->ctx11->CopySubresourceRegion(
+		context->texCrop.get(), 0, 0, 0, 0,
+		context->mirror_textures[latestFrame % kMirrorTextureCount].get(),
+		0, &poksi);
 	context->ctx11->Flush();
-
-	context->current_frame++;
 
 	// Draw from shared mirror texture
 	effect = obs_get_base_effect(OBS_EFFECT_OPAQUE);
@@ -555,6 +489,11 @@ static void win_openxrmirror_tick(void *data, float seconds)
 	struct win_openxrmirror *context = (win_openxrmirror *)data;
 
 	context->active = obs_source_active(context->source);
+
+	// Heartbeat: tells the layer the plugin is alive even on frames where
+	// the source itself is not rendered.
+	if (context->surface)
+		context->surface->frameNumber++;
 }
 
 static bool crop_preset_changed(obs_properties_t *props, obs_property_t *p,
@@ -565,7 +504,7 @@ static bool crop_preset_changed(obs_properties_t *props, obs_property_t *p,
 
 	int sel = (int)obs_data_get_int(s, "croppreset") - 1;
 
-	if (sel >= croppresets.size() || sel < 0)
+	if (sel < 0 || sel >= (int)croppresets.size())
 		return false;
 
 	const crop &crop = croppresets[sel].crop;
