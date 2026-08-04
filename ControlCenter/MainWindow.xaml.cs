@@ -32,6 +32,7 @@ public sealed partial class MainWindow : Window
     private string _vrRestartProducerApp = string.Empty;
     private int _previewFramesSinceSample;
     private double _previewFps;
+    private readonly DispatcherTimer _obsCloseWatchTimer = new() { Interval = TimeSpan.FromSeconds(3) };
     private bool _autoUpdateInProgress;
     private bool _autoUpdateFailed;
     private string _lastAutoUpdateKey = string.Empty;
@@ -73,9 +74,12 @@ public sealed partial class MainWindow : Window
         appWindow.TitleBar.ButtonInactiveForegroundColor = ColorHelper.FromArgb(255, 130, 138, 153);
         App.LogStartup("AppWindow title bar styled");
 
+        _obsCloseWatchTimer.Tick += ObsCloseWatchTimer_Tick;
+
         Activated += MainWindow_Activated;
         Closed += (_, _) =>
         {
+            _obsCloseWatchTimer.Stop();
             StopMirrorPreview();
             _previewWindow?.Close();
             _previewWindow = null;
@@ -841,8 +845,13 @@ public sealed partial class MainWindow : Window
             return;
 
         // The plugin DLL cannot be replaced while OBS holds it; the layer
-        // still updates now and the plugin follows once OBS has closed.
+        // still updates now and the plugin follows once OBS has closed. A
+        // watcher finishes the job so the user never has to press Refresh.
         var pluginDeferred = pluginOutdated && snapshot.ObsRunning;
+        if (pluginDeferred)
+            _obsCloseWatchTimer.Start();
+        else
+            _obsCloseWatchTimer.Stop();
         var key = $"{snapshot.SourceLayerHash}|{snapshot.SourcePluginHash}|{pluginDeferred}";
         if (key == _lastAutoUpdateKey)
             return;
@@ -882,6 +891,22 @@ public sealed partial class MainWindow : Window
             SetBusy(false);
             _autoUpdateInProgress = false;
         }
+        await RefreshSnapshotAsync();
+    }
+
+    // Runs only while an OBS source update is waiting for OBS to close. The
+    // probe is a process-name lookup, so polling it every few seconds is far
+    // cheaper than taking a full snapshot.
+    private async void ObsCloseWatchTimer_Tick(object? sender, object e)
+    {
+        if (_autoUpdateInProgress)
+            return;
+        if (await Task.Run(() => Process.GetProcessesByName("obs64").Length > 0))
+            return;
+
+        _obsCloseWatchTimer.Stop();
+        // Refreshing re-runs the auto-update pass, which now sees OBS closed
+        // and installs the pending source update.
         await RefreshSnapshotAsync();
     }
 
