@@ -19,6 +19,7 @@ public sealed partial class MainWindow : Window
     private readonly OBSMirrorService _service = new();
     private readonly MirrorPreviewService _previewService = new();
     private readonly LogSharingService _logSharing = new();
+    private readonly AppUpdateService _appUpdate = new();
     private readonly Stopwatch _previewFrameClock = new();
     private SystemSnapshot? _snapshot;
     private WriteableBitmap? _previewBitmap;
@@ -103,7 +104,7 @@ public sealed partial class MainWindow : Window
     {
         // RangeBase validates each assignment immediately. Set the upper bound
         // first so a 100-based percentage range never conflicts with defaults.
-        slider.Maximum = 150;
+        slider.Maximum = 200;
         slider.Minimum = 100;
         slider.StepFrequency = 1;
         slider.Value = value;
@@ -131,6 +132,90 @@ public sealed partial class MainWindow : Window
         Activated -= MainWindow_Activated;
         await RefreshSnapshotAsync();
         StartMirrorPreview();
+        _ = CheckForAppUpdateAsync();
+    }
+
+    // On launch: ask GitHub for a newer release and offer it in one click.
+    // A failed check (offline, rate-limited) is logged and stays silent - the
+    // app must never nag about updates it cannot fetch.
+    private async Task CheckForAppUpdateAsync()
+    {
+        AppUpdateInfo? update;
+        try
+        {
+            update = await _appUpdate.CheckForUpdateAsync();
+        }
+        catch (Exception ex)
+        {
+            App.LogStartup("App update check failed", ex);
+            return;
+        }
+
+        if (update is null)
+        {
+            App.LogStartup($"App update check: {AppUpdateService.CurrentVersion} is current");
+            return;
+        }
+        App.LogStartup($"App update check: {update.Version} is available (running {AppUpdateService.CurrentVersion})");
+
+        if (Content?.XamlRoot is not { } xamlRoot)
+            return;
+
+        var notes = update.ReleaseNotes;
+        if (notes.Length > 1200)
+            notes = notes[..1200] + "…";
+        var dialog = new ContentDialog
+        {
+            XamlRoot = xamlRoot,
+            Title = $"Update available — {update.Title}",
+            PrimaryButtonText = "Yes, update",
+            CloseButtonText = "Later",
+            DefaultButton = ContentDialogButton.Primary,
+            Content = new ScrollViewer
+            {
+                MaxHeight = 340,
+                Content = new TextBlock
+                {
+                    Text = $"Version {update.Version} is available (you have {AppUpdateService.CurrentVersion}). " +
+                           "It downloads, installs, and reopens the app automatically." +
+                           (string.IsNullOrWhiteSpace(notes) ? string.Empty : $"\n\n{notes}"),
+                    TextWrapping = TextWrapping.Wrap,
+                },
+            },
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+            return;
+
+        SetBusy(true);
+        try
+        {
+            var progress = new Progress<int>(percent =>
+                ShowMessage(
+                    $"Downloading update {update.Version}",
+                    $"{update.InstallerName} — {percent}%",
+                    InfoBarSeverity.Informational));
+            var installerPath = await _appUpdate.DownloadInstallerAsync(update, progress);
+
+            ShowMessage(
+                "Installing update",
+                "The app closes now and reopens automatically when the update finishes.",
+                InfoBarSeverity.Informational);
+            AppUpdateService.StartUpdateAndRelaunch(installerPath);
+            await Task.Delay(500);
+            Application.Current.Exit();
+        }
+        catch (Exception ex)
+        {
+            App.LogStartup("App update failed", ex);
+            ShowMessage(
+                "Update failed",
+                $"{ex.Message} You can retry from the dialog on next launch or download it from GitHub Releases.",
+                InfoBarSeverity.Error);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
     }
 
     private async Task RefreshSnapshotAsync()

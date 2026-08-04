@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$Version = '0.3.0-beta.4',
-    [string]$FileVersion = '0.3.0.4',
+    [string]$Version = '0.3.0-beta.5',
+    [string]$FileVersion = '0.3.0.5',
     [string]$OBSSourcePath = 'E:\Github\obs-studio',
     [string]$OBSInstallPath = 'C:\Program Files\obs-studio'
 )

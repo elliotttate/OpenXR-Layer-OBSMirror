@@ -7,11 +7,11 @@ param(
     [switch]$Disable,
 
     [Parameter(ParameterSetName = 'Enable')]
-    [ValidateRange(100, 150)]
+    [ValidateRange(100, 200)]
     [int]$HorizontalPercent = 115,
 
     [Parameter(ParameterSetName = 'Enable')]
-    [ValidateRange(100, 150)]
+    [ValidateRange(100, 200)]
     [int]$VerticalPercent = 108
 )
 

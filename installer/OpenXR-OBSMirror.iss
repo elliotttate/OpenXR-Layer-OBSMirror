@@ -1,8 +1,8 @@
 #ifndef MyAppVersion
-  #define MyAppVersion "0.3.0-beta.4"
+  #define MyAppVersion "0.3.0-beta.5"
 #endif
 #ifndef MyFileVersion
-  #define MyFileVersion "0.3.0.4"
+  #define MyFileVersion "0.3.0.5"
 #endif
 #ifndef PayloadRoot
   #define PayloadRoot "..\artifacts\payload"
@@ -60,6 +60,9 @@ Name: "{autodesktop}\OpenXR OBS Mirror"; Filename: "{app}\ControlCenter\OBSMirro
 
 [Run]
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\scripts\Setup-OBS.ps1"" -AllowRunningOBS -SkipPluginInstall"; StatusMsg: "Registering the OpenXR mirror layer..."; Flags: runhidden waituntilterminated runasoriginaluser
+; skipifsilent is required: the Control Center's in-app updater runs this
+; installer with /VERYSILENT and reopens the app itself once setup exits, so
+; letting Setup also launch it would start a second instance.
 Filename: "{app}\ControlCenter\OBSMirror.ControlCenter.exe"; Description: "Open Control Center"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [UninstallRun]

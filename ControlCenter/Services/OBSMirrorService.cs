@@ -91,8 +91,8 @@ public sealed class OBSMirrorService
 
     public void ApplyOverscan(bool enabled, int horizontalPercent, int verticalPercent)
     {
-        horizontalPercent = Math.Clamp(horizontalPercent, 100, 150);
-        verticalPercent = Math.Clamp(verticalPercent, 100, 150);
+        horizontalPercent = Math.Clamp(horizontalPercent, 100, 200);
+        verticalPercent = Math.Clamp(verticalPercent, 100, 200);
 
         using var key = Registry.CurrentUser.CreateSubKey(ConfigKey, writable: true)
             ?? throw new InvalidOperationException("Could not open the per-user OBSMirror settings key.");
@@ -370,8 +370,8 @@ public sealed class OBSMirrorService
     {
         using var key = Registry.CurrentUser.OpenSubKey(ConfigKey);
         var enabled = Convert.ToInt32(key?.GetValue("RecordingOverscan", 0) ?? 0) != 0;
-        var horizontal = Math.Clamp(Convert.ToInt32(key?.GetValue("OverscanHorizontalPercent", 115) ?? 115), 100, 150);
-        var vertical = Math.Clamp(Convert.ToInt32(key?.GetValue("OverscanVerticalPercent", 108) ?? 108), 100, 150);
+        var horizontal = Math.Clamp(Convert.ToInt32(key?.GetValue("OverscanHorizontalPercent", 115) ?? 115), 100, 200);
+        var vertical = Math.Clamp(Convert.ToInt32(key?.GetValue("OverscanVerticalPercent", 108) ?? 108), 100, 200);
         return (enabled, horizontal, vertical);
     }
 

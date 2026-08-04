@@ -141,8 +141,8 @@ namespace {
             _overscanRequested = readConfigDword(L"RecordingOverscan", 0) != 0;
             if (_overscanRequested) {
                 const DWORD hPercent =
-                    std::clamp<DWORD>(readConfigDword(L"OverscanHorizontalPercent", 115), 100, 150);
-                const DWORD vPercent = std::clamp<DWORD>(readConfigDword(L"OverscanVerticalPercent", 108), 100, 150);
+                    std::clamp<DWORD>(readConfigDword(L"OverscanHorizontalPercent", 115), 100, 200);
+                const DWORD vPercent = std::clamp<DWORD>(readConfigDword(L"OverscanVerticalPercent", 108), 100, 200);
                 _overscanDesiredH = static_cast<float>(hPercent) / 100.0f;
                 _overscanDesiredV = static_cast<float>(vPercent) / 100.0f;
                 Log("Recording overscan requested: %.2fx horizontal, %.2fx vertical\n",
