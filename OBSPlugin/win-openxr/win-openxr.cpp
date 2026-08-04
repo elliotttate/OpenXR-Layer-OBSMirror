@@ -63,7 +63,7 @@ using obs_mirror_ipc::kMirrorTextureCount;
 
 // Logged at load and published through the shared diagnostics block so the
 // layer log records which plugin build it talked to.
-static const char *const kPluginVersion = "0.3.0-beta.6";
+static const char *const kPluginVersion = "0.3.0-beta.7";
 
 struct win_openxrmirror {
 	obs_source_t *source;
