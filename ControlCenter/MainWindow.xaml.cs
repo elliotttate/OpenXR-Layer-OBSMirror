@@ -269,6 +269,18 @@ public sealed partial class MainWindow : Window
             ? "OBS is running — the update installs when it closes"
             : snapshot.ObsRunning ? "OBS is running" : "OBS is not running";
 
+        // A stale copy inside the OBS folder wins source registration over the
+        // installed one, so the capture silently runs old code and stays blank.
+        var hasConflictingPlugin = !string.IsNullOrWhiteSpace(snapshot.ConflictingPluginPath);
+        ConflictingPluginInfoBar.IsOpen = hasConflictingPlugin;
+        if (hasConflictingPlugin)
+        {
+            ConflictingPluginInfoBar.Message =
+                $"OBS is loading a second, older copy of the capture source from {snapshot.ConflictingPluginPath}. " +
+                "OBS uses whichever copy registers first, so the source can stay blank even though everything here " +
+                "reports as current. Removing the old copy leaves the installed source in place.";
+        }
+
         var runtimeConfigured = !snapshot.RuntimeName.Equals("Not configured", StringComparison.OrdinalIgnoreCase);
         var runtimeOkay = runtimeConfigured && !snapshot.SimulatorRuntimeOverrideActive;
         SetStatus(RuntimeDot, RuntimeStatusText, runtimeOkay,
@@ -982,6 +994,23 @@ public sealed partial class MainWindow : Window
         {
             _loadingLayerRegistrationControls = false;
         }
+    }
+
+    private async void RemoveConflictingPlugin_Click(object sender, RoutedEventArgs e)
+    {
+        await RunActionAsync("Removing the old OBS source copy", async () =>
+        {
+            if (_snapshot?.ObsRunning == true)
+                throw new InvalidOperationException("Close OBS first; it is holding the old plugin file open.");
+
+            // The OBS folder is normally under Program Files, so removal needs
+            // the same elevation path the plugin installer uses.
+            var message = await ElevatedInstallService.RemoveConflictingPluginElevatedAsync();
+            ShowMessage(
+                "Old OBS source copy removed",
+                $"{message} Start OBS again; the installed source will now be the one that loads.",
+                InfoBarSeverity.Success);
+        });
     }
 
     private async void LaunchObs_Click(object sender, RoutedEventArgs e)

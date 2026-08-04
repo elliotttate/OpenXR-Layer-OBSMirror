@@ -905,13 +905,34 @@ namespace {
 
                     const bool includeQuadLayers = mirrorQuadLayers();
                     uint32_t count = frameEndInfo->layerCount;
+                    _diagSubmittedLayers = count;
+                    _diagSawProjectionLayer = false;
+                    _diagProjectionViews = 0;
                     for (uint32_t i = 0; i < count; ++i) {
                         const XrCompositionLayerBaseHeader* hdr = frameEndInfo->layers[i];
+                        if (!hdr)
+                            continue;
                         if (hdr->type == XR_TYPE_COMPOSITION_LAYER_PROJECTION) {
                             projLayer = reinterpret_cast<const XrCompositionLayerProjection*>(hdr);
-                            if (projLayer->viewCount >= 2) {
-                                if (_mirror->getEyeIndex() < 2) {
-                                    const uint32_t eyeIndex = _mirror->getEyeIndex();
+                            _diagSawProjectionLayer = true;
+                            _diagProjectionViews = std::max(_diagProjectionViews, projLayer->viewCount);
+
+                            // Both eyes side by side needs a stereo layer; a
+                            // single-view submission (alternate-eye VR mods do
+                            // this) is mirrored as mono instead of skipped.
+                            const bool stereo = projLayer->viewCount >= 2;
+                            const bool bothEyes =
+                                stereo && _mirror->getEyeIndex() >= 2 && _projectionViews.size() >= 2;
+                            if (projLayer->viewCount >= 1) {
+                                if (!bothEyes) {
+                                    uint32_t eyeIndex = _mirror->getEyeIndex();
+                                    if (eyeIndex >= projLayer->viewCount)
+                                        eyeIndex = 0;
+                                    if (!stereo && !_monoProjectionLogged) {
+                                        _monoProjectionLogged = true;
+                                        Log("The application submits a projection layer with a single view; "
+                                            "mirroring it as mono (the OBS eye selection has no effect here)\n");
+                                    }
                                     projView = &projLayer->views[eyeIndex];
                                     if (isSwapchainHandled(projView->subImage.swapchain)) {
                                         auto& swapchainState = _swapchains[projView->subImage.swapchain];
@@ -934,7 +955,7 @@ namespace {
                                     } else {
                                         outcome = std::max(outcome, MirrorOutcome::SwapchainNotTracked);
                                     }
-                                } else if (_projectionViews.size() >= 2) {
+                                } else {
                                     projView = &projLayer->views[0];
                                     const XrCompositionLayerProjectionView* projView2 = &projLayer->views[1];
                                     if (isSwapchainHandled(projView->subImage.swapchain) &&
@@ -1062,7 +1083,7 @@ namespace {
             case MirrorOutcome::NoViewData:
                 return "waiting for view data from xrLocateViews against a tracked reference space";
             case MirrorOutcome::NoProjectionLayer:
-                return "no stereo projection layer in the game's frame submission";
+                return "no usable projection layer in the game's frame submission";
             case MirrorOutcome::SwapchainNotTracked:
                 return "the projection layer uses a swapchain the layer is not tracking";
             case MirrorOutcome::TextureNotReady:
@@ -1079,7 +1100,25 @@ namespace {
         // Logs mirror pipeline state transitions so a single log file explains
         // why OBS shows (or stops showing) frames. Capped in case a game flaps
         // between states every frame.
+        // "No usable projection layer" has three very different causes; naming
+        // the one that actually happened is what makes the log actionable.
+        void describeSubmissionShape(char* buffer, size_t size) const {
+            if (_diagSubmittedLayers == 0)
+                snprintf(buffer, size, " (the application submitted no composition layers this frame)");
+            else if (!_diagSawProjectionLayer)
+                snprintf(buffer,
+                         size,
+                         " (%u layer(s) submitted, none of them a projection layer)",
+                         _diagSubmittedLayers);
+            else
+                snprintf(buffer, size, " (projection layer carries %u view(s))", _diagProjectionViews);
+        }
+
         void noteMirrorOutcome(MirrorOutcome outcome) {
+            char shape[160] = {};
+            if (outcome == MirrorOutcome::NoProjectionLayer)
+                describeSubmissionShape(shape, sizeof(shape));
+
             if (outcome == _lastMirrorOutcome) {
                 ++_mirrorOutcomeFrames;
                 const ULONGLONG now = GetTickCount64();
@@ -1087,18 +1126,20 @@ namespace {
                     _lastMirrorHealthLogTick = now;
                 else if (now - _lastMirrorHealthLogTick >= 30000) {
                     _lastMirrorHealthLogTick = now;
-                    Log("Mirror health: %s for %u consecutive xrEndFrame calls. This confirms the pipeline state, "
+                    Log("Mirror health: %s%s for %u consecutive xrEndFrame calls. This confirms the pipeline state, "
                         "not whether the published pixels are non-black; use the Control Center Preview diagnostics "
                         "log for pixel sampling.\n",
                         describeMirrorOutcome(outcome),
+                        shape,
                         _mirrorOutcomeFrames);
                 }
                 return;
             }
             if (_mirrorOutcomeTransitionLogs < 40) {
                 ++_mirrorOutcomeTransitionLogs;
-                Log("Mirror state: %s (after %u frames of: %s)\n",
+                Log("Mirror state: %s%s (after %u frames of: %s)\n",
                     describeMirrorOutcome(outcome),
+                    shape,
                     _mirrorOutcomeFrames,
                     describeMirrorOutcome(_lastMirrorOutcome));
                 if (_mirrorOutcomeTransitionLogs == 40) {
@@ -1423,6 +1464,11 @@ namespace {
         uint32_t _mirrorOutcomeTransitionLogs = 0;
         ULONGLONG _lastMirrorHealthLogTick = 0;
         bool _untrackedViewSpaceLogged = false;
+        bool _monoProjectionLogged = false;
+        // Shape of the most recent frame submission, for the diagnostics above.
+        uint32_t _diagSubmittedLayers = 0;
+        uint32_t _diagProjectionViews = 0;
+        bool _diagSawProjectionLayer = false;
 
         // Recording overscan state (experimental, latched at instance creation).
         bool _overscanRequested = false;

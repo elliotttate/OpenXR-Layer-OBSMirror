@@ -213,6 +213,12 @@
                                         </Grid>
                                         <InfoBar x:Name="RuntimeModeInfoBar" IsOpen="True" IsClosable="False" Severity="Informational"
                                                  Title="Checking runtime selection" Message="Reading the effective and system OpenXR runtime settings." />
+                                        <InfoBar x:Name="ConflictingPluginInfoBar" IsOpen="False" IsClosable="False" Severity="Error"
+                                                 Title="An old OBS source copy is taking over">
+                                            <InfoBar.ActionButton>
+                                                <Button Click="RemoveConflictingPlugin_Click" Content="Remove the old copy" />
+                                            </InfoBar.ActionButton>
+                                        </InfoBar>
                                     </StackPanel>
                                 </Border>
 

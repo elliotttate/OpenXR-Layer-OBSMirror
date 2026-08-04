@@ -29,4 +29,7 @@ public sealed record SystemSnapshot(
     bool MirrorQuadLayers,
     string LastCaptureSummary,
     string MetaXrExecutable,
+    // Empty unless a stale plugin copy inside the OBS installation is
+    // shadowing the installed one.
+    string ConflictingPluginPath,
     DateTime CapturedAt);

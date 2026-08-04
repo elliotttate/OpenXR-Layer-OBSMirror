@@ -86,6 +86,7 @@ public sealed class OBSMirrorService
             MirrorQuadLayers: mirrorQuadLayers,
             LastCaptureSummary: FindLastCaptureSummary(),
             MetaXrExecutable: metaExe,
+            ConflictingPluginPath: FindConflictingPluginPath() ?? string.Empty,
             CapturedAt: DateTime.Now);
     }
 
@@ -293,6 +294,56 @@ public sealed class OBSMirrorService
 
     /// <summary>Best-effort path of obs64.exe, or null when it cannot be found.</summary>
     public string? FindObsExecutable() => ResolveObsExecutablePath();
+
+    /// <summary>
+    /// A win-openxr.dll inside the OBS installation directory, which is where
+    /// the plugin used to be installed by hand. OBS loads that folder before
+    /// the shared plugin folder, so the stale copy wins the source
+    /// registration ("Source 'openxrmirror_capture' already exists!") and
+    /// every capture source ends up driven by the old build - which then fails
+    /// to open the current layer's shared textures and shows nothing.
+    /// Returns null when there is no such file.
+    /// </summary>
+    public string? FindConflictingPluginPath()
+    {
+        var obsExecutable = ResolveObsExecutablePath();
+        if (string.IsNullOrWhiteSpace(obsExecutable))
+            return null;
+
+        // obs64.exe lives in <root>\bin\64bit.
+        var obsRoot = Directory.GetParent(obsExecutable)?.Parent?.Parent?.FullName;
+        if (string.IsNullOrWhiteSpace(obsRoot))
+            return null;
+
+        var candidate = Path.Combine(obsRoot, "obs-plugins", "64bit", "win-openxr.dll");
+        return File.Exists(candidate) ? candidate : null;
+    }
+
+    /// <summary>
+    /// Removes the shadowing copy described by <see cref="FindConflictingPluginPath"/>
+    /// along with its data folder. Requires administrator rights when OBS is
+    /// installed under Program Files.
+    /// </summary>
+    public string RemoveConflictingPlugin()
+    {
+        var conflicting = FindConflictingPluginPath();
+        if (conflicting is null)
+            return "No conflicting OBS plugin copy was found.";
+        if (IsProcessRunning("obs64"))
+            throw new InvalidOperationException("Close OBS before removing the old plugin copy; OBS is holding the file.");
+
+        File.Delete(conflicting);
+
+        // The matching data folder would otherwise leave stale locale files.
+        var obsRoot = Directory.GetParent(conflicting)?.Parent?.Parent?.FullName;
+        if (!string.IsNullOrWhiteSpace(obsRoot))
+        {
+            var dataDirectory = Path.Combine(obsRoot, "data", "obs-plugins", "win-openxr");
+            if (Directory.Exists(dataDirectory))
+                Directory.Delete(dataDirectory, recursive: true);
+        }
+        return $"Removed the conflicting plugin copy at {conflicting}.";
+    }
 
     /// <summary>
     /// Remembers a user-picked obs64.exe so every later launch uses it.

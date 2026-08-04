@@ -9,12 +9,15 @@ internal sealed record ElevatedInstallResult(bool Success, string Message);
 internal static class ElevatedInstallService
 {
     private const string HelperArgument = "--install-obs-plugin-elevated";
+    private const string RemoveHelperArgument = "--remove-conflicting-plugin-elevated";
     private const string ResultArgument = "--result-file";
 
     public static bool TryGetHelperResultPath(out string resultPath)
     {
         var arguments = Environment.GetCommandLineArgs();
         var helperIndex = Array.IndexOf(arguments, HelperArgument);
+        if (helperIndex < 0)
+            helperIndex = Array.IndexOf(arguments, RemoveHelperArgument);
         var resultIndex = Array.IndexOf(arguments, ResultArgument);
         if (helperIndex < 0 || resultIndex < 0 || resultIndex + 1 >= arguments.Length)
         {
@@ -31,10 +34,18 @@ internal static class ElevatedInstallService
 
     public static async Task RunHelperAndExitAsync(string resultPath)
     {
+        // The elevated instance re-resolves what to act on itself; nothing
+        // from the command line is used as a path, so an elevated run can only
+        // ever touch the plugin locations this app already manages.
+        var removing = Array.IndexOf(Environment.GetCommandLineArgs(), RemoveHelperArgument) >= 0;
+
         ElevatedInstallResult result;
         try
         {
-            var message = await new OBSMirrorService().InstallPluginOnlyAsync();
+            var service = new OBSMirrorService();
+            var message = removing
+                ? await Task.Run(service.RemoveConflictingPlugin)
+                : await service.InstallPluginOnlyAsync();
             result = new ElevatedInstallResult(true, message);
         }
         catch (Exception ex)
@@ -55,7 +66,11 @@ internal static class ElevatedInstallService
         Environment.Exit(result.Success ? 0 : 1);
     }
 
-    public static async Task<string> InstallPluginElevatedAsync()
+    public static Task<string> InstallPluginElevatedAsync() => RunElevatedAsync(HelperArgument);
+
+    public static Task<string> RemoveConflictingPluginElevatedAsync() => RunElevatedAsync(RemoveHelperArgument);
+
+    private static async Task<string> RunElevatedAsync(string helperArgument)
     {
         var executable = Environment.ProcessPath;
         if (string.IsNullOrWhiteSpace(executable) || !File.Exists(executable))
@@ -72,7 +87,7 @@ internal static class ElevatedInstallService
                 Verb = "runas",
                 WorkingDirectory = AppContext.BaseDirectory
             };
-            startInfo.ArgumentList.Add(HelperArgument);
+            startInfo.ArgumentList.Add(helperArgument);
             startInfo.ArgumentList.Add(ResultArgument);
             startInfo.ArgumentList.Add(resultPath);
 
