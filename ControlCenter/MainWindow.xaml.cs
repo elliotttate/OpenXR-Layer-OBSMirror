@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Graphics;
+using Windows.Storage.Pickers;
 using WinRT.Interop;
 
 namespace OBSMirror.ControlCenter;
@@ -958,7 +959,7 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void LaunchObs_Click(object sender, RoutedEventArgs e)
+    private async void LaunchObs_Click(object sender, RoutedEventArgs e)
     {
         try
         {
@@ -969,6 +970,57 @@ public sealed partial class MainWindow : Window
             }
             _service.LaunchObs();
             ShowMessage("OBS launched", "Refresh status after OBS finishes loading.", InfoBarSeverity.Success);
+        }
+        catch (OBSMirrorService.ObsNotFoundException ex)
+        {
+            // Portable and unusual installs register nothing to detect, so let
+            // the user point at obs64.exe once instead of dead-ending.
+            await BrowseForObsAndLaunchAsync(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            ShowMessage("Could not launch OBS", ex.Message, InfoBarSeverity.Error);
+        }
+    }
+
+    private async Task BrowseForObsAndLaunchAsync(string reason)
+    {
+        if (Content?.XamlRoot is not { } xamlRoot)
+            return;
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = xamlRoot,
+            Title = "Locate OBS Studio",
+            PrimaryButtonText = "Browse for obs64.exe",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            Content = new TextBlock
+            {
+                Text = $"{reason}\n\nobs64.exe is usually in the OBS install folder under bin\\64bit.",
+                TextWrapping = TextWrapping.Wrap,
+            },
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+            return;
+
+        var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.ComputerFolder };
+        picker.FileTypeFilter.Add(".exe");
+        // WinUI 3 pickers are window-owned and must be told which window.
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+
+        var file = await picker.PickSingleFileAsync();
+        if (file is null)
+            return;
+
+        try
+        {
+            _service.SetObsExecutable(file.Path);
+            _service.LaunchObs();
+            ShowMessage(
+                "OBS launched",
+                $"Saved this location for future launches: {file.Path}",
+                InfoBarSeverity.Success);
         }
         catch (Exception ex)
         {

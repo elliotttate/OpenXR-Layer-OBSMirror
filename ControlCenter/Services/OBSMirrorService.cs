@@ -285,13 +285,35 @@ public sealed class OBSMirrorService
         return Convert.ToHexString(SHA256.HashData(stream));
     }
 
+    /// <summary>
+    /// Thrown when OBS cannot be located, so the UI can offer to browse for it
+    /// instead of only reporting a failure.
+    /// </summary>
+    public sealed class ObsNotFoundException(string message) : Exception(message);
+
+    /// <summary>Best-effort path of obs64.exe, or null when it cannot be found.</summary>
+    public string? FindObsExecutable() => ResolveObsExecutablePath();
+
+    /// <summary>
+    /// Remembers a user-picked obs64.exe so every later launch uses it.
+    /// </summary>
+    public void SetObsExecutable(string path)
+    {
+        EnsureFile(path, "OBS executable");
+        if (!Path.GetFileName(path).Equals("obs64.exe", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Select obs64.exe (the 64-bit OBS Studio executable).");
+
+        using var key = Registry.CurrentUser.CreateSubKey(ConfigKey, writable: true)
+            ?? throw new InvalidOperationException("Could not open the per-user OBSMirror settings key.");
+        key.SetValue("ObsExecutable", path, RegistryValueKind.String);
+    }
+
     public void LaunchObs()
     {
         var obsPath = ResolveObsExecutablePath()
-            ?? throw new FileNotFoundException(
-                "OBS Studio (obs64.exe) was not found. If OBS is installed in a custom location, " +
-                @"set the ObsExecutable value under HKEY_CURRENT_USER\Software\OpenXR-OBSMirror " +
-                "to the full path of obs64.exe.");
+            ?? throw new ObsNotFoundException(
+                "OBS Studio (obs64.exe) could not be found automatically. This is normal for a custom or " +
+                "portable install - browse to obs64.exe once and it will be remembered.");
         var startInfo = new ProcessStartInfo(obsPath)
         {
             WorkingDirectory = Path.GetDirectoryName(obsPath)!,
@@ -459,6 +481,25 @@ public sealed class OBSMirrorService
             }
         }
 
+        // A running OBS is the most reliable source of truth, and it covers
+        // portable copies that register nothing at all.
+        try
+        {
+            foreach (var process in Process.GetProcessesByName("obs64"))
+            {
+                using (process)
+                {
+                    var runningPath = process.MainModule?.FileName;
+                    if (!string.IsNullOrWhiteSpace(runningPath) && File.Exists(runningPath))
+                        return runningPath;
+                }
+            }
+        }
+        catch
+        {
+            // Reading another process's module list can fail on permissions.
+        }
+
         foreach (var hive in new[] { RegistryHive.LocalMachine, RegistryHive.CurrentUser })
         {
             foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
@@ -469,17 +510,89 @@ public sealed class OBSMirrorService
                 if (ObsExecutableFromInstallDirectory(installDirectory) is { } fromInstallKey)
                     return fromInstallKey;
 
-                var uninstaller = ReadRegistryString(
-                    hive, view, @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\OBS Studio", "UninstallString");
-                if (!string.IsNullOrWhiteSpace(uninstaller) &&
-                    ObsExecutableFromInstallDirectory(
-                        Path.GetDirectoryName(uninstaller.Trim().Trim('"'))) is { } fromUninstallKey)
-                    return fromUninstallKey;
+                foreach (var uninstallKey in new[]
+                         {
+                             @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\OBS Studio",
+                             @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{5E4EFC30-6A6B-4F53-B21A-9D1E01F76B18}_is1",
+                         })
+                {
+                    foreach (var valueName in new[] { "InstallLocation", "UninstallString", "DisplayIcon" })
+                    {
+                        var value = ReadRegistryString(hive, view, uninstallKey, valueName);
+                        if (string.IsNullOrWhiteSpace(value))
+                            continue;
+                        // DisplayIcon can be "<path>,0" and points at an exe.
+                        var cleaned = value.Trim().Trim('"').Split(',')[0].Trim();
+                        var directory = File.Exists(cleaned) ? Path.GetDirectoryName(cleaned) : cleaned;
+                        if (ObsExecutableFromInstallDirectory(directory) is { } fromUninstall)
+                            return fromUninstall;
+                        // InstallLocation may already be the bin\64bit folder.
+                        if (!string.IsNullOrWhiteSpace(directory))
+                        {
+                            var direct = Path.Combine(directory, "obs64.exe");
+                            if (File.Exists(direct))
+                                return direct;
+                        }
+                    }
+                }
+
+                // Windows records launchable executables here as well.
+                var appPath = ReadRegistryString(
+                    hive, view, @"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\obs64.exe", null);
+                if (!string.IsNullOrWhiteSpace(appPath))
+                {
+                    var cleaned = appPath.Trim().Trim('"');
+                    if (File.Exists(cleaned))
+                        return cleaned;
+                }
             }
         }
 
-        return ObsExecutableFromInstallDirectory(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "obs-studio"));
+        // Last resort: the default folder name on every fixed drive, which
+        // catches "D:\Program Files\obs-studio" style relocations.
+        foreach (var root in EnumerateFixedDriveRoots())
+        {
+            foreach (var relative in new[]
+                     {
+                         @"Program Files\obs-studio",
+                         @"Program Files (x86)\obs-studio",
+                         "obs-studio",
+                         @"Games\obs-studio",
+                     })
+            {
+                if (ObsExecutableFromInstallDirectory(Path.Combine(root, relative)) is { } found)
+                    return found;
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> EnumerateFixedDriveRoots()
+    {
+        DriveInfo[] drives;
+        try
+        {
+            drives = DriveInfo.GetDrives();
+        }
+        catch
+        {
+            yield break;
+        }
+        foreach (var drive in drives)
+        {
+            var isReady = false;
+            try
+            {
+                isReady = drive.DriveType == DriveType.Fixed && drive.IsReady;
+            }
+            catch
+            {
+                // Unreadable drives are simply skipped.
+            }
+            if (isReady)
+                yield return drive.RootDirectory.FullName;
+        }
     }
 
     private static string? ObsExecutableFromInstallDirectory(string? installDirectory)
