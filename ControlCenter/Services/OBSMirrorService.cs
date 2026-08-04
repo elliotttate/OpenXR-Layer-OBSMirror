@@ -154,8 +154,11 @@ public sealed class OBSMirrorService
 
     public void LaunchObs()
     {
-        const string obsPath = @"C:\Program Files\obs-studio\bin\64bit\obs64.exe";
-        EnsureFile(obsPath, "OBS executable");
+        var obsPath = ResolveObsExecutablePath()
+            ?? throw new FileNotFoundException(
+                "OBS Studio (obs64.exe) was not found. If OBS is installed in a custom location, " +
+                @"set the ObsExecutable value under HKEY_CURRENT_USER\Software\OpenXR-OBSMirror " +
+                "to the full path of obs64.exe.");
         var startInfo = new ProcessStartInfo(obsPath)
         {
             WorkingDirectory = Path.GetDirectoryName(obsPath)!,
@@ -320,6 +323,50 @@ public sealed class OBSMirrorService
         {
             return null;
         }
+    }
+
+    private string? ResolveObsExecutablePath()
+    {
+        using (var config = Registry.CurrentUser.OpenSubKey(ConfigKey))
+        {
+            if (config?.GetValue("ObsExecutable") is string configured)
+            {
+                var trimmed = configured.Trim().Trim('"');
+                if (File.Exists(trimmed))
+                    return trimmed;
+            }
+        }
+
+        foreach (var hive in new[] { RegistryHive.LocalMachine, RegistryHive.CurrentUser })
+        {
+            foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
+            {
+                // The OBS installer records its install directory in this key's
+                // default value, wherever the user chose to install it.
+                var installDirectory = ReadRegistryString(hive, view, @"SOFTWARE\OBS Studio", null);
+                if (ObsExecutableFromInstallDirectory(installDirectory) is { } fromInstallKey)
+                    return fromInstallKey;
+
+                var uninstaller = ReadRegistryString(
+                    hive, view, @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\OBS Studio", "UninstallString");
+                if (!string.IsNullOrWhiteSpace(uninstaller) &&
+                    ObsExecutableFromInstallDirectory(
+                        Path.GetDirectoryName(uninstaller.Trim().Trim('"'))) is { } fromUninstallKey)
+                    return fromUninstallKey;
+            }
+        }
+
+        return ObsExecutableFromInstallDirectory(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "obs-studio"));
+    }
+
+    private static string? ObsExecutableFromInstallDirectory(string? installDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(installDirectory))
+            return null;
+        var candidate = Path.Combine(
+            installDirectory.Trim().Trim('"'), "bin", "64bit", "obs64.exe");
+        return File.Exists(candidate) ? candidate : null;
     }
 
     private static string FriendlyRuntimeName(string path)
