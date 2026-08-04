@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="OBSMirror.ControlCenter.MirrorPreviewWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="OBSMirror — Live Preview">
+
+    <Grid Background="#FF0D1115" Padding="20" RowSpacing="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <StackPanel Spacing="3">
+                <TextBlock Text="LIVE MIRROR PREVIEW" Foreground="#FF58D7DF"
+                           FontSize="12" FontWeight="SemiBold" CharacterSpacing="110" />
+                <TextBlock x:Name="LargePreviewStatusText" Text="Waiting for an OpenXR app"
+                           FontSize="24" FontWeight="SemiBold" />
+                <TextBlock x:Name="LargePreviewDetailText"
+                           Text="The preview will connect automatically when a frame is published."
+                           Foreground="#FFAAB2C3" FontSize="12" />
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="1" CornerRadius="12" Background="#FF030507"
+                BorderBrush="#FF2A3038" BorderThickness="1">
+            <Grid>
+                <Image x:Name="LargeMirrorPreviewImage" Stretch="Uniform" />
+                <StackPanel x:Name="LargePreviewPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Spacing="10" MaxWidth="440" Margin="24">
+                    <SymbolIcon Symbol="Video" Width="38" Height="38" Foreground="#FFAAB2C3" />
+                    <TextBlock x:Name="LargePreviewPlaceholderTitle" Text="No mirror image yet"
+                               FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    <TextBlock x:Name="LargePreviewPlaceholderDetail"
+                               Text="Start a VR app after enabling the OpenXR layer."
+                               Foreground="#FFAAB2C3" TextAlignment="Center" TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <TextBlock Grid.Row="2"
+                   Text="This view uses the same live preview stream as the Dashboard. OBS does not need to be open."
+                   Foreground="#FFAAB2C3" FontSize="11" />
+    </Grid>
+</Window>

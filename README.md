@@ -13,8 +13,8 @@ Key recording controls include:
 
 - recording-only FOV overscan with an unchanged headset center crop;
 - live camera smoothing and crop margin;
-- optional matching for fullscreen-effect edges exposed by overscan;
 - independent show/hide control for OpenXR composition quad layers;
+- an in-app preview of the layer's shared mirror image;
 - live runtime, layer, plugin, hash, and diagnostic-log status.
 
 ## See it in action
@@ -103,8 +103,8 @@ installs the plugin under OBS's Windows discovery path at
 
 The dark WinUI 3 Control Center provides one place to inspect layer, plugin,
 runtime, and OBS status; install or update both components; register the layer;
-configure recording overscan and guard-band matching; control camera smoothing;
-show or hide OpenXR quad-layer UI in the recording; and read live logs.
+preview the shared mirror image; configure recording overscan; control camera
+smoothing; show or hide OpenXR quad-layer UI in the recording; and read live logs.
 It is headset-first: the dashboard shows the effective runtime, warns when a
 simulator override is active, and provides **Use headset runtime** to clear
 per-user simulator selectors and return to the machine-wide OpenXR runtime.
@@ -120,15 +120,16 @@ portable ZIP, and checksums in one reproducible command:
 
 ```powershell
 pwsh -File .\scripts\Build-Release.ps1 `
-  -Version 0.3.0-beta.3 `
+  -Version 0.3.0-beta.4 `
   -OBSSourcePath E:\Github\obs-studio
 ```
 
 Run `bin\x64\Release\ControlCenter\OBSMirror.ControlCenter.exe`. Overscan
 changes apply when the OpenXR application next starts. Camera-smoothing changes
 are picked up live by an active OBS Mirror source. Quad-layer visibility is
-picked up live by the updated OpenXR layer after it has been loaded once, as is
-overscan boundary matching.
+picked up live by the updated OpenXR layer after it has been loaded once. The
+Dashboard preview connects directly to the same shared image used by OBS and
+pauses when another Control Center page is selected.
 
 ## Runtime notes
 
@@ -181,14 +182,9 @@ after changing it. Caveats:
 - Applications that ignore `xrLocateViews` FOVs or the recommended render resolution
   fall back to normal behaviour automatically (their submissions pass through
   unmodified).
-- A projection-baked fullscreen blur, tint, vignette, or fade can be authored as
-  a finite surface that covers only the headset-native FOV. This reveals a hard
-  edge in the added recording perimeter even though the headset looks uniform.
-  Turn on **Match fullscreen effects at the FOV boundary** in Control Center to
-  sample the color change across that known boundary and extend it into the
-  recording guard band. The strength is adjustable, applies live, and never
-  changes the image submitted to the headset. Leave it off when an application
-  does not need the compatibility correction.
+- A projection-baked fullscreen blur, tint, vignette, or fade can cover only the
+  headset-native FOV and reveal a hard edge in the added recording perimeter.
+  Reduce or disable overscan for titles that render those effects this way.
 
 ## Camera smoothing (experimental)
 

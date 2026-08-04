@@ -35,6 +35,10 @@ namespace LAYER_NAMESPACE {
     // The path where the DLL is loaded from (eg: to load data files).
     std::filesystem::path dllHome;
 
+    // Full path of the loaded layer DLL, for the log: installed binaries are
+    // hash-versioned, so this identifies exactly which build is running.
+    std::filesystem::path dllFullPath;
+
     // The path that is writable (eg: to store logs).
     std::filesystem::path localAppData;
 
@@ -64,14 +68,28 @@ XrResult __declspec(dllexport) XRAPI_CALL
                                &module)) {
             char path[_MAX_PATH];
             GetModuleFileNameA(module, path, sizeof(path));
-            dllHome = std::filesystem::path(path).parent_path();
+            dllFullPath = std::filesystem::path(path);
+            dllHome = dllFullPath.parent_path();
         }
     }
 
-    // Start logging to file.
+    // Start logging to file. Sessions append: every OpenXR process shares this
+    // file, and truncating here used to destroy the previous session's log
+    // right when a user wanted to share it. Rotate once instead of growing
+    // forever; the rename simply fails (and we keep appending) while another
+    // running process still holds the file.
     if (!logStream.is_open()) {
-        std::string logFile = (std::filesystem::path(getenv("LOCALAPPDATA")) / (LayerName + ".log")).string();
-        logStream.open(logFile, std::ios_base::ate);
+        const std::filesystem::path logFile = std::filesystem::path(getenv("LOCALAPPDATA")) / (LayerName + ".log");
+        constexpr std::uintmax_t kMaxLogBytes = 5 * 1024 * 1024;
+        std::error_code ec;
+        if (std::filesystem::exists(logFile, ec) && std::filesystem::file_size(logFile, ec) > kMaxLogBytes) {
+            std::filesystem::path rotated = logFile;
+            rotated += ".old";
+            std::filesystem::remove(rotated, ec);
+            std::filesystem::rename(logFile, rotated, ec);
+        }
+        logStream.open(logFile.string(), std::ios_base::app);
+        Log("\n-------- New session (pid %u) --------\n", GetCurrentProcessId());
     }
 
     DebugLog("--> xrNegotiateLoaderApiLayerInterface\n");
@@ -104,6 +122,9 @@ XrResult __declspec(dllexport) XRAPI_CALL
     DebugLog("<-- xrNegotiateLoaderApiLayerInterface\n");
 
     Log("%s layer (%s) is active\n", LayerName.c_str(), VersionString.c_str());
+    if (!dllFullPath.empty()) {
+        Log("Layer DLL: %s\n", dllFullPath.string().c_str());
+    }
 
     TraceLoggingWrite(g_traceProvider, "xrNegotiateLoaderApiLayerInterface_Complete");
 

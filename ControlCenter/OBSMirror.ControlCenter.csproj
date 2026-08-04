@@ -11,20 +11,23 @@
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>OBSMirror.ControlCenter</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\OBSMirror.ControlCenter.ico</ApplicationIcon>
-    <Version>0.3.0-beta.3</Version>
-    <AssemblyVersion>0.3.0.3</AssemblyVersion>
-    <FileVersion>0.3.0.3</FileVersion>
-    <InformationalVersion>0.3.0-beta.3</InformationalVersion>
+    <Version>0.3.0-beta.4</Version>
+    <AssemblyVersion>0.3.0.4</AssemblyVersion>
+    <FileVersion>0.3.0.4</FileVersion>
+    <InformationalVersion>0.3.0-beta.4</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260508005" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1839" />
+    <PackageReference Include="Vortice.D3DCompiler" Version="3.6.2" />
+    <PackageReference Include="Vortice.Direct3D11" Version="3.6.2" />
     <Manifest Include="$(ApplicationManifest)" />
     <Content Include="Assets\OBSMirror.ControlCenter.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

@@ -60,24 +60,25 @@ namespace Mirror
                    const XrSpace space,
                    const XrTime displayTime);
 
-        void Blend(const XrCompositionLayerProjectionView* view,
+        /// The eye Blend overloads and copyPerspectiveTex return false only on
+        /// structural failures (source never registered, ring creation failed)
+        /// so xrEndFrame can report an honest mirror state. Transient skips
+        /// such as keyed-mutex timeouts still return true.
+        bool Blend(const XrCompositionLayerProjectionView* view,
                    const XrFovf& hmdFov,
                    const DXGI_FORMAT format,
                    const XrSpace space,
-                   const XrTime displayTime,
-                   const XrFovf* nativeFov = nullptr);
+                   const XrTime displayTime);
 
-        void Blend(const XrCompositionLayerProjectionView* view1,
+        bool Blend(const XrCompositionLayerProjectionView* view1,
                    const XrFovf& hmdFov1,
                    const XrCompositionLayerProjectionView* view2,
                    const XrFovf& hmdFov2,
                    const DXGI_FORMAT format,
                    const XrSpace viewSpace,
-                   const XrTime displayTime,
-                   const XrFovf* nativeFov1 = nullptr,
-                   const XrFovf* nativeFov2 = nullptr);
+                   const XrTime displayTime);
 
-        void copyPerspectiveTex(const XrRect2Di& imgRect,
+        bool copyPerspectiveTex(const XrRect2Di& imgRect,
                                 const uint32_t arraySlice,
                                 const DXGI_FORMAT format,
                                 const XrSwapchain& swapchain);
@@ -87,6 +88,10 @@ namespace Mirror
         void checkOBSRunning();
 
         uint32_t getEyeIndex() const;
+
+        /// Records the game's name in the shared diagnostics block so the OBS
+        /// log can identify which application is (or is not) feeding frames.
+        void setApplicationInfo(const char* applicationName);
 
       private:
         struct SourceData {
@@ -107,6 +112,19 @@ namespace Mirror
 
         bool createMirrorSurface();
 
+        /// Fills the layer's half of the shared diagnostics block (no-op when
+        /// attached to a legacy-sized surface).
+        void publishLayerDiagnostics();
+
+        /// Logs which consumers (OBS plugin, Control Center preview) have
+        /// stamped the diagnostics block, and raises a GPU-mismatch error when
+        /// OBS renders on a different adapter.
+        void logConsumerDetails();
+
+        /// Tracks consecutive keyed-mutex acquire failures so a persistent
+        /// stall is reported once instead of silently dropping every frame.
+        void noteSourceAcquire(bool acquired);
+
         bool createSourceView(SourceData& srcData);
 
         /// True when the OBS-side camera smoothing sliders request smoothing
@@ -126,8 +144,7 @@ namespace Mirror
                              const XrRect2Di& targetRect,
                              const bool seamBlend,
                              const float alphaOverride,
-                             const XrTime displayTime,
-                             const XrFovf* nativeFov = nullptr);
+                             const XrTime displayTime);
 
         static XrFovf scaleFovTan(const XrFovf& fov, const float scale);
 
@@ -144,18 +161,7 @@ namespace Mirror
         void writeBlendConstants(float blendStartX,
                                  float blendEndX,
                                  float texIndex,
-                                 float alphaOverride,
-                                 const UVRect& uv,
-                                 const D3D11_TEXTURE2D_DESC& srcDesc,
-                                 const XrFovf* renderedFov = nullptr,
-                                 const XrFovf* headsetFov = nullptr);
-
-        bool computeOverscanBounds(const XrFovf& renderedFov,
-                                   const XrFovf& headsetFov,
-                                   const UVRect& uv,
-                                   DirectX::XMFLOAT4& bounds) const;
-
-        void refreshOverscanCompensationConfig();
+                                 float alphaOverride);
 
         void bindQuadPipeline(const SourceData& srcData);
 
@@ -173,7 +179,10 @@ namespace Mirror
 
         std::map<XrSwapchain, SourceData> _sourceData;
         obs_mirror_ipc::MirrorSurfaceData* _pMirrorSurfaceData = nullptr;
+        // Null when attached to a legacy 64-byte surface from an older layer.
+        obs_mirror_ipc::MirrorDiagnostics* _diag = nullptr;
         HANDLE _mapFile = nullptr;
+        LUID _adapterLuid{};
 
         std::map<XrSpace, XrReferenceSpaceCreateInfo> _spaceInfo;
 
@@ -199,6 +208,11 @@ namespace Mirror
         uint32_t _lastOBSFrameNumber = 0;
         bool _obsRunning = false;
         bool _initialized = false;
+        uint32_t _acquireTimeoutStreak = 0;
+        bool _acquireTimeoutWarned = false;
+        // Non-zero while mirror ring creation is failing; retries (and their
+        // log output) are limited to once per second instead of every frame.
+        ULONGLONG _lastRingBuildFailTick = 0;
 
         float _fovVertRatio = 1.f;
         float _fovHorizRatio = 1.f;
@@ -215,12 +229,5 @@ namespace Mirror
         DirectX::XMFLOAT4 _smoothRelQuat{0.0f, 0.0f, 0.0f, 1.0f};
         DirectX::XMFLOAT3 _smoothRelPos{0.0f, 0.0f, 0.0f};
 
-        // Recording-only correction for finite, projection-baked fullscreen
-        // effects that stop at the runtime-native FOV when overscan is active.
-        bool _overscanCompensation = false;
-        float _overscanCompensationStrength = 1.0f;
-        bool _overscanCompensationConfigInitialized = false;
-        bool _overscanCompensationAppliedLogged = false;
-        ULONGLONG _lastOverscanCompensationConfigCheckTick = 0;
     };
 }

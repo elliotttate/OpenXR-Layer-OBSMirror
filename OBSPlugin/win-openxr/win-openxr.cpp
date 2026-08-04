@@ -61,12 +61,36 @@ using obs_mirror_ipc::DxgiFormatInfo;
 using obs_mirror_ipc::GetFormatInfo;
 using obs_mirror_ipc::kMirrorTextureCount;
 
+// Logged at load and published through the shared diagnostics block so the
+// layer log records which plugin build it talked to.
+static const char *const kPluginVersion = "0.3.0-beta.4";
+
 struct win_openxrmirror {
 	obs_source_t *source;
 	HANDLE map_file = nullptr;
 	obs_mirror_ipc::MirrorSurfaceData *surface = nullptr;
+	// Null while disconnected or when attached to an older layer that only
+	// provides the legacy 64-byte surface.
+	obs_mirror_ipc::MirrorDiagnostics *diag = nullptr;
+	bool legacy_surface = false;
 	std::uint64_t shared_handle = 0;
 	std::uint32_t surface_generation = 0;
+
+	// Connection-progress logging state. Deliberately not reset by deinit so
+	// waiting messages repeat every 30 s instead of on every 1 s init retry.
+	int connect_stage = -1;
+	ULONGLONG stage_log_tick = 0;
+	LUID adapter_luid = {};
+
+	// Stale-frame watchdog: notices when the layer stops publishing frames.
+	std::uint32_t last_index = 0;
+	ULONGLONG last_index_tick = 0;
+	std::uint32_t heartbeat_baseline = 0;
+	bool stall_warned = false;
+	ULONGLONG last_health_log_tick = 0;
+	ULONGLONG last_render_tick = 0;
+	ULONGLONG last_adapter_mismatch_log_tick = 0;
+	std::uint64_t render_count = 0;
 
 	int captureeye = 1; // left = 0, right = 1, both = 2
 	int croppreset;
@@ -149,6 +173,66 @@ static void refresh_app_smoothing(win_openxrmirror *context, bool force = false)
 	publish_smoothing(context);
 }
 
+enum connect_stage_t {
+	STAGE_NO_MAPPING = 0,
+	STAGE_MAPPING_FAILED,
+	STAGE_WAITING_HANDLES,
+	// Mapped and handles published, but opening/creating textures failed.
+	// Persistent (e.g. GPU mismatch), so its warnings must be throttled -
+	// init retries every second.
+	STAGE_INIT_FAILED,
+	STAGE_CONNECTED,
+};
+
+// True when this stage should be logged now: always on a stage change, and
+// every 30 s while stuck in a waiting stage (STAGE_CONNECTED never repeats).
+static bool should_log_stage(win_openxrmirror *context, int stage)
+{
+	const ULONGLONG now = GetTickCount64();
+	if (context->connect_stage != stage) {
+		context->connect_stage = stage;
+		context->stage_log_tick = now;
+		return true;
+	}
+	if (stage != STAGE_CONNECTED && now - context->stage_log_tick >= 30000) {
+		context->stage_log_tick = now;
+		return true;
+	}
+	return false;
+}
+
+// Shared textures cannot cross GPU adapters; when both sides published their
+// LUID and they differ, a blank source is expected - say so explicitly.
+static void warn_on_adapter_mismatch(win_openxrmirror *context)
+{
+	if (!context->diag ||
+	    context->diag->layerMagic != obs_mirror_ipc::kDiagnosticsMagic)
+		return;
+
+	const bool obs_luid_known = context->adapter_luid.LowPart != 0 ||
+				    context->adapter_luid.HighPart != 0;
+	const bool layer_luid_known = context->diag->layerAdapterLuidLow != 0 ||
+				      context->diag->layerAdapterLuidHigh != 0;
+	if (obs_luid_known && layer_luid_known &&
+	    (context->diag->layerAdapterLuidLow !=
+		     (std::uint32_t)context->adapter_luid.LowPart ||
+	     context->diag->layerAdapterLuidHigh !=
+		     context->adapter_luid.HighPart)) {
+		const ULONGLONG now = GetTickCount64();
+		if (context->last_adapter_mismatch_log_tick != 0 &&
+		    now - context->last_adapter_mismatch_log_tick < 30000)
+			return;
+		context->last_adapter_mismatch_log_tick = now;
+		warn("GPU MISMATCH: OBS renders on adapter LUID %08lX:%08lX but the VR game's mirror is on %08X:%08X. "
+		     "Shared textures cannot cross GPUs, so this source will stay blank. Force OBS onto the game's GPU "
+		     "(Windows Settings > System > Display > Graphics).",
+		     (unsigned long)context->adapter_luid.HighPart,
+		     (unsigned long)context->adapter_luid.LowPart,
+		     context->diag->layerAdapterLuidHigh,
+		     context->diag->layerAdapterLuidLow);
+	}
+}
+
 static void win_openxrmirror_deinit(void *data)
 {
 	struct win_openxrmirror *context = (win_openxrmirror *)data;
@@ -173,9 +257,15 @@ static void win_openxrmirror_deinit(void *data)
 	context->surface_generation = 0;
 
 	if (context->surface) {
+		// Withdraw our identity so the layer's consumer log stays accurate
+		// after OBS exits (the magic is re-stamped on the next init).
+		if (context->diag)
+			context->diag->pluginMagic = 0;
 		UnmapViewOfFile(context->surface);
 		context->surface = nullptr;
 	}
+	context->diag = nullptr;
+	context->legacy_surface = false;
 	if (context->map_file) {
 		CloseHandle(context->map_file);
 		context->map_file = nullptr;
@@ -205,12 +295,19 @@ static void win_openxrmirror_init(void *data, bool forced = false)
 
 	if (context->map_file == nullptr) {
 		const DWORD error = GetLastError();
-		// The VR application normally creates this mapping after OBS starts.
-		// Keep retrying silently while it is absent, but report unexpected
-		// failures such as access-denied or resource exhaustion.
-		if (error != ERROR_FILE_NOT_FOUND) {
-			warn("win_openxrmirror_init: Could not open file mapping object:  %d",
-			     error);
+		// The VR application normally creates this mapping after OBS
+		// starts, so absence is the expected idle state; still, say so
+		// periodically because "blank source" reports start here.
+		if (error == ERROR_FILE_NOT_FOUND) {
+			if (should_log_stage(context, STAGE_NO_MAPPING))
+				info("waiting for a VR application: shared surface '%ls' not found yet (no game with the OpenXR mirror layer is running)",
+				     obs_mirror_ipc::kSharedMemoryName);
+		} else if (should_log_stage(context, STAGE_MAPPING_FAILED)) {
+			warn("could not open the mirror shared surface (error %lu)%s",
+			     error,
+			     error == ERROR_ACCESS_DENIED
+				     ? " - if OBS or the game runs as administrator, run both at the same elevation"
+				     : "");
 		}
 		return;
 	}
@@ -222,11 +319,37 @@ static void win_openxrmirror_init(void *data, bool forced = false)
 		0, 0, sizeof(obs_mirror_ipc::MirrorSurfaceData));
 
 	if (context->surface == nullptr) {
-		warn("win_openxrmirror_init: Could not map view of file.");
+		// A mapping created by an older layer build can be smaller than
+		// the current struct; fall back to the legacy prefix so capture
+		// still works, just without shared diagnostics.
+		context->surface =
+			(obs_mirror_ipc::MirrorSurfaceData *)MapViewOfFile(
+			context->map_file, FILE_MAP_WRITE | FILE_MAP_READ,
+			0, 0, obs_mirror_ipc::kLegacySurfaceSize);
+		if (context->surface) {
+			context->legacy_surface = true;
+			info("connected to an older mirror layer (legacy 64-byte surface); update the OpenXR layer for full diagnostics");
+		}
+	}
+
+	if (context->surface == nullptr) {
+		warn("win_openxrmirror_init: could not map the mirror shared surface (error %lu)",
+		     GetLastError());
 		CloseHandle(context->map_file);
                 context->map_file = nullptr;
                 return;
         }
+
+	context->diag = context->legacy_surface ? nullptr
+						: &context->surface->diagnostics;
+	if (context->diag) {
+		context->diag->pluginDiagVersion =
+			obs_mirror_ipc::kDiagnosticsVersion;
+		context->diag->pluginPid = GetCurrentProcessId();
+		strncpy_s(context->diag->pluginVersionString, kPluginVersion,
+			  _TRUNCATE);
+		context->diag->pluginMagic = obs_mirror_ipc::kDiagnosticsMagic;
+	}
 
         context->surface->eyeIndex = context->captureeye;
         context->surface->blend = context->blend;
@@ -250,13 +373,47 @@ static void win_openxrmirror_init(void *data, bool forced = false)
             return;
         }
 
+        // Publish OBS's adapter identity so both logs can prove whether OBS
+        // and the game render on the same GPU.
+        if (auto dxgiDevice = context->dev11.try_as<IDXGIDevice>()) {
+            winrt::com_ptr<IDXGIAdapter> dxgiAdapter;
+            DXGI_ADAPTER_DESC adapterDesc{};
+            if (SUCCEEDED(dxgiDevice->GetAdapter(dxgiAdapter.put())) &&
+                SUCCEEDED(dxgiAdapter->GetDesc(&adapterDesc))) {
+                context->adapter_luid = adapterDesc.AdapterLuid;
+                if (context->diag) {
+                    context->diag->pluginAdapterLuidLow =
+                        (std::uint32_t)adapterDesc.AdapterLuid.LowPart;
+                    context->diag->pluginAdapterLuidHigh =
+                        adapterDesc.AdapterLuid.HighPart;
+                }
+            }
+        }
+	warn_on_adapter_mismatch(context);
+
         context->mirror_textures = std::vector<winrt::com_ptr<ID3D11Texture2D>>();
         const std::uint32_t published_generation =
             context->surface->surfaceGeneration.load(std::memory_order_acquire);
         const std::uint64_t published_handle = context->surface->sharedHandle[0];
         if (published_generation == 0 || published_handle == 0) {
-			// The layer publishes handles after the application's first usable
-			// swapchain image. This is an expected transient state, not an error.
+            // The layer publishes handles after the application's first usable
+            // swapchain image. This is an expected transient state, not an
+            // error, but it is the state a "source stays blank" report usually
+            // sits in - so describe it periodically with what we know.
+            if (should_log_stage(context, STAGE_WAITING_HANDLES)) {
+                if (context->diag &&
+                    context->diag->layerMagic == obs_mirror_ipc::kDiagnosticsMagic) {
+                    info("layer connected: app '%s', layer %s, pid %u, heartbeat %u - waiting for mirror textures "
+                         "(published once the game renders while this source is active)",
+                         context->diag->applicationName[0] ? context->diag->applicationName : "unknown",
+                         context->diag->layerVersionString[0] ? context->diag->layerVersionString : "unknown",
+                         context->diag->layerPid,
+                         context->diag->layerHeartbeat.load());
+                } else {
+                    info("shared surface open - waiting for the layer to publish mirror textures");
+                }
+                warn_on_adapter_mismatch(context);
+            }
             return;
         }
         MemoryBarrier();
@@ -265,7 +422,8 @@ static void win_openxrmirror_init(void *data, bool forced = false)
             const std::uint64_t shared_handle = i == 0 ? published_handle : context->surface->sharedHandle[i];
 
             if (shared_handle == 0) {
-                warn("win_openxrmirror_init: Mirror surface handle is null");
+                if (should_log_stage(context, STAGE_INIT_FAILED))
+                    warn("win_openxrmirror_init: Mirror surface handle is null");
                 return;
             }
 
@@ -275,14 +433,20 @@ static void win_openxrmirror_init(void *data, bool forced = false)
                                                    __uuidof(IDXGIResource),
                                                    copy_tex_resource_mirror.put_void());
             if (FAILED(hr) || !copy_tex_resource_mirror) {
-                warn("win_openxrmirror_init: OpenSharedResource failed");
+                if (should_log_stage(context, STAGE_INIT_FAILED)) {
+                    warn("win_openxrmirror_init: OpenSharedResource failed (hr 0x%08lX) for handle %llu - OBS cannot open the game's shared texture",
+                         (unsigned long)hr, (unsigned long long)shared_handle);
+                    warn_on_adapter_mismatch(context);
+                }
                 return;
             }
 
             winrt::com_ptr<ID3D11Texture2D> mirror_texture;
             hr = copy_tex_resource_mirror->QueryInterface(__uuidof(ID3D11Texture2D), mirror_texture.put_void());
             if (FAILED(hr) || !mirror_texture) {
-                warn("win_openxrmirror_init: copy_tex_resource_mirror->QueryInterface failed");
+                if (should_log_stage(context, STAGE_INIT_FAILED))
+                    warn("win_openxrmirror_init: shared resource is not a Texture2D (hr 0x%08lX)",
+                         (unsigned long)hr);
                 return;
             }
             context->mirror_textures.push_back(mirror_texture);
@@ -299,7 +463,8 @@ static void win_openxrmirror_init(void *data, bool forced = false)
         D3D11_TEXTURE2D_DESC desc;
         context->mirror_textures[0]->GetDesc(&desc);
         if (desc.Width == 0 || desc.Height == 0) {
-            warn("win_openxrmirror_init: device width or height is 0");
+            if (should_log_stage(context, STAGE_INIT_FAILED))
+                warn("win_openxrmirror_init: device width or height is 0");
             return;
         }
         context->device_width = desc.Width;
@@ -323,17 +488,18 @@ static void win_openxrmirror_init(void *data, bool forced = false)
 	// Using linear here will cause correct sRGB gamma to be applied
 	DxgiFormatInfo info{};
 	if (!GetFormatInfo(desc.Format, info)) {
-		warn("win_openxrmirror_init: Unsupported DXGI texture format: %d",
-		     desc.Format);
+		if (should_log_stage(context, STAGE_INIT_FAILED))
+			warn("win_openxrmirror_init: Unsupported DXGI texture format: %d",
+			     desc.Format);
 		return;
 	}
 	desc.Format = info.linear;
-	info("Texture format: %d", desc.Format);
-	info("Texture width: %d", desc.Width);
-	info("Texture height: %d", desc.Height);
 	hr = context->dev11->CreateTexture2D(&desc, NULL, context->texCrop.put());
 	if (FAILED(hr)) {
-		warn("win_openxrmirror_init: CreateTexture2D failed");
+		if (should_log_stage(context, STAGE_INIT_FAILED))
+			warn("win_openxrmirror_init: CreateTexture2D failed (hr 0x%08lX) for %ux%u format %d",
+			     (unsigned long)hr, desc.Width, desc.Height,
+			     (int)desc.Format);
 		return;
 	}
 
@@ -342,7 +508,9 @@ static void win_openxrmirror_init(void *data, bool forced = false)
 	hr = context->texCrop->QueryInterface(__uuidof(IDXGIResource),
 					      (void **)&res);
 	if (FAILED(hr)) {
-		warn("win_openxrmirror_init: QueryInterface failed");
+		if (should_log_stage(context, STAGE_INIT_FAILED))
+			warn("win_openxrmirror_init: QueryInterface failed (hr 0x%08lX)",
+			     (unsigned long)hr);
 		return;
 	}
 
@@ -350,13 +518,16 @@ static void win_openxrmirror_init(void *data, bool forced = false)
 	hr = res->GetSharedHandle(&handle);
 	res->Release();
 	if (FAILED(hr)) {
-		warn("win_openxrmirror_init: GetSharedHandle failed");
+		if (should_log_stage(context, STAGE_INIT_FAILED))
+			warn("win_openxrmirror_init: GetSharedHandle failed (hr 0x%08lX)",
+			     (unsigned long)hr);
 		return;
 	}
 
 	const std::uintptr_t handle_value = reinterpret_cast<std::uintptr_t>(handle);
 	if (handle_value > std::numeric_limits<std::uint32_t>::max()) {
-		warn("win_openxrmirror_init: Shared texture handle does not fit OBS's 32-bit handle API");
+		if (should_log_stage(context, STAGE_INIT_FAILED))
+			warn("win_openxrmirror_init: Shared texture handle does not fit OBS's 32-bit handle API");
 		return;
 	}
 
@@ -366,9 +537,46 @@ static void win_openxrmirror_init(void *data, bool forced = false)
 		gs_texture_open_shared(static_cast<std::uint32_t>(handle_value));
 	obs_leave_graphics();
 	if (!context->texture) {
-		warn("win_openxrmirror_init: OBS could not open the shared texture");
+		if (should_log_stage(context, STAGE_INIT_FAILED)) {
+			warn("win_openxrmirror_init: OBS could not open the shared crop texture (handle 0x%08X)",
+			     (unsigned)handle_value);
+			warn_on_adapter_mismatch(context);
+		}
 		return;
 	}
+
+	if (context->diag &&
+	    context->diag->layerMagic == obs_mirror_ipc::kDiagnosticsMagic) {
+		info("connected to app '%s' (pid %u, layer %s); game adapter LUID %08X:%08X, OBS adapter LUID %08lX:%08lX",
+		     context->diag->applicationName[0]
+			     ? context->diag->applicationName
+			     : "unknown",
+		     context->diag->layerPid,
+		     context->diag->layerVersionString[0]
+			     ? context->diag->layerVersionString
+			     : "unknown",
+		     context->diag->layerAdapterLuidHigh,
+		     context->diag->layerAdapterLuidLow,
+		     (unsigned long)context->adapter_luid.HighPart,
+		     (unsigned long)context->adapter_luid.LowPart);
+	}
+	info("mirror capture initialized: source %ux%u, cropped output %ux%u format %d, generation %u",
+	     context->device_width, context->device_height, context->width,
+	     context->height, (int)desc.Format, context->surface_generation);
+	info("capture settings: eye %d, crop %.1f%% top / %.1f%% right / %.1f%% bottom / %.1f%% left, overlap %.1f%%, blend %.1f%% at %.1f%%",
+	     context->captureeye, context->crop.top, context->crop.right,
+	     context->crop.bottom, context->crop.left, context->overlap,
+	     context->blend, context->blendPos);
+	should_log_stage(context, STAGE_CONNECTED);
+
+	context->last_index = context->surface->lastProcessedIndex.load();
+	context->last_index_tick = GetTickCount64();
+	context->heartbeat_baseline =
+		context->diag ? context->diag->layerHeartbeat.load() : 0;
+	context->stall_warned = false;
+	context->last_health_log_tick = GetTickCount64();
+	context->last_render_tick = 0;
+	context->render_count = 0;
 
 	context->initialized = true;
 
@@ -556,6 +764,8 @@ static void win_openxrmirror_render(void *data, gs_effect_t *effect)
 	while (gs_effect_loop(effect, "Draw")) {
 		obs_source_draw(context->texture, 0, 0, 0, 0, false);
 	}
+	context->last_render_tick = GetTickCount64();
+	context->render_count++;
 }
 
 static void win_openxrmirror_tick(void *data, float seconds)
@@ -571,6 +781,61 @@ static void win_openxrmirror_tick(void *data, float seconds)
 	// the source itself is not rendered.
 	if (context->surface)
 		context->surface->frameNumber++;
+
+	// Watchdog: a frozen or blank source should explain itself, so report
+	// when the layer stops publishing new frames (and when it resumes).
+	if (context->initialized && context->surface) {
+		const ULONGLONG now = GetTickCount64();
+		const std::uint32_t idx =
+			context->surface->lastProcessedIndex.load();
+		if (idx != context->last_index) {
+			if (context->stall_warned)
+				info("mirror frames resumed (frame index %u)",
+				     idx);
+			context->last_index = idx;
+			context->last_index_tick = now;
+			context->heartbeat_baseline =
+				context->diag
+					? context->diag->layerHeartbeat.load()
+					: 0;
+			context->stall_warned = false;
+		} else if (!context->stall_warned &&
+			   now - context->last_index_tick > 10000) {
+			context->stall_warned = true;
+			const char *cause =
+				"no layer diagnostics available (older layer)";
+			if (context->diag) {
+				cause = context->diag->layerHeartbeat.load() !=
+						context->heartbeat_baseline
+					? "the VR app is alive but not feeding frames (headset idle, mirroring paused, or see the layer log)"
+					: "the VR app appears to have exited or stopped rendering";
+			}
+			warn("no new mirror frames for 10 s (frame index stuck at %u): %s",
+			     idx, cause);
+		}
+
+		if (now - context->last_health_log_tick >= 30000) {
+			context->last_health_log_tick = now;
+			const ULONGLONG render_age = context->last_render_tick == 0
+				? 0
+				: now - context->last_render_tick;
+			const std::uint32_t layer_heartbeat =
+				context->diag ? context->diag->layerHeartbeat.load() : 0;
+			info("mirror health: active=%s, render calls=%llu, last render=%s, producer frame=%u (age %.1fs), "
+			     "generation=%u, layer heartbeat=%u. Advancing counters prove transport activity, not non-black pixels; "
+			     "use the Control Center Preview diagnostics log for pixel sampling",
+			     context->active ? "yes" : "no",
+			     (unsigned long long)context->render_count,
+			     context->last_render_tick == 0 ? "never" : "recent",
+			     idx,
+			     (now - context->last_index_tick) / 1000.0,
+			     context->surface_generation,
+			     layer_heartbeat);
+			if (context->last_render_tick != 0 && render_age > 5000)
+				warn("OBS has not rendered this source for %.1fs even though it is initialized; check scene/source visibility",
+				     render_age / 1000.0);
+		}
+	}
 }
 
 static bool crop_preset_changed(obs_properties_t *props, obs_property_t *p,
@@ -740,6 +1005,9 @@ OBS_MODULE_USE_DEFAULT_LOCALE("win_openxrmirror", "en-US")
 
 bool obs_module_load(void)
 {
+	blog(LOG_INFO, "plugin version %s (IPC diagnostics v%u)",
+	     kPluginVersion, obs_mirror_ipc::kDiagnosticsVersion);
+
 	obs_source_info info = {};
 	info.id = "openxrmirror_capture";
 	info.type = OBS_SOURCE_TYPE_INPUT;

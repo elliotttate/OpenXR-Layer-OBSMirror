@@ -23,8 +23,6 @@ public sealed record SystemSnapshot(
     bool OverscanEnabled,
     int HorizontalPercent,
     int VerticalPercent,
-    bool OverscanBoundaryCompensation,
-    int OverscanBoundaryCompensationStrength,
     bool CameraSmoothingManaged,
     int CameraSmoothing,
     double SmoothingCrop,

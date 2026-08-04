@@ -89,10 +89,6 @@ namespace Mirror {
         float blendEndX;
         float texIndex; // Ignored by the non-array shader
         float alphaOverride;
-        XMFLOAT4 overscanBounds; // left, right, top, bottom in source UVs
-        XMFLOAT2 sourceTexelSize;
-        float overscanCompensation;
-        float overscanSampleRadius;
     };
 
     constexpr char quad_vs_code[] = R"_(
@@ -131,10 +127,6 @@ cbuffer PSConstants : register(b1) // Use a different register for PS constants
     float blendEndX;
     float texIndex; // Unused here; keeps the layout shared with the array shader
     float alphaOverride;
-    float4 overscanBounds;
-    float2 sourceTexelSize;
-    float overscanCompensation;
-    float overscanSampleRadius;
 };
 
 Texture2D shaderTexture : register(t0);
@@ -146,73 +138,9 @@ struct psIn {
 	float2 tex : TEXCOORD0;
 };
 
-float3 boundaryAverage(float2 uv, float2 alongStep)
-{
-    float3 sum = 0.0;
-    [unroll]
-    for (int i = -2; i <= 2; ++i)
-        sum += shaderTexture.Sample(SampleType, saturate(uv + alongStep * i)).rgb;
-    return sum / 5.0;
-}
-
-float3 matchOverscanGuardBand(float2 uv, float3 color)
-{
-    if (overscanCompensation <= 0.001)
-        return color;
-
-    float leftPx = (overscanBounds.x - uv.x) / max(sourceTexelSize.x, 0.000001);
-    float rightPx = (uv.x - overscanBounds.y) / max(sourceTexelSize.x, 0.000001);
-    float topPx = (overscanBounds.z - uv.y) / max(sourceTexelSize.y, 0.000001);
-    float bottomPx = (uv.y - overscanBounds.w) / max(sourceTexelSize.y, 0.000001);
-
-    int edge = -1;
-    float nearestPx = 1000000.0;
-    if (leftPx > 0.0 && leftPx < nearestPx) { edge = 0; nearestPx = leftPx; }
-    if (rightPx > 0.0 && rightPx < nearestPx) { edge = 1; nearestPx = rightPx; }
-    if (topPx > 0.0 && topPx < nearestPx) { edge = 2; nearestPx = topPx; }
-    if (bottomPx > 0.0 && bottomPx < nearestPx) { edge = 3; nearestPx = bottomPx; }
-    if (edge < 0)
-        return color;
-
-    float radius = max(overscanSampleRadius, 1.0);
-    float2 outerUv;
-    float2 innerUv;
-    float2 alongStep;
-    if (edge < 2) {
-        float safeY = clamp(uv.y,
-                            overscanBounds.z + sourceTexelSize.y * 6.0,
-                            overscanBounds.w - sourceTexelSize.y * 6.0);
-        float boundaryX = edge == 0 ? overscanBounds.x : overscanBounds.y;
-        float direction = edge == 0 ? 1.0 : -1.0;
-        outerUv = float2(boundaryX - direction * sourceTexelSize.x * radius, safeY);
-        innerUv = float2(boundaryX + direction * sourceTexelSize.x * radius, safeY);
-        alongStep = float2(0.0, sourceTexelSize.y * 2.0);
-    } else {
-        float safeX = clamp(uv.x,
-                            overscanBounds.x + sourceTexelSize.x * 6.0,
-                            overscanBounds.y - sourceTexelSize.x * 6.0);
-        float boundaryY = edge == 2 ? overscanBounds.z : overscanBounds.w;
-        float direction = edge == 2 ? 1.0 : -1.0;
-        outerUv = float2(safeX, boundaryY - direction * sourceTexelSize.y * radius);
-        innerUv = float2(safeX, boundaryY + direction * sourceTexelSize.y * radius);
-        alongStep = float2(sourceTexelSize.x * 2.0, 0.0);
-    }
-
-    float3 outsideColor = boundaryAverage(outerUv, alongStep);
-    float3 insideColor = boundaryAverage(innerUv, alongStep);
-    const float epsilon = 0.02;
-    float3 channelGain = clamp((insideColor + epsilon) / (outsideColor + epsilon), 0.60, 1.40);
-    float outsideLuma = dot(outsideColor, float3(0.2126, 0.7152, 0.0722));
-    float insideLuma = dot(insideColor, float3(0.2126, 0.7152, 0.0722));
-    float lumaGain = clamp((insideLuma + epsilon) / (outsideLuma + epsilon), 0.60, 1.40);
-    float3 stableGain = lerp(lumaGain.xxx, channelGain, 0.50);
-    return color * lerp(1.0.xxx, stableGain, saturate(overscanCompensation));
-}
-
 float4 ps_quad(psIn inputPS) : SV_TARGET
 {
 	float4 textureColor = shaderTexture.Sample(SampleType, inputPS.tex);
-	textureColor.rgb = matchOverscanGuardBand(inputPS.tex, textureColor.rgb);
 
     // Calculate the horizontal blend factor based on texture coordinate x
     // smoothstep provides a nice S-curve interpolation between the start and end points.
@@ -237,10 +165,6 @@ cbuffer PSConstants : register(b1) // Use a different register for PS constants
     float blendEndX;
     float texIndex;
     float alphaOverride;
-    float4 overscanBounds;
-    float2 sourceTexelSize;
-    float overscanCompensation;
-    float overscanSampleRadius;
 };
 
 Texture2DArray shaderTexture : register(t0);
@@ -251,76 +175,12 @@ struct psIn {
 	float2 tex : TEXCOORD0;
 };
 
-float3 boundaryAverage(float2 uv, float2 alongStep)
-{
-    float3 sum = 0.0;
-    [unroll]
-    for (int i = -2; i <= 2; ++i)
-        sum += shaderTexture.Sample(SampleType, float3(saturate(uv + alongStep * i), texIndex)).rgb;
-    return sum / 5.0;
-}
-
-float3 matchOverscanGuardBand(float2 uv, float3 color)
-{
-    if (overscanCompensation <= 0.001)
-        return color;
-
-    float leftPx = (overscanBounds.x - uv.x) / max(sourceTexelSize.x, 0.000001);
-    float rightPx = (uv.x - overscanBounds.y) / max(sourceTexelSize.x, 0.000001);
-    float topPx = (overscanBounds.z - uv.y) / max(sourceTexelSize.y, 0.000001);
-    float bottomPx = (uv.y - overscanBounds.w) / max(sourceTexelSize.y, 0.000001);
-
-    int edge = -1;
-    float nearestPx = 1000000.0;
-    if (leftPx > 0.0 && leftPx < nearestPx) { edge = 0; nearestPx = leftPx; }
-    if (rightPx > 0.0 && rightPx < nearestPx) { edge = 1; nearestPx = rightPx; }
-    if (topPx > 0.0 && topPx < nearestPx) { edge = 2; nearestPx = topPx; }
-    if (bottomPx > 0.0 && bottomPx < nearestPx) { edge = 3; nearestPx = bottomPx; }
-    if (edge < 0)
-        return color;
-
-    float radius = max(overscanSampleRadius, 1.0);
-    float2 outerUv;
-    float2 innerUv;
-    float2 alongStep;
-    if (edge < 2) {
-        float safeY = clamp(uv.y,
-                            overscanBounds.z + sourceTexelSize.y * 6.0,
-                            overscanBounds.w - sourceTexelSize.y * 6.0);
-        float boundaryX = edge == 0 ? overscanBounds.x : overscanBounds.y;
-        float direction = edge == 0 ? 1.0 : -1.0;
-        outerUv = float2(boundaryX - direction * sourceTexelSize.x * radius, safeY);
-        innerUv = float2(boundaryX + direction * sourceTexelSize.x * radius, safeY);
-        alongStep = float2(0.0, sourceTexelSize.y * 2.0);
-    } else {
-        float safeX = clamp(uv.x,
-                            overscanBounds.x + sourceTexelSize.x * 6.0,
-                            overscanBounds.y - sourceTexelSize.x * 6.0);
-        float boundaryY = edge == 2 ? overscanBounds.z : overscanBounds.w;
-        float direction = edge == 2 ? 1.0 : -1.0;
-        outerUv = float2(safeX, boundaryY - direction * sourceTexelSize.y * radius);
-        innerUv = float2(safeX, boundaryY + direction * sourceTexelSize.y * radius);
-        alongStep = float2(sourceTexelSize.x * 2.0, 0.0);
-    }
-
-    float3 outsideColor = boundaryAverage(outerUv, alongStep);
-    float3 insideColor = boundaryAverage(innerUv, alongStep);
-    const float epsilon = 0.02;
-    float3 channelGain = clamp((insideColor + epsilon) / (outsideColor + epsilon), 0.60, 1.40);
-    float outsideLuma = dot(outsideColor, float3(0.2126, 0.7152, 0.0722));
-    float insideLuma = dot(insideColor, float3(0.2126, 0.7152, 0.0722));
-    float lumaGain = clamp((insideLuma + epsilon) / (outsideLuma + epsilon), 0.60, 1.40);
-    float3 stableGain = lerp(lumaGain.xxx, channelGain, 0.50);
-    return color * lerp(1.0.xxx, stableGain, saturate(overscanCompensation));
-}
-
 float4 ps_quad(psIn inputPS) : SV_TARGET
 {
     // Combine UV coords with the desired array slice index
     float3 sampleCoord = float3(inputPS.tex.x, inputPS.tex.y, texIndex);
 
 	float4 textureColor = shaderTexture.Sample(SampleType, sampleCoord);
-	textureColor.rgb = matchOverscanGuardBand(inputPS.tex, textureColor.rgb);
 
     // Calculate the horizontal blend factor based on texture coordinate x
     // smoothstep provides a nice S-curve interpolation between the start and end points.
@@ -417,7 +277,23 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
             return;
         }
 
-        Log("init: D3D11CreateDevice created\n");
+        // Record which adapter the mirror ended up on; a capture that stays
+        // blank because OBS renders on a different GPU is diagnosed by
+        // comparing this LUID against the one the plugin reports.
+        ComPtr<IDXGIDevice> dxgiDevice;
+        ComPtr<IDXGIAdapter> deviceAdapter;
+        DXGI_ADAPTER_DESC adapterDesc{};
+        if (SUCCEEDED(_d3d11MirrorDevice.As(&dxgiDevice)) &&
+            SUCCEEDED(dxgiDevice->GetAdapter(deviceAdapter.ReleaseAndGetAddressOf())) &&
+            SUCCEEDED(deviceAdapter->GetDesc(&adapterDesc))) {
+            _adapterLuid = adapterDesc.AdapterLuid;
+            Log("init: mirror device created on adapter '%ls' (LUID %08x:%08x)\n",
+                adapterDesc.Description,
+                _adapterLuid.HighPart,
+                _adapterLuid.LowPart);
+        } else {
+            Log("init: mirror device created (adapter identity query failed)\n");
+        }
 
         // Optional: fences let us publish only fully-copied frames to OBS and
         // wait for D3D12 game copies. Unavailable before Windows 10 1703.
@@ -620,21 +496,37 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
 
         ComPtr<IDXGIResource> pOtherResource;
         CHECK_DX(tex->QueryInterface(IID_PPV_ARGS(&pOtherResource)));
-        if (!pOtherResource)
+        if (!pOtherResource) {
+            Log("createSharedMirrorTexture: game copy texture has no IDXGIResource; swapchain %p not mirrored\n",
+                swapchain);
             return;
+        }
 
         HANDLE sharedHandle = nullptr;
-        if (FAILED(pOtherResource->GetSharedHandle(&sharedHandle)) || !sharedHandle)
+        const HRESULT handleHr = pOtherResource->GetSharedHandle(&sharedHandle);
+        if (FAILED(handleHr) || !sharedHandle) {
+            Log("createSharedMirrorTexture: GetSharedHandle failed (0x%08x); swapchain %p not mirrored\n",
+                handleHr,
+                swapchain);
             return;
+        }
 
         ComPtr<IDXGIResource> openedResource;
-        CHECK_DX(_d3d11MirrorDevice->OpenSharedResource(sharedHandle, IID_PPV_ARGS(&openedResource)));
-        if (!openedResource)
+        const HRESULT openHr = _d3d11MirrorDevice->OpenSharedResource(sharedHandle, IID_PPV_ARGS(&openedResource));
+        if (FAILED(openHr) || !openedResource) {
+            Log("createSharedMirrorTexture: OpenSharedResource failed (0x%08x) for swapchain %p - the game texture "
+                "cannot be shared with the mirror device (different GPU?)\n",
+                openHr,
+                swapchain);
             return;
+        }
 
         CHECK_DX(openedResource->QueryInterface(IID_PPV_ARGS(&srcData._texture)));
-        if (!srcData._texture)
+        if (!srcData._texture) {
+            Log("createSharedMirrorTexture: shared resource is not a Texture2D; swapchain %p not mirrored\n",
+                swapchain);
             return;
+        }
 
         // The layer-side copy texture is created with a keyed mutex; both
         // devices must acquire it around access. Absence is tolerated.
@@ -643,6 +535,9 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         if (!createSourceView(srcData))
             return;
 
+        Log("Mirror source registered for swapchain %p (D3D11, keyed mutex: %s)\n",
+            swapchain,
+            srcData._keyedMutex ? "yes" : "no");
         _sourceData[swapchain] = std::move(srcData);
     }
 
@@ -656,11 +551,18 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
 
         ComPtr<ID3D11Device1> pDevice;
         CHECK_DX(_d3d11MirrorDevice->QueryInterface(IID_PPV_ARGS(&pDevice)));
-        if (!pDevice)
+        if (!pDevice) {
+            Log("createSharedMirrorTexture: ID3D11Device1 unavailable; D3D12 swapchain %p not mirrored\n", swapchain);
             return;
-        CHECK_DX(pDevice->OpenSharedResource1(textureHandle, IID_PPV_ARGS(&srcData._texture)));
-        if (!srcData._texture)
+        }
+        const HRESULT openHr = pDevice->OpenSharedResource1(textureHandle, IID_PPV_ARGS(&srcData._texture));
+        if (FAILED(openHr) || !srcData._texture) {
+            Log("createSharedMirrorTexture: OpenSharedResource1 failed (0x%08x) for D3D12 swapchain %p - the game "
+                "texture cannot be shared with the mirror device (different GPU?)\n",
+                openHr,
+                swapchain);
             return;
+        }
 
         // The game's D3D12 queue signals this fence when its copy into the
         // shared texture completes; we GPU-wait on it before sampling.
@@ -677,6 +579,9 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         if (!createSourceView(srcData))
             return;
 
+        Log("Mirror source registered for swapchain %p (D3D12, copy fence: %s)\n",
+            swapchain,
+            srcData._copyFence ? "yes" : "no");
         _sourceData[swapchain] = std::move(srcData);
     }
 
@@ -828,13 +733,13 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
                                       const XrRect2Di& targetRect,
                                       const bool seamBlend,
                                       const float alphaOverride,
-                                      const XrTime displayTime,
-                                      const XrFovf* nativeFov) {
+                                      const XrTime displayTime) {
         D3D11_TEXTURE2D_DESC srcDesc;
         src._texture->GetDesc(&srcDesc);
 
         syncToSource(src);
         ScopedKeyedMutex lock(src._keyedMutex.Get());
+        noteSourceAcquire(lock.acquired());
         if (!lock.acquired())
             return;
 
@@ -849,7 +754,7 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
             blendEndX = std::min(uv.endX, uv.startX + ((_pMirrorSurfaceData->blendPos + blendOffset) * blendWidth));
         }
         const float texIndex = srcDesc.ArraySize > 1 ? static_cast<float>(view->subImage.imageArrayIndex) : 0.0f;
-        writeBlendConstants(blendStartX, blendEndX, texIndex, alphaOverride, uv, srcDesc, &view->fov, nativeFov);
+        writeBlendConstants(blendStartX, blendEndX, texIndex, alphaOverride);
         bindQuadPipeline(src);
         setTargetRect(targetRect);
 
@@ -962,124 +867,15 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         return uv;
     }
 
-    void D3D11Mirror::refreshOverscanCompensationConfig() {
-        const ULONGLONG now = GetTickCount64();
-        if (_overscanCompensationConfigInitialized &&
-            now - _lastOverscanCompensationConfigCheckTick < 250)
-            return;
-        _lastOverscanCompensationConfigCheckTick = now;
-
-        DWORD enabled = 0;
-        DWORD strength = 100;
-        HKEY key = nullptr;
-        if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\OpenXR-OBSMirror", 0, KEY_QUERY_VALUE, &key) ==
-            ERROR_SUCCESS) {
-            DWORD size = sizeof(DWORD);
-            RegQueryValueExW(key,
-                             L"OverscanBoundaryCompensation",
-                             nullptr,
-                             nullptr,
-                             reinterpret_cast<BYTE*>(&enabled),
-                             &size);
-            size = sizeof(DWORD);
-            RegQueryValueExW(key,
-                             L"OverscanBoundaryCompensationStrength",
-                             nullptr,
-                             nullptr,
-                             reinterpret_cast<BYTE*>(&strength),
-                             &size);
-            RegCloseKey(key);
-        }
-
-        const bool active = enabled != 0;
-        const float normalizedStrength = static_cast<float>(std::clamp<DWORD>(strength, 0, 100)) / 100.0f;
-        if (!_overscanCompensationConfigInitialized || active != _overscanCompensation ||
-            fabsf(normalizedStrength - _overscanCompensationStrength) > 0.001f) {
-            Log("Recording overscan boundary matching: %s at %.0f%% strength\n",
-                active ? "enabled" : "disabled",
-                normalizedStrength * 100.0f);
-            _overscanCompensationAppliedLogged = false;
-        }
-        _overscanCompensation = active;
-        _overscanCompensationStrength = normalizedStrength;
-        _overscanCompensationConfigInitialized = true;
-    }
-
-    bool D3D11Mirror::computeOverscanBounds(const XrFovf& renderedFov,
-                                            const XrFovf& headsetFov,
-                                            const UVRect& uv,
-                                            XMFLOAT4& bounds) const {
-        const float renderedLeft = tanf(renderedFov.angleLeft);
-        const float renderedRight = tanf(renderedFov.angleRight);
-        const float renderedDown = tanf(renderedFov.angleDown);
-        const float renderedUp = tanf(renderedFov.angleUp);
-        const float headsetLeft = tanf(headsetFov.angleLeft);
-        const float headsetRight = tanf(headsetFov.angleRight);
-        const float headsetDown = tanf(headsetFov.angleDown);
-        const float headsetUp = tanf(headsetFov.angleUp);
-
-        const float spanX = renderedRight - renderedLeft;
-        const float spanY = renderedUp - renderedDown;
-        if (spanX <= 0.0001f || spanY <= 0.0001f)
-            return false;
-
-        // The game-rendered FOV must contain the runtime-native headset FOV.
-        // If it does not, this is a normal non-overscan projection and the
-        // correction stays out of the way.
-        constexpr float containmentEpsilon = 0.001f;
-        if (renderedLeft > headsetLeft + containmentEpsilon ||
-            renderedRight < headsetRight - containmentEpsilon ||
-            renderedDown > headsetDown + containmentEpsilon ||
-            renderedUp < headsetUp - containmentEpsilon)
-            return false;
-
-        const float left = std::clamp((headsetLeft - renderedLeft) / spanX, 0.0f, 1.0f);
-        const float right = std::clamp((headsetRight - renderedLeft) / spanX, 0.0f, 1.0f);
-        const float top = std::clamp((renderedUp - headsetUp) / spanY, 0.0f, 1.0f);
-        const float bottom = std::clamp((renderedUp - headsetDown) / spanY, 0.0f, 1.0f);
-        if (left < 0.0005f && right > 0.9995f && top < 0.0005f && bottom > 0.9995f)
-            return false;
-
-        const float uvWidth = uv.endX - uv.startX;
-        const float uvHeight = uv.endY - uv.startY;
-        bounds = {uv.startX + left * uvWidth,
-                  uv.startX + right * uvWidth,
-                  uv.startY + top * uvHeight,
-                  uv.startY + bottom * uvHeight};
-        return bounds.x < bounds.y && bounds.z < bounds.w;
-    }
-
     void D3D11Mirror::writeBlendConstants(float blendStartX,
                                           float blendEndX,
                                           float texIndex,
-                                          float alphaOverride,
-                                          const UVRect& uv,
-                                          const D3D11_TEXTURE2D_DESC& srcDesc,
-                                          const XrFovf* renderedFov,
-                                          const XrFovf* headsetFov) {
-        refreshOverscanCompensationConfig();
-
+                                          float alphaOverride) {
         quad_blend_buffer_t psCB1{};
         psCB1.blendStartX = blendStartX;
         psCB1.blendEndX = blendEndX;
         psCB1.texIndex = texIndex;
         psCB1.alphaOverride = alphaOverride;
-        psCB1.overscanBounds = {uv.startX, uv.endX, uv.startY, uv.endY};
-        psCB1.sourceTexelSize = {1.0f / static_cast<float>(std::max(srcDesc.Width, 1u)),
-                                 1.0f / static_cast<float>(std::max(srcDesc.Height, 1u))};
-        psCB1.overscanSampleRadius = 3.0f;
-        if (_overscanCompensation && _overscanCompensationStrength > 0.0f && renderedFov && headsetFov &&
-            computeOverscanBounds(*renderedFov, *headsetFov, uv, psCB1.overscanBounds)) {
-            psCB1.overscanCompensation = _overscanCompensationStrength;
-            if (!_overscanCompensationAppliedLogged) {
-                Log("Recording overscan boundary matching applied: UV %.4f,%.4f x %.4f,%.4f\n",
-                    psCB1.overscanBounds.x,
-                    psCB1.overscanBounds.y,
-                    psCB1.overscanBounds.z,
-                    psCB1.overscanBounds.w);
-                _overscanCompensationAppliedLogged = true;
-            }
-        }
 
         D3D11_MAPPED_SUBRESOURCE mapped{};
         CHECK_DX(_d3d11MirrorContext->Map(_quadConstantBlendBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped));
@@ -1154,16 +950,15 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
 
         syncToSource(it->second);
         ScopedKeyedMutex lock(it->second._keyedMutex.Get());
+        noteSourceAcquire(lock.acquired());
         if (!lock.acquired())
             return;
 
-        const UVRect quadUv = writeQuadUVs(quad->subImage.imageRect, srcDesc);
+        writeQuadUVs(quad->subImage.imageRect, srcDesc);
         writeBlendConstants(0.0f,
                             0.0f,
                             static_cast<float>(quad->subImage.imageArrayIndex),
-                            0.0f,
-                            quadUv,
-                            srcDesc);
+                            0.0f);
         bindQuadPipeline(it->second);
 
         XrRect2Di rect = {{0, 0}, {static_cast<int32_t>(_comp_desc.Width), static_cast<int32_t>(_comp_desc.Height)}};
@@ -1224,44 +1019,37 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         _d3d11MirrorContext->DrawIndexed((UINT)_countof(quad_inds), 0, 0);
     }
 
-    void D3D11Mirror::Blend(const XrCompositionLayerProjectionView* view,
+    bool D3D11Mirror::Blend(const XrCompositionLayerProjectionView* view,
                             const XrFovf& hmdFov,
                             const DXGI_FORMAT format,
                             const XrSpace viewSpace,
-                            const XrTime displayTime,
-                            const XrFovf* nativeFov) {
+                            const XrTime displayTime) {
         if (!_initialized)
-            return;
+            return false;
 
         const bool smoothing = smoothingActive();
-        XMFLOAT4 compensationBounds{};
-        const bool compensateOverscan =
-            _overscanCompensation && nativeFov &&
-            computeOverscanBounds(view->fov, *nativeFov, {0.0f, 1.0f, 0.0f, 1.0f}, compensationBounds);
-
-        if (!smoothing && !compensateOverscan && XMScalarNearEqual(hmdFov.angleDown, view->fov.angleDown, 0.001f) &&
+        if (!smoothing && XMScalarNearEqual(hmdFov.angleDown, view->fov.angleDown, 0.001f) &&
             XMScalarNearEqual(hmdFov.angleUp, view->fov.angleUp, 0.001f) &&
             XMScalarNearEqual(hmdFov.angleLeft, view->fov.angleLeft, 0.001f) &&
             XMScalarNearEqual(hmdFov.angleRight, view->fov.angleRight, 0.001f))
         {
             // If FOV is the same then use fast copy
-            copyPerspectiveTex(view->subImage.imageRect, view->subImage.imageArrayIndex, format, view->subImage.swapchain);
-            return;
+            return copyPerspectiveTex(view->subImage.imageRect, view->subImage.imageArrayIndex, format, view->subImage.swapchain);
         }
 
         auto it = _sourceData.find(view->subImage.swapchain);
         if (it == _sourceData.end() || !it->second._texture)
-            return;
+            return false;
 
         checkCopyTex(view->subImage.imageRect.extent.width, view->subImage.imageRect.extent.height, format);
 
         if (_compositorTexture == nullptr || _mirrorTextures.size() == 0)
-            return;
+            return false;
 
         if (smoothing) {
             const XrRect2Di rect = {{0, 0}, view->subImage.imageRect.extent};
-            drawSmoothedEye(view, hmdFov, it->second, rect, false, 1.0f, displayTime, nativeFov);
-            return;
+            drawSmoothedEye(view, hmdFov, it->second, rect, false, 1.0f, displayTime);
+            return true;
         }
 
         D3D11_TEXTURE2D_DESC srcDesc;
@@ -1269,13 +1057,14 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
 
         syncToSource(it->second);
         ScopedKeyedMutex lock(it->second._keyedMutex.Get());
+        noteSourceAcquire(lock.acquired());
         if (!lock.acquired())
-            return;
+            return true; // Transient; noteSourceAcquire tracks streaks.
 
         const UVRect uv = writeQuadUVs(view->subImage.imageRect, srcDesc);
 
         const float texIndex = srcDesc.ArraySize > 1 ? static_cast<float>(view->subImage.imageArrayIndex) : 0.0f;
-        writeBlendConstants(0.0f, 0.0f, texIndex, 1.0f, uv, srcDesc, &view->fov, nativeFov);
+        writeBlendConstants(0.0f, 0.0f, texIndex, 1.0f);
         bindQuadPipeline(it->second);
 
         XrRect2Di rect = {{0, 0}, view->subImage.imageRect.extent};
@@ -1283,47 +1072,41 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
 
         checkFOVs(hmdFov, view->fov);
         drawOrthoQuad();
+        return true;
     }
 
-    void D3D11Mirror::Blend(const XrCompositionLayerProjectionView* view1,
+    bool D3D11Mirror::Blend(const XrCompositionLayerProjectionView* view1,
                             const XrFovf& hmdFov1,
                             const XrCompositionLayerProjectionView* view2,
                             const XrFovf& hmdFov2,
                             const DXGI_FORMAT format,
                             const XrSpace viewSpace,
-                            const XrTime displayTime,
-                            const XrFovf* nativeFov1,
-                            const XrFovf* nativeFov2) {
+                            const XrTime displayTime) {
         if (!_initialized)
-            return;
+            return false;
 
         auto it1 = _sourceData.find(view1->subImage.swapchain);
         if (it1 == _sourceData.end() || !it1->second._texture)
-            return;
+            return false;
 
         auto it2 = _sourceData.find(view2->subImage.swapchain);
         if (it2 == _sourceData.end() || !it2->second._texture)
-            return;
+            return false;
 
         checkCopyTex(view1->subImage.imageRect.extent.width,
                      view1->subImage.imageRect.extent.height,
                      format);
 
         if (_compositorTexture == nullptr || _mirrorTextures.size() == 0)
-            return;
+            return false;
 
         const bool smoothing = smoothingActive();
-        XMFLOAT4 compensationBounds{};
-        const bool compensateOverscan1 =
-            _overscanCompensation && nativeFov1 &&
-            computeOverscanBounds(view1->fov, *nativeFov1, {0.0f, 1.0f, 0.0f, 1.0f}, compensationBounds);
-
         // First eye
         if (smoothing) {
             const XrRect2Di rect = {{0, 0}, view1->subImage.imageRect.extent};
-            drawSmoothedEye(view1, hmdFov1, it1->second, rect, false, 0.0f, displayTime, nativeFov1);
+            drawSmoothedEye(view1, hmdFov1, it1->second, rect, false, 0.0f, displayTime);
         }
-        else if (!compensateOverscan1 && XMScalarNearEqual(hmdFov1.angleDown, view1->fov.angleDown, 0.001f) &&
+        else if (XMScalarNearEqual(hmdFov1.angleDown, view1->fov.angleDown, 0.001f) &&
             XMScalarNearEqual(hmdFov1.angleUp, view1->fov.angleUp, 0.001f) &&
             XMScalarNearEqual(hmdFov1.angleLeft, view1->fov.angleLeft, 0.001f) &&
             XMScalarNearEqual(hmdFov1.angleRight, view1->fov.angleRight, 0.001f))
@@ -1338,12 +1121,13 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
 
             syncToSource(it1->second);
             ScopedKeyedMutex lock(it1->second._keyedMutex.Get());
+            noteSourceAcquire(lock.acquired());
             if (lock.acquired()) {
                 const UVRect uv = writeQuadUVs(view1->subImage.imageRect, srcDesc);
 
                 const float texIndex =
                     srcDesc.ArraySize > 1 ? static_cast<float>(view1->subImage.imageArrayIndex) : 0.0f;
-                writeBlendConstants(0.0f, 0.0f, texIndex, 0.0f, uv, srcDesc, &view1->fov, nativeFov1);
+                writeBlendConstants(0.0f, 0.0f, texIndex, 0.0f);
                 bindQuadPipeline(it1->second);
 
                 XrRect2Di rect = {{0, 0}, view1->subImage.imageRect.extent};
@@ -1359,15 +1143,16 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
             XrRect2Di rect = {{0, 0}, view2->subImage.imageRect.extent};
             rect.offset.x =
                 rect.offset.x + static_cast<int32_t>((rect.extent.width * _pMirrorSurfaceData->overlap) / 100);
-            drawSmoothedEye(view2, hmdFov2, it2->second, rect, true, 1.0f, displayTime, nativeFov2);
+            drawSmoothedEye(view2, hmdFov2, it2->second, rect, true, 1.0f, displayTime);
         } else {
             D3D11_TEXTURE2D_DESC srcDesc;
             it2->second._texture->GetDesc(&srcDesc);
 
             syncToSource(it2->second);
             ScopedKeyedMutex lock(it2->second._keyedMutex.Get());
+            noteSourceAcquire(lock.acquired());
             if (!lock.acquired())
-                return;
+                return true; // Transient; noteSourceAcquire tracks streaks.
 
             const UVRect uv = writeQuadUVs(view2->subImage.imageRect, srcDesc);
 
@@ -1378,7 +1163,7 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
             const float blendEndX =
                 std::min(uv.endX, uv.startX + ((_pMirrorSurfaceData->blendPos + blendOffset) * blendWidth));
             const float texIndex = srcDesc.ArraySize > 1 ? static_cast<float>(view2->subImage.imageArrayIndex) : 0.0f;
-            writeBlendConstants(blendStartX, blendEndX, texIndex, 1.0f, uv, srcDesc, &view2->fov, nativeFov2);
+            writeBlendConstants(blendStartX, blendEndX, texIndex, 1.0f);
             bindQuadPipeline(it2->second);
 
             XrRect2Di rect = {{0, 0}, view2->subImage.imageRect.extent};
@@ -1388,6 +1173,7 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
 
             drawOrthoQuad();
         }
+        return true;
     }
 
     void D3D11Mirror::checkFOVs(const XrFovf& hmdFov, const XrFovf& viewFov)
@@ -1416,20 +1202,20 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         }
     }
 
-    void D3D11Mirror::copyPerspectiveTex(const XrRect2Di& imgRect,
+    bool D3D11Mirror::copyPerspectiveTex(const XrRect2Di& imgRect,
                                          const uint32_t arraySlice,
                                          const DXGI_FORMAT format,
                                          const XrSwapchain& swapchain) {
         if (!_initialized)
-            return;
+            return false;
 
         auto it = _sourceData.find(swapchain);
         if (it == _sourceData.end() || !it->second._texture)
-            return;
+            return false;
 
         checkCopyTex(imgRect.extent.width, imgRect.extent.height, format);
         if (!_compositorTexture)
-            return;
+            return false;
 
         D3D11_TEXTURE2D_DESC srcDesc;
         it->second._texture->GetDesc(&srcDesc);
@@ -1438,8 +1224,9 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
 
         syncToSource(it->second);
         ScopedKeyedMutex lock(it->second._keyedMutex.Get());
+        noteSourceAcquire(lock.acquired());
         if (!lock.acquired())
-            return;
+            return true; // Transient; noteSourceAcquire tracks streaks.
 
         D3D11_BOX sourceRegion;
         sourceRegion.left = imgRect.offset.x;
@@ -1450,6 +1237,7 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         sourceRegion.back = 1;
         _d3d11MirrorContext->CopySubresourceRegion(
             _compositorTexture.Get(), 0, 0, 0, 0, it->second._texture.Get(), subresource, &sourceRegion);
+        return true;
     }
 
     void D3D11Mirror::checkCopyTex(const uint32_t srcWidth, const uint32_t height, const DXGI_FORMAT format) {
@@ -1477,6 +1265,11 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
                            currentDesc.Format != renderFormat;
         }
         if (!needsRebuild)
+            return;
+
+        // A persistently failing rebuild (e.g. VRAM exhaustion) would otherwise
+        // retry - and log - every single frame.
+        if (_lastRingBuildFailTick != 0 && GetTickCount64() - _lastRingBuildFailTick < 1000)
             return;
 
         uint32_t nextGeneration =
@@ -1507,10 +1300,14 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         Log("Use linear = %d Linear = %d sRGB = %d\n", linear, info.linear, info.srgb);
         Log("Creating mirror textures w %u h %u f %d\n", desc.Width, desc.Height, format);
 
+        const auto failRingBuild = [this]() { _lastRingBuildFailTick = GetTickCount64(); };
+
         ComPtr<ID3D11Texture2D> newCompositorTexture;
         CHECK_DX(_d3d11MirrorDevice->CreateTexture2D(&desc, nullptr, newCompositorTexture.GetAddressOf()));
-        if (!newCompositorTexture)
+        if (!newCompositorTexture) {
+            failRingBuild();
             return;
+        }
 
         desc.Format = info.linear;
         std::vector<ComPtr<ID3D11Texture2D>> newMirrorTextures(kMirrorTextureCount);
@@ -1518,17 +1315,23 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         for (size_t i = 0; i < newMirrorTextures.size(); ++i) {
             auto& texture = newMirrorTextures[i];
             CHECK_DX(_d3d11MirrorDevice->CreateTexture2D(&desc, nullptr, texture.GetAddressOf()));
-            if (!texture)
+            if (!texture) {
+                failRingBuild();
                 return;
+            }
 
             ComPtr<IDXGIResource> resource;
             CHECK_DX(texture->QueryInterface(IID_PPV_ARGS(&resource)));
-            if (!resource)
+            if (!resource) {
+                failRingBuild();
                 return;
+            }
 
             HANDLE sharedHandle = nullptr;
-            if (FAILED(resource->GetSharedHandle(&sharedHandle)) || !sharedHandle)
+            if (FAILED(resource->GetSharedHandle(&sharedHandle)) || !sharedHandle) {
+                failRingBuild();
                 return;
+            }
 
             newSharedHandles[i] = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(sharedHandle));
             Log("Shared handle: 0x%p\n", sharedHandle);
@@ -1541,9 +1344,12 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         ComPtr<ID3D11RenderTargetView> newTargetView;
         CHECK_DX(_d3d11MirrorDevice->CreateRenderTargetView(
             newCompositorTexture.Get(), &targetDesc, newTargetView.GetAddressOf()));
-        if (!newTargetView)
+        if (!newTargetView) {
+            failRingBuild();
             return;
+        }
 
+        _lastRingBuildFailTick = 0;
         _compositorTexture = std::move(newCompositorTexture);
         _mirrorTextures = std::move(newMirrorTextures);
         _targetView = std::move(newTargetView);
@@ -1554,6 +1360,11 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         MemoryBarrier();
         _pMirrorSurfaceData->sharedHandle[0] = newSharedHandles[0];
         _pMirrorSurfaceData->surfaceGeneration.store(nextGeneration, std::memory_order_release);
+        if (_diag) {
+            _diag->mirrorWidth = _comp_desc.Width;
+            _diag->mirrorHeight = _comp_desc.Height;
+            _diag->mirrorFormat = static_cast<uint32_t>(info.linear);
+        }
 
         Log("Compositor texture generation %u: %d x %d Format %d\n",
             nextGeneration,
@@ -1591,11 +1402,10 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
             return;
         }
 
-        // Keep recording-only controls live even while the OBS heartbeat is
-        // reconnecting (for example after the VR application restarts). If
-        // this refresh only happens in writeBlendConstants(), a stale
-        // heartbeat prevents the draw that would have refreshed the setting.
-        refreshOverscanCompensationConfig();
+        // Ticks even while mirroring is idle so the OBS plugin can tell a
+        // living-but-idle game apart from one that exited.
+        if (_diag)
+            _diag->layerHeartbeat.fetch_add(1, std::memory_order_relaxed);
 
         const uint32_t frameNumber = _pMirrorSurfaceData->frameNumber;
         if (_lastOBSFrameNumber == frameNumber) {
@@ -1605,8 +1415,77 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
             _obsFrameCounter = 0;
         }
 
+        const bool wasRunning = _obsRunning;
         _obsRunning = _obsFrameCounter <= 10;
         _lastOBSFrameNumber = frameNumber;
+
+        if (_obsRunning != wasRunning) {
+            if (_obsRunning) {
+                Log("Mirror consumer heartbeat detected (frame %u): mirroring enabled\n", frameNumber);
+                logConsumerDetails();
+            } else {
+                Log("Mirror consumer heartbeat lost (last frame %u): mirroring paused until OBS or the Control "
+                    "Center preview resumes\n",
+                    frameNumber);
+            }
+        }
+    }
+
+    void D3D11Mirror::logConsumerDetails() {
+        if (!_diag) {
+            Log("Consumer identity unavailable (legacy shared surface)\n");
+            return;
+        }
+
+        bool anyIdentified = false;
+        if (_diag->pluginMagic == obs_mirror_ipc::kDiagnosticsMagic) {
+            anyIdentified = true;
+            Log("OBS plugin: pid %u, version %s, adapter LUID %08x:%08x\n",
+                _diag->pluginPid,
+                _diag->pluginVersionString[0] ? _diag->pluginVersionString : "unknown",
+                _diag->pluginAdapterLuidHigh,
+                _diag->pluginAdapterLuidLow);
+
+            const bool pluginLuidKnown = _diag->pluginAdapterLuidLow != 0 || _diag->pluginAdapterLuidHigh != 0;
+            const bool layerLuidKnown = _adapterLuid.LowPart != 0 || _adapterLuid.HighPart != 0;
+            if (pluginLuidKnown && layerLuidKnown &&
+                (_diag->pluginAdapterLuidLow != static_cast<uint32_t>(_adapterLuid.LowPart) ||
+                 _diag->pluginAdapterLuidHigh != _adapterLuid.HighPart)) {
+                ErrorLog("GPU MISMATCH: OBS renders on adapter LUID %08x:%08x but the game's mirror is on %08x:%08x. "
+                         "Shared textures cannot cross GPUs, so the OBS capture will stay blank. Force OBS onto the "
+                         "game's GPU (Windows Settings > System > Display > Graphics).\n",
+                         _diag->pluginAdapterLuidHigh,
+                         _diag->pluginAdapterLuidLow,
+                         _adapterLuid.HighPart,
+                         _adapterLuid.LowPart);
+            }
+        }
+        if (_diag->previewMagic == obs_mirror_ipc::kDiagnosticsMagic) {
+            anyIdentified = true;
+            Log("Control Center preview: pid %u (a preview alone keeps mirroring active without OBS)\n",
+                _diag->previewPid);
+        }
+        if (!anyIdentified) {
+            Log("Consumer published no identity (OBS plugin or Control Center predates this layer version?)\n");
+        }
+    }
+
+    void D3D11Mirror::noteSourceAcquire(bool acquired) {
+        if (acquired) {
+            if (_acquireTimeoutWarned)
+                Log("Shared texture acquire recovered after %u skipped mirror updates\n", _acquireTimeoutStreak);
+            _acquireTimeoutStreak = 0;
+            _acquireTimeoutWarned = false;
+            return;
+        }
+
+        ++_acquireTimeoutStreak;
+        if (!_acquireTimeoutWarned && _acquireTimeoutStreak >= 90) {
+            _acquireTimeoutWarned = true;
+            ErrorLog("Mirror skipped %u consecutive updates waiting for the shared texture keyed mutex; "
+                     "the OBS capture will look frozen or blank\n",
+                     _acquireTimeoutStreak);
+        }
     }
 
     uint32_t D3D11Mirror::getEyeIndex() const {
@@ -1614,19 +1493,25 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
     }
 
     bool D3D11Mirror::createMirrorSurface() {
-        Log("Mapping OBS mirror IPC surface.\n");
+        Log("Mapping OBS mirror IPC surface '%ls' (%u bytes)\n",
+            obs_mirror_ipc::kSharedMemoryName,
+            static_cast<uint32_t>(sizeof(MirrorSurfaceData)));
         _mapFile = CreateFileMappingW(INVALID_HANDLE_VALUE,      // use paging file
                                       NULL,                      // default security
                                       PAGE_READWRITE,            // read/write access
                                       0,                         // maximum object size (high-order DWORD)
                                       sizeof(MirrorSurfaceData), // maximum object size (low-order DWORD)
                                       obs_mirror_ipc::kSharedMemoryName); // name of mapping object
+        const DWORD createError = GetLastError();
 
         if (_mapFile == nullptr) {
-            Log("Could not create file mapping object (%d).\n", GetLastError());
+            Log("Could not create file mapping object (%d).\n", createError);
             return false;
         }
-        const bool created = GetLastError() != ERROR_ALREADY_EXISTS;
+        const bool created = createError != ERROR_ALREADY_EXISTS;
+        Log(created ? "Created a new mirror surface mapping\n"
+                    : "Attached to an existing mirror surface mapping (another VR app with the layer is running, or a "
+                      "previous session is still open)\n");
         _pMirrorSurfaceData = (MirrorSurfaceData*)MapViewOfFile(_mapFile,            // handle to map object
                                                                 FILE_MAP_ALL_ACCESS, // read/write permission
                                                                 0,
@@ -1634,14 +1519,61 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
                                                                 sizeof(MirrorSurfaceData));
 
         if (_pMirrorSurfaceData == nullptr) {
-            Log("Could not map view of file (%d).\n", GetLastError());
-            CloseHandle(_mapFile);
-            _mapFile = nullptr;
-            return false;
+            const DWORD fullMapError = GetLastError();
+            // A pre-existing section created by an older layer build may be
+            // smaller than the current struct; fall back to the legacy prefix
+            // so mirroring still works, just without diagnostics.
+            _pMirrorSurfaceData = (MirrorSurfaceData*)MapViewOfFile(
+                _mapFile, FILE_MAP_ALL_ACCESS, 0, 0, obs_mirror_ipc::kLegacySurfaceSize);
+            if (_pMirrorSurfaceData == nullptr) {
+                Log("Could not map view of file (%d).\n", fullMapError);
+                CloseHandle(_mapFile);
+                _mapFile = nullptr;
+                return false;
+            }
+            Log("Mapped the legacy 64-byte mirror surface (full-size map failed with %d); shared diagnostics "
+                "disabled for this session\n",
+                fullMapError);
+        } else {
+            _diag = &_pMirrorSurfaceData->diagnostics;
         }
-        if (created) {
+
+        // A legacy-size fallback can only happen when the section pre-existed,
+        // so construction never runs against the short mapping.
+        if (created && _diag) {
             new (_pMirrorSurfaceData) MirrorSurfaceData();
         }
+
+        // Only one VR app can publish at a time; make the collision visible
+        // before our diagnostics overwrite the other session's identity.
+        if (!created && _diag && _diag->layerMagic == obs_mirror_ipc::kDiagnosticsMagic &&
+            _diag->layerPid != GetCurrentProcessId()) {
+            Log("Another VR app (pid %u, '%s') is already publishing to this mirror surface; only one app is "
+                "captured at a time and the newest one wins\n",
+                _diag->layerPid,
+                _diag->applicationName[0] ? _diag->applicationName : "unknown");
+        }
+
+        publishLayerDiagnostics();
         return true;
+    }
+
+    void D3D11Mirror::publishLayerDiagnostics() {
+        if (!_diag)
+            return;
+        _diag->layerDiagVersion = obs_mirror_ipc::kDiagnosticsVersion;
+        _diag->layerPid = GetCurrentProcessId();
+        _diag->layerAdapterLuidLow = static_cast<uint32_t>(_adapterLuid.LowPart);
+        _diag->layerAdapterLuidHigh = _adapterLuid.HighPart;
+        strncpy_s(_diag->layerVersionString,
+                  layer_OBSMirror::VersionString.c_str(),
+                  _TRUNCATE);
+        _diag->layerMagic = obs_mirror_ipc::kDiagnosticsMagic;
+    }
+
+    void D3D11Mirror::setApplicationInfo(const char* applicationName) {
+        if (!_diag || !applicationName)
+            return;
+        strncpy_s(_diag->applicationName, applicationName, _TRUNCATE);
     }
 } // Mirror namespace

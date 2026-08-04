@@ -67,10 +67,12 @@
                             <StackPanel Orientation="Horizontal" Spacing="12"><SymbolIcon Symbol="Setting" /><TextBlock Text="Diagnostics" FontWeight="SemiBold" /></StackPanel>
                         </Button>
                     </StackPanel>
-                    <Border Grid.Row="2" CornerRadius="12" Padding="13" Background="#80333A4A">
+                    <Border x:Name="VrRestartPanel" Grid.Row="2" CornerRadius="12" Padding="13"
+                            Background="#80333A4A" Visibility="Collapsed">
                         <StackPanel Spacing="5">
-                            <TextBlock Text="VR APP RESTART" Style="{StaticResource EyebrowStyle}" />
-                            <TextBlock Text="Required after overscan changes" Style="{StaticResource MutedTextStyle}" FontSize="11" />
+                            <TextBlock x:Name="VrRestartTitleText" Text="RESTART VR APP" Style="{StaticResource EyebrowStyle}" />
+                            <TextBlock x:Name="VrRestartReasonText" Text="Restart the running VR app to apply the change."
+                                       Style="{StaticResource MutedTextStyle}" FontSize="11" TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -83,9 +85,14 @@
                     </Grid.RowDefinitions>
 
                     <!-- Dashboard -->
-                    <ScrollViewer x:Name="DashboardPage" Grid.Row="0" Padding="34,28,34,34">
-                        <StackPanel Spacing="24" MaxWidth="1260" HorizontalAlignment="Stretch">
-                            <Grid>
+                    <Grid x:Name="DashboardPage" Grid.Row="0" Padding="28,20,28,24"
+                          RowSpacing="14" MaxWidth="1260" HorizontalAlignment="Stretch">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                            <Grid Grid.Row="0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -103,7 +110,7 @@
                                 </Button>
                             </Grid>
 
-                            <Grid ColumnSpacing="14">
+                            <Grid Grid.Row="1" ColumnSpacing="14">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="*" />
@@ -111,66 +118,66 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
 
-                                <Border Grid.Column="0" Style="{StaticResource CardStyle}">
-                                    <StackPanel Spacing="14">
+                                <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="16,14">
+                                    <StackPanel Spacing="8">
                                         <Grid>
                                             <Border x:Name="LayerDot" Width="10" Height="10" CornerRadius="5" HorizontalAlignment="Left" />
                                             <SymbolIcon Symbol="Link" HorizontalAlignment="Right" Foreground="{StaticResource MutedTextBrush}" />
                                         </Grid>
                                         <TextBlock Text="OPENXR LAYER" Style="{StaticResource EyebrowStyle}" />
-                                        <TextBlock x:Name="LayerStatusText" Text="Checking…" FontSize="20" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="LayerStatusText" Text="Checking…" FontSize="18" FontWeight="SemiBold" />
                                         <TextBlock x:Name="LayerDetailText" Style="{StaticResource MutedTextStyle}" FontSize="12" />
                                     </StackPanel>
                                 </Border>
 
-                                <Border Grid.Column="1" Style="{StaticResource CardStyle}">
-                                    <StackPanel Spacing="14">
+                                <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="16,14">
+                                    <StackPanel Spacing="8">
                                         <Grid>
                                             <Border x:Name="PluginDot" Width="10" Height="10" CornerRadius="5" HorizontalAlignment="Left" />
                                             <SymbolIcon Symbol="Video" HorizontalAlignment="Right" Foreground="{StaticResource MutedTextBrush}" />
                                         </Grid>
                                         <TextBlock Text="OBS SOURCE" Style="{StaticResource EyebrowStyle}" />
-                                        <TextBlock x:Name="PluginStatusText" Text="Checking…" FontSize="20" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="PluginStatusText" Text="Checking…" FontSize="18" FontWeight="SemiBold" />
                                         <TextBlock x:Name="PluginDetailText" Style="{StaticResource MutedTextStyle}" FontSize="12" />
                                     </StackPanel>
                                 </Border>
 
-                                <Border Grid.Column="2" Style="{StaticResource CardStyle}">
-                                    <StackPanel Spacing="14">
+                                <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="16,14">
+                                    <StackPanel Spacing="8">
                                         <Grid>
                                             <Border x:Name="RuntimeDot" Width="10" Height="10" CornerRadius="5" HorizontalAlignment="Left" />
                                             <SymbolIcon Symbol="World" HorizontalAlignment="Right" Foreground="{StaticResource MutedTextBrush}" />
                                         </Grid>
                                         <TextBlock Text="OPENXR RUNTIME" Style="{StaticResource EyebrowStyle}" />
-                                        <TextBlock x:Name="RuntimeStatusText" Text="Checking…" FontSize="20" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock x:Name="RuntimeStatusText" Text="Checking…" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                         <TextBlock x:Name="RuntimeDetailText" Style="{StaticResource MutedTextStyle}" FontSize="12" MaxLines="2" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                 </Border>
 
-                                <Border Grid.Column="3" Style="{StaticResource CardStyle}">
-                                    <StackPanel Spacing="14">
+                                <Border Grid.Column="3" Style="{StaticResource CardStyle}" Padding="16,14">
+                                    <StackPanel Spacing="8">
                                         <Grid>
                                             <Border x:Name="OverscanDot" Width="10" Height="10" CornerRadius="5" HorizontalAlignment="Left" />
                                             <SymbolIcon Symbol="FullScreen" HorizontalAlignment="Right" Foreground="{StaticResource MutedTextBrush}" />
                                         </Grid>
                                         <TextBlock Text="OVERSCAN" Style="{StaticResource EyebrowStyle}" />
-                                        <TextBlock x:Name="OverscanStatusText" Text="Checking…" FontSize="20" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="OverscanStatusText" Text="Checking…" FontSize="18" FontWeight="SemiBold" />
                                         <TextBlock x:Name="OverscanDetailText" Style="{StaticResource MutedTextStyle}" FontSize="12" />
                                     </StackPanel>
                                 </Border>
                             </Grid>
 
-                            <Grid ColumnSpacing="14">
+                            <Grid Grid.Row="2" ColumnSpacing="14" MinHeight="0">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="1.2*" />
-                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="0.9*" />
+                                    <ColumnDefinition Width="1.1*" />
                                 </Grid.ColumnDefinitions>
 
-                                <Border Grid.Column="0" Style="{StaticResource CardStyle}">
-                                    <StackPanel Spacing="16">
+                                <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="16">
+                                    <StackPanel Spacing="10">
                                         <TextBlock Text="QUICK ACTIONS" Style="{StaticResource EyebrowStyle}" />
-                                        <TextBlock Text="Capture workflow" FontSize="21" FontWeight="SemiBold" />
-                                        <Grid ColumnSpacing="10" RowSpacing="10">
+                                        <TextBlock Text="Capture workflow" FontSize="18" FontWeight="SemiBold" />
+                                        <Grid ColumnSpacing="8" RowSpacing="8">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="*" />
@@ -179,7 +186,7 @@
                                                 <RowDefinition Height="Auto" />
                                                 <RowDefinition Height="Auto" />
                                             </Grid.RowDefinitions>
-                                            <Border Grid.Row="0" Grid.Column="0" Padding="12,7" CornerRadius="8"
+                                            <Border Grid.Row="0" Grid.Column="0" Padding="10,5" CornerRadius="8"
                                                     BorderBrush="{StaticResource CardStrokeBrush}" BorderThickness="1">
                                                 <Grid ColumnSpacing="10">
                                                     <Grid.ColumnDefinitions>
@@ -189,7 +196,8 @@
                                                     <TextBlock Text="Layer" FontWeight="SemiBold" VerticalAlignment="Center" />
                                                     <ToggleSwitch x:Name="DashboardLayerRegistrationToggle" Grid.Column="1"
                                                                   HorizontalAlignment="Right" VerticalAlignment="Center"
-                                                                  OnContent="Enabled" OffContent="Disabled"
+                                                                  Width="48" MinWidth="0"
+                                                                  OnContent="" OffContent=""
                                                                   Toggled="LayerRegistrationToggle_Toggled" />
                                                 </Grid>
                                             </Border>
@@ -208,25 +216,58 @@
                                     </StackPanel>
                                 </Border>
 
-                                <Border Grid.Column="1" Style="{StaticResource CardStyle}">
-                                    <StackPanel Spacing="13">
-                                        <TextBlock Text="LAST CAPTURE" Style="{StaticResource EyebrowStyle}" />
-                                        <TextBlock Text="Layer activity" FontSize="21" FontWeight="SemiBold" />
-                                        <TextBlock x:Name="LastCaptureText" Style="{StaticResource MutedTextStyle}" FontFamily="Cascadia Mono" FontSize="12" />
-                                        <Rectangle Height="1" Fill="{StaticResource CardStrokeBrush}" />
-                                        <Grid>
-                                            <TextBlock Text="OBS" Style="{StaticResource MutedTextStyle}" />
-                                            <TextBlock x:Name="ObsProcessText" HorizontalAlignment="Right" FontWeight="SemiBold" />
+                                <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="16">
+                                    <Grid RowSpacing="10">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+                                        <Grid Grid.Row="0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="LIVE MIRROR PREVIEW" Style="{StaticResource EyebrowStyle}" />
+                                                <TextBlock x:Name="PreviewStatusText" Text="Waiting for an OpenXR app" FontSize="18" FontWeight="SemiBold" />
+                                                <TextBlock x:Name="PreviewDetailText"
+                                                           Text="Start a VR app after enabling the OpenXR layer."
+                                                           Style="{StaticResource MutedTextStyle}" FontSize="11"
+                                                           MaxLines="1" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <Button Click="RefreshPreview_Click" Style="{StaticResource SecondaryButtonStyle}"
+                                                        Padding="10" ToolTipService.ToolTip="Refresh preview now">
+                                                    <SymbolIcon Symbol="Refresh" />
+                                                </Button>
+                                                <Button Click="OpenPreviewWindow_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="12,9">
+                                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                                        <SymbolIcon Symbol="FullScreen" />
+                                                        <TextBlock Text="Open larger" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </StackPanel>
                                         </Grid>
-                                        <Grid>
-                                            <TextBlock Text="Simulator testing tool" Style="{StaticResource MutedTextStyle}" />
-                                            <TextBlock x:Name="MetaProcessText" HorizontalAlignment="Right" FontWeight="SemiBold" />
-                                        </Grid>
-                                    </StackPanel>
+
+                                        <Border Grid.Row="1" MinHeight="0" CornerRadius="10" Background="#FF05070A"
+                                                BorderBrush="{StaticResource CardStrokeBrush}" BorderThickness="1">
+                                            <Grid>
+                                                <Image x:Name="MirrorPreviewImage" Stretch="Uniform" />
+                                                <StackPanel x:Name="PreviewPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                            Spacing="8" MaxWidth="330" Margin="18">
+                                                    <SymbolIcon Symbol="Video" Width="30" Height="30" Foreground="{StaticResource MutedTextBrush}" />
+                                                    <TextBlock x:Name="PreviewPlaceholderTitle" Text="No mirror image yet"
+                                                               FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                                    <TextBlock x:Name="PreviewPlaceholderDetail"
+                                                               Text="The preview connects automatically when an OpenXR app publishes a frame."
+                                                               Style="{StaticResource MutedTextStyle}" FontSize="11" TextAlignment="Center" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
                                 </Border>
                             </Grid>
-                        </StackPanel>
-                    </ScrollViewer>
+                    </Grid>
 
                     <!-- Overscan -->
                     <ScrollViewer x:Name="OverscanPage" Grid.Row="0" Padding="34,28,34,34" Visibility="Collapsed">
@@ -269,29 +310,6 @@
                                             <Slider x:Name="VerticalSlider" ValueChanged="OverscanSlider_ValueChanged" />
                                             <TextBlock Text="Adds room above and below the headset crop." Style="{StaticResource MutedTextStyle}" FontSize="12" />
                                         </StackPanel>
-
-                                        <Border CornerRadius="14" Padding="16" Background="#80333A4A">
-                                            <StackPanel Spacing="10">
-                                                <Grid>
-                                                    <StackPanel Margin="0,0,88,0">
-                                                        <TextBlock Text="Match fullscreen effects at the FOV boundary" FontWeight="SemiBold" />
-                                                        <TextBlock x:Name="BoundaryCompensationSummaryText"
-                                                                   Text="Off — the overscan perimeter is copied exactly as rendered."
-                                                                   Style="{StaticResource MutedTextStyle}" FontSize="12" TextWrapping="Wrap" />
-                                                    </StackPanel>
-                                                    <ToggleSwitch x:Name="BoundaryCompensationToggle" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                                                  Toggled="OverscanToggle_Toggled" />
-                                                </Grid>
-                                                <Grid>
-                                                    <TextBlock Text="Match strength" Style="{StaticResource MutedTextStyle}" />
-                                                    <TextBlock x:Name="BoundaryCompensationStrengthText" Text="100%" HorizontalAlignment="Right"
-                                                               Foreground="{StaticResource BrandBrush}" FontWeight="SemiBold" />
-                                                </Grid>
-                                                <Slider x:Name="BoundaryCompensationStrengthSlider" ValueChanged="OverscanSlider_ValueChanged" />
-                                                <TextBlock Text="Recording only. Useful when a projection-baked blur, tint, vignette, or fade ends at the headset's native FOV."
-                                                           Style="{StaticResource MutedTextStyle}" FontSize="12" TextWrapping="Wrap" />
-                                            </StackPanel>
-                                        </Border>
 
                                         <StackPanel Spacing="9">
                                             <TextBlock Text="PRESETS" Style="{StaticResource EyebrowStyle}" />
@@ -532,7 +550,7 @@
                                     <StackPanel Spacing="7">
                                         <TextBlock Text="INSTALL OR UPDATE BOTH COMPONENTS" Style="{StaticResource EyebrowStyle}" />
                                         <TextBlock Text="Use the release artifacts already built in this repository." FontSize="20" FontWeight="SemiBold" />
-                                        <TextBlock Text="If OBS is open and already has this exact plugin, the installer safely updates only the layer. Close OBS first when the plugin binary has changed." Style="{StaticResource MutedTextStyle}" />
+                                        <TextBlock Text="If OBS is open and already has this exact plugin, the installer safely updates only the layer. Close OBS first when the plugin binary has changed; Windows may then ask for administrator permission." Style="{StaticResource MutedTextStyle}" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                                         <Button Click="OpenInstallFolder_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Open install folder" />
@@ -611,10 +629,16 @@
                                         <ComboBox x:Name="LogSelector" Width="170" SelectedIndex="0" SelectionChanged="LogSelector_SelectionChanged">
                                             <ComboBoxItem Content="OpenXR layer log" Tag="layer" />
                                             <ComboBoxItem Content="OBS log" Tag="obs" />
+                                            <ComboBoxItem Content="Preview diagnostics" Tag="preview" />
                                         </ComboBox>
                                         <Button Click="RefreshLogs_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Refresh log" />
                                     </StackPanel>
-                                    <Button HorizontalAlignment="Right" Click="OpenSelectedLog_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Open in Explorer" />
+                                    <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+                                        <Button x:Name="ShareLogsButton" Click="ShareLogs_Click" Style="{StaticResource SecondaryButtonStyle}" ToolTipService.ToolTip="Uploads the diagnostics report, layer log and OBS log to filebin.net and copies the share link to the clipboard. The link expires after about a week.">
+                                            <StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Upload" /><TextBlock Text="Upload &amp; share logs" /></StackPanel>
+                                        </Button>
+                                        <Button Click="OpenSelectedLog_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Open in Explorer" />
+                                    </StackPanel>
                                 </Grid>
                                 <TextBox x:Name="LogTextBox" Grid.Row="1" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                                          FontFamily="Cascadia Mono" FontSize="12" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"

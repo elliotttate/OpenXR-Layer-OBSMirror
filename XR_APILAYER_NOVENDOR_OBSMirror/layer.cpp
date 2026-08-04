@@ -234,8 +234,10 @@ namespace {
 
             if (boundApi != XR_TYPE_UNKNOWN) {
                 _xrGraphicsAPI = boundApi;
+                Log("Graphics binding: %s\n", boundApi == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR ? "D3D11" : "D3D12");
             } else {
-                Log("No supported graphics binding found; mirroring disabled for this session\n");
+                Log("No supported graphics binding found (D3D11 or D3D12 required); mirroring disabled for this "
+                    "session\n");
             }
 
             const XrResult result = OpenXrApi::xrCreateSession(instance, createInfo, session);
@@ -438,21 +440,47 @@ namespace {
             const XrResult result =
                 OpenXrApi::xrEnumerateSwapchainImages(swapchain, imageCapacityInput, imageCountOutput, images);
             if (XR_SUCCEEDED(result) && _mirror && _mirror->initialized()) {
-                Mirror::DxgiFormatInfo formatInfo;
-                Mirror::GetFormatInfo((DXGI_FORMAT)swapchainState._createInfo.format, formatInfo);
-                if (formatInfo.bpc <= 10 &&
-                    swapchainState._createInfo.usageFlags & XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT) {
-#ifdef _DEBUG
-                    Log("Mirroring swapchain width %d height %d format %d usage %d sample %d array %d face %d mip %d\n",
-                        swapchainState._createInfo.width,
-                        swapchainState._createInfo.height,
-                        swapchainState._createInfo.format,
-                        swapchainState._createInfo.usageFlags,
-                        swapchainState._createInfo.sampleCount,
-                        swapchainState._createInfo.arraySize,
-                        swapchainState._createInfo.faceCount,
-                        swapchainState._createInfo.mipCount);
-#endif
+                Mirror::DxgiFormatInfo formatInfo{};
+                const bool knownFormat =
+                    Mirror::GetFormatInfo((DXGI_FORMAT)swapchainState._createInfo.format, formatInfo);
+                const bool colorAttachment =
+                    (swapchainState._createInfo.usageFlags & XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT) != 0;
+                const bool mirrorable = knownFormat && formatInfo.bpc <= 10 && colorAttachment;
+
+                // Whether a swapchain is mirrored decides if OBS ever receives
+                // pixels from it, so the decision and its reason must reach the
+                // log in release builds too - once per swapchain.
+                if (!swapchainState._mirrorDecisionLogged) {
+                    swapchainState._mirrorDecisionLogged = true;
+                    if (mirrorable) {
+                        Log("Mirroring swapchain %p: %ux%u format %d usage 0x%x samples %u array %u\n",
+                            swapchain,
+                            swapchainState._createInfo.width,
+                            swapchainState._createInfo.height,
+                            swapchainState._createInfo.format,
+                            swapchainState._createInfo.usageFlags,
+                            swapchainState._createInfo.sampleCount,
+                            swapchainState._createInfo.arraySize);
+                    } else if (!knownFormat) {
+                        Log("NOT mirroring swapchain %p: unsupported DXGI format %d. If the OBS capture stays "
+                            "blank, the game renders in a format the mirror does not support.\n",
+                            swapchain,
+                            swapchainState._createInfo.format);
+                    } else if (!colorAttachment) {
+                        Log("NOT mirroring swapchain %p: no color-attachment usage (flags 0x%x) - typically a "
+                            "depth or utility swapchain\n",
+                            swapchain,
+                            swapchainState._createInfo.usageFlags);
+                    } else {
+                        Log("NOT mirroring swapchain %p: %d bits per channel exceeds the supported 10 "
+                            "(HDR-format swapchain, format %d). If the OBS capture stays blank, this is why.\n",
+                            swapchain,
+                            formatInfo.bpc,
+                            swapchainState._createInfo.format);
+                    }
+                }
+
+                if (mirrorable) {
                     if (_xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR) {
                         Log("XR_TYPE_GRAPHICS_BINDING_D3D11_KHR\n");
                         swapchainState._dx11SurfaceImages.resize(*imageCountOutput);
@@ -609,20 +637,6 @@ namespace {
                         }
                     }
                 }
-#ifdef _DEBUG
-                else {
-                    Log("Not mirroring swapchain width %d height %d format %d usage %d sample %d array %d face %d mip "
-                        "%d\n",
-                        swapchainState._createInfo.width,
-                        swapchainState._createInfo.height,
-                        swapchainState._createInfo.format,
-                        swapchainState._createInfo.usageFlags,
-                        swapchainState._createInfo.sampleCount,
-                        swapchainState._createInfo.arraySize,
-                        swapchainState._createInfo.faceCount,
-                        swapchainState._createInfo.mipCount);
-                }
-#endif
             } else {
                 if (_xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR)
                     swapchainState._dx11SurfaceImages.clear();
@@ -682,6 +696,7 @@ namespace {
                                 swapchainState._dx11KeyedMutex->ReleaseSync(0);
                             swapchainState._lastCopiedIndex = idx;
                         }
+                        noteMirrorCopyResult(swapchainState, acquired, "keyed mutex timeout");
                     }
                 } else if (_xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_D3D12_KHR &&
                            idx < swapchainState._dx12SurfaceImages.size()) {
@@ -707,8 +722,9 @@ namespace {
                                 _mirror->notifyFenceValue(swapchain, copyValue);
                             }
                             swapchainState._lastCopiedIndex = idx;
+                            noteMirrorCopyResult(swapchainState, true, nullptr);
                         } else {
-                            Log("Skipped mirror copy: fence wait timed out\n");
+                            noteMirrorCopyResult(swapchainState, false, "fence wait timed out");
                         }
                     }
                 }
@@ -768,6 +784,14 @@ namespace {
 
             if (_mirror && _mirror->enabled() && XR_SUCCEEDED(res)) {
                 auto siPtr = _mirror->getSpaceInfo(viewLocateInfo->space);
+                if (views && !siPtr && !_untrackedViewSpaceLogged) {
+                    // Without a tracked reference space the projection views
+                    // are never recorded and the mirror stays blank forever.
+                    _untrackedViewSpaceLogged = true;
+                    Log("xrLocateViews uses space %p which is not a tracked reference space; views located against "
+                        "it cannot be mirrored\n",
+                        viewLocateInfo->space);
+                }
                 if (views && siPtr) {
                     if (_projectionViews.size() != *viewCountOutput) {
                         Log("Reference Space Type: %d\n", siPtr->referenceSpaceType);
@@ -856,8 +880,21 @@ namespace {
             if (_mirror) {
                 _mirror->checkOBSRunning();
 
-                if (_mirror->enabled() && isSessionHandled(session) && !_projectionViews.empty() &&
-                    !_xrViewsList.empty()) {
+                // Classify how far this frame makes it through the mirror
+                // pipeline; noteMirrorOutcome() logs the transitions.
+                MirrorOutcome outcome = MirrorOutcome::Unset;
+                if (isSessionHandled(session)) {
+                    if (!_mirror->initialized())
+                        outcome = MirrorOutcome::MirrorUnavailable;
+                    else if (!_mirror->enabled())
+                        outcome = MirrorOutcome::WaitingForObs;
+                    else if (_projectionViews.empty() || _xrViewsList.empty())
+                        outcome = MirrorOutcome::NoViewData;
+                    else
+                        outcome = MirrorOutcome::NoProjectionLayer;
+                }
+
+                if (outcome >= MirrorOutcome::NoProjectionLayer) {
                     const XrCompositionLayerProjectionView* projView = &_projectionViews[0];
                     const XrCompositionLayerProjection* projLayer = nullptr;
 
@@ -882,15 +919,20 @@ namespace {
                                             const XrFovf& mirrorFov = eyeIndex < _projectionViews.size()
                                                                                 ? _projectionViews[eyeIndex].fov
                                                                                 : _projectionViews[0].fov;
-                                            const XrFovf* nativeFov =
-                                                eyeIndex < _originalViewFovs.size() ? &_originalViewFovs[eyeIndex] : nullptr;
-                                            _mirror->Blend(projView,
-                                                           mirrorFov,
-                                                           (DXGI_FORMAT)swapchainState._createInfo.format,
-                                                           projLayer->space,
-                                                           frameEndInfo->displayTime,
-                                                           nativeFov);
+                                            const bool drew =
+                                                _mirror->Blend(projView,
+                                                               mirrorFov,
+                                                               (DXGI_FORMAT)swapchainState._createInfo.format,
+                                                               projLayer->space,
+                                                               frameEndInfo->displayTime);
+                                            outcome = std::max(
+                                                outcome,
+                                                drew ? MirrorOutcome::Mirroring : MirrorOutcome::DrawFailed);
+                                        } else {
+                                            outcome = std::max(outcome, MirrorOutcome::TextureNotReady);
                                         }
+                                    } else {
+                                        outcome = std::max(outcome, MirrorOutcome::SwapchainNotTracked);
                                     }
                                 } else if (_projectionViews.size() >= 2) {
                                     projView = &projLayer->views[0];
@@ -901,16 +943,22 @@ namespace {
                                         auto& swapchainState2 = _swapchains[projView2->subImage.swapchain];
                                         if ((swapchainState._dx11LastTexture || swapchainState._dx12LastTexture) &&
                                             (swapchainState2._dx11LastTexture || swapchainState2._dx12LastTexture)) {
-                                            _mirror->Blend(projView,
-                                                           _projectionViews[0].fov,
-                                                           projView2,
-                                                           _projectionViews[1].fov,
-                                                           (DXGI_FORMAT)swapchainState._createInfo.format,
-                                                           projLayer->space,
-                                                           frameEndInfo->displayTime,
-                                                           _originalViewFovs.size() > 0 ? &_originalViewFovs[0] : nullptr,
-                                                           _originalViewFovs.size() > 1 ? &_originalViewFovs[1] : nullptr);
+                                            const bool drew =
+                                                _mirror->Blend(projView,
+                                                               _projectionViews[0].fov,
+                                                               projView2,
+                                                               _projectionViews[1].fov,
+                                                               (DXGI_FORMAT)swapchainState._createInfo.format,
+                                                               projLayer->space,
+                                                               frameEndInfo->displayTime);
+                                            outcome = std::max(
+                                                outcome,
+                                                drew ? MirrorOutcome::Mirroring : MirrorOutcome::DrawFailed);
+                                        } else {
+                                            outcome = std::max(outcome, MirrorOutcome::TextureNotReady);
                                         }
+                                    } else {
+                                        outcome = std::max(outcome, MirrorOutcome::SwapchainNotTracked);
                                     }
                                 }
                             }
@@ -939,6 +987,8 @@ namespace {
                     }
                     _mirror->copyToMirror();
                 }
+                if (outcome != MirrorOutcome::Unset)
+                    noteMirrorOutcome(outcome);
             }
 
             // With overscan active, OBS has already been fed the full wide
@@ -982,7 +1032,105 @@ namespace {
             ComPtr<ID3D12Fence> _copyFence = nullptr;
             UniqueHandle _copyFenceHandle;
             UINT64 _copyFenceValue = 0;
+            // Diagnostics: the mirror decision is logged once per swapchain,
+            // and persistent copy-skip streaks are reported with recovery.
+            bool _mirrorDecisionLogged = false;
+            uint32_t _copySkipStreak = 0;
+            bool _copySkipWarned = false;
         };
+
+        // Why the most recent frame did not (or did) reach OBS, ordered by how
+        // far the frame progressed through the mirror pipeline.
+        enum class MirrorOutcome : uint32_t {
+            Unset = 0,
+            MirrorUnavailable,
+            WaitingForObs,
+            NoViewData,
+            NoProjectionLayer,
+            SwapchainNotTracked,
+            TextureNotReady,
+            DrawFailed,
+            Mirroring,
+        };
+
+        static const char* describeMirrorOutcome(MirrorOutcome outcome) {
+            switch (outcome) {
+            case MirrorOutcome::MirrorUnavailable:
+                return "mirror initialization failed - no capture possible";
+            case MirrorOutcome::WaitingForObs:
+                return "waiting for the OBS plugin heartbeat (is OBS running with an active OpenXR Mirror source?)";
+            case MirrorOutcome::NoViewData:
+                return "waiting for view data from xrLocateViews against a tracked reference space";
+            case MirrorOutcome::NoProjectionLayer:
+                return "no stereo projection layer in the game's frame submission";
+            case MirrorOutcome::SwapchainNotTracked:
+                return "the projection layer uses a swapchain the layer is not tracking";
+            case MirrorOutcome::TextureNotReady:
+                return "the swapchain has no mirror copy texture (see the swapchain mirroring decisions above)";
+            case MirrorOutcome::DrawFailed:
+                return "the mirror could not draw (source not registered or ring creation failed - see errors above)";
+            case MirrorOutcome::Mirroring:
+                return "actively mirroring frames to OBS";
+            default:
+                return "session start";
+            }
+        }
+
+        // Logs mirror pipeline state transitions so a single log file explains
+        // why OBS shows (or stops showing) frames. Capped in case a game flaps
+        // between states every frame.
+        void noteMirrorOutcome(MirrorOutcome outcome) {
+            if (outcome == _lastMirrorOutcome) {
+                ++_mirrorOutcomeFrames;
+                const ULONGLONG now = GetTickCount64();
+                if (_lastMirrorHealthLogTick == 0)
+                    _lastMirrorHealthLogTick = now;
+                else if (now - _lastMirrorHealthLogTick >= 30000) {
+                    _lastMirrorHealthLogTick = now;
+                    Log("Mirror health: %s for %u consecutive xrEndFrame calls. This confirms the pipeline state, "
+                        "not whether the published pixels are non-black; use the Control Center Preview diagnostics "
+                        "log for pixel sampling.\n",
+                        describeMirrorOutcome(outcome),
+                        _mirrorOutcomeFrames);
+                }
+                return;
+            }
+            if (_mirrorOutcomeTransitionLogs < 40) {
+                ++_mirrorOutcomeTransitionLogs;
+                Log("Mirror state: %s (after %u frames of: %s)\n",
+                    describeMirrorOutcome(outcome),
+                    _mirrorOutcomeFrames,
+                    describeMirrorOutcome(_lastMirrorOutcome));
+                if (_mirrorOutcomeTransitionLogs == 40) {
+                    Log("Mirror state keeps changing; further transitions will not be logged\n");
+                }
+            }
+            _lastMirrorOutcome = outcome;
+            _mirrorOutcomeFrames = 0;
+            _lastMirrorHealthLogTick = GetTickCount64();
+        }
+
+        static void noteMirrorCopyResult(Swapchain& state, bool copied, const char* reason) {
+            if (copied) {
+                if (state._copySkipWarned) {
+                    Log("Mirror source copy recovered for swapchain %p after %u skipped frames\n",
+                        state._xrSwapchain,
+                        state._copySkipStreak);
+                }
+                state._copySkipStreak = 0;
+                state._copySkipWarned = false;
+                return;
+            }
+            ++state._copySkipStreak;
+            if (!state._copySkipWarned && state._copySkipStreak >= 90) {
+                state._copySkipWarned = true;
+                Log("Mirror source copy skipped %u consecutive frames for swapchain %p (%s); the OBS capture will "
+                    "be stale or blank\n",
+                    state._copySkipStreak,
+                    state._xrSwapchain,
+                    reason ? reason : "unknown reason");
+            }
+        }
 
         // ---- Recording overscan (experimental) ----
 
@@ -1231,6 +1379,8 @@ namespace {
             _mirror = std::make_unique<D3D11Mirror>(adapter.Get());
             if (!_mirror->initialized()) {
                 Log("Mirror initialization failed; OBS mirroring disabled\n");
+            } else {
+                _mirror->setApplicationInfo(GetApplicationName().c_str());
             }
         }
 
@@ -1265,6 +1415,14 @@ namespace {
 
         std::map<XrSession, Session> _sessions;
         std::map<XrSwapchain, Swapchain> _swapchains;
+
+        // Mirror pipeline diagnostics: last classified frame outcome plus
+        // throttling counters for the transition log.
+        MirrorOutcome _lastMirrorOutcome = MirrorOutcome::Unset;
+        uint32_t _mirrorOutcomeFrames = 0;
+        uint32_t _mirrorOutcomeTransitionLogs = 0;
+        ULONGLONG _lastMirrorHealthLogTick = 0;
+        bool _untrackedViewSpaceLogged = false;
 
         // Recording overscan state (experimental, latched at instance creation).
         bool _overscanRequested = false;

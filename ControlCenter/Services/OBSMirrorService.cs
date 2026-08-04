@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Win32;
 using OBSMirror.ControlCenter.Models;
 
@@ -31,6 +33,7 @@ public sealed class OBSMirrorService
     public string InstalledManifestPath => Path.Combine(InstallDirectory, LayerManifestName);
     public string InstalledLayerPath => ResolveManifestLibraryPath(InstalledManifestPath);
     public string ReleaseLayerPath => Path.Combine(RepoRoot, "bin", "x64", "Release", "XR_APILAYER_NOVENDOR_OBSMirror.dll");
+    public string ReleaseLayerManifestPath => Path.Combine(RepoRoot, "bin", "x64", "Release", LayerManifestName);
     public string ReleasePluginPath => Path.Combine(RepoRoot, "bin", "x64", "Release", "OBS_Plugin", "win-openxr.dll");
     public string SetupScriptPath => Path.Combine(RepoRoot, "scripts", "Setup-OBS.ps1");
     public string InstallScriptPath => Path.Combine(RepoRoot, "scripts", "Install-Layer.ps1");
@@ -39,7 +42,6 @@ public sealed class OBSMirrorService
     public SystemSnapshot GetSnapshot()
     {
         var (enabled, horizontal, vertical) = ReadOverscan();
-        var (boundaryCompensation, boundaryCompensationStrength) = ReadOverscanBoundaryCompensation();
         var (smoothingManaged, cameraSmoothing, smoothingCrop) = ReadCameraSmoothing();
         var mirrorQuadLayers = ReadMirrorQuadLayers();
         var runtime = ResolveRuntimeSelection();
@@ -78,8 +80,6 @@ public sealed class OBSMirrorService
             OverscanEnabled: enabled,
             HorizontalPercent: horizontal,
             VerticalPercent: vertical,
-            OverscanBoundaryCompensation: boundaryCompensation,
-            OverscanBoundaryCompensationStrength: boundaryCompensationStrength,
             CameraSmoothingManaged: smoothingManaged,
             CameraSmoothing: cameraSmoothing,
             SmoothingCrop: smoothingCrop,
@@ -113,16 +113,6 @@ public sealed class OBSMirrorService
         key.SetValue("SmoothingCropTenths", (int)Math.Round(crop * 10.0), RegistryValueKind.DWord);
     }
 
-    public void ApplyOverscanBoundaryCompensation(bool enabled, int strength)
-    {
-        strength = Math.Clamp(strength, 0, 100);
-
-        using var key = Registry.CurrentUser.CreateSubKey(ConfigKey, writable: true)
-            ?? throw new InvalidOperationException("Could not open the per-user OBSMirror settings key.");
-        key.SetValue("OverscanBoundaryCompensation", enabled ? 1 : 0, RegistryValueKind.DWord);
-        key.SetValue("OverscanBoundaryCompensationStrength", strength, RegistryValueKind.DWord);
-    }
-
     public void ApplyMirrorQuadLayers(bool visible)
     {
         using var key = Registry.CurrentUser.CreateSubKey(ConfigKey, writable: true)
@@ -130,26 +120,169 @@ public sealed class OBSMirrorService
         key.SetValue("MirrorQuadLayers", visible ? 1 : 0, RegistryValueKind.DWord);
     }
 
-    public async Task<string> SetupAsync(bool allowRunningObs)
+    public Task<string> SetupAsync(bool allowRunningObs) =>
+        Task.Run(() => Setup(allowRunningObs));
+
+    public Task<string> InstallLayerOnlyAsync() =>
+        Task.Run(InstallLayerOnly);
+
+    public Task<string> InstallPluginOnlyAsync() =>
+        Task.Run(InstallPluginOnly);
+
+    public Task<string> RegisterLayerAsync() =>
+        Task.Run(() => RegisterLayer(InstalledManifestPath));
+
+    public Task<string> UnregisterLayerAsync() =>
+        Task.Run(UnregisterLayer);
+
+    private string Setup(bool allowRunningObs)
     {
-        EnsureFile(SetupScriptPath, "setup script");
-        var args = new List<string>();
-        if (allowRunningObs)
-            args.Add("-AllowRunningOBS");
-        return await RunPowerShellAsync(SetupScriptPath, args);
+        var obsRunning = IsProcessRunning("obs64");
+        if (obsRunning && !allowRunningObs)
+            throw new InvalidOperationException("OBS is running. Close it before updating the OBS plugin.");
+
+        var layerResult = InstallLayerOnly();
+        var pluginResult = InstallPluginOnly();
+        return $"{layerResult} {pluginResult}";
     }
 
-    public async Task<string> RegisterLayerAsync()
+    private string InstallLayerOnly()
     {
-        EnsureFile(InstallScriptPath, "layer registration script");
-        EnsureFile(InstalledManifestPath, "installed layer manifest");
-        return await RunPowerShellAsync(InstallScriptPath, ["-ManifestPath", InstalledManifestPath]);
+        EnsureFile(ReleaseLayerPath, "release layer binary");
+        EnsureFile(ReleaseLayerManifestPath, "release layer manifest");
+
+        Directory.CreateDirectory(InstallDirectory);
+        var layerHash = ComputeFileHash(ReleaseLayerPath);
+        var versionedLayerName = $"XR_APILAYER_NOVENDOR_OBSMirror.{layerHash[..12].ToLowerInvariant()}.dll";
+        var versionedLayerPath = Path.Combine(InstallDirectory, versionedLayerName);
+        CopyFileUnlessCurrent(ReleaseLayerPath, versionedLayerPath, layerHash);
+
+        WriteInstalledManifest(versionedLayerName);
+        CopyFileUnlessCurrent(InstallScriptPath, Path.Combine(InstallDirectory, Path.GetFileName(InstallScriptPath)));
+        CopyFileUnlessCurrent(UninstallScriptPath, Path.Combine(InstallDirectory, Path.GetFileName(UninstallScriptPath)));
+
+        RegisterLayer(InstalledManifestPath);
+        return $"Installed and enabled layer {layerHash[..12].ToLowerInvariant()}.";
     }
 
-    public async Task<string> UnregisterLayerAsync()
+    private string InstallPluginOnly()
     {
-        EnsureFile(UninstallScriptPath, "layer unregistration script");
-        return await RunPowerShellAsync(UninstallScriptPath, ["-Scope", "CurrentUser"]);
+        EnsureFile(ReleasePluginPath, "release OBS plugin");
+
+        var pluginSourceHash = ComputeFileHash(ReleasePluginPath);
+        var pluginCurrent = File.Exists(PluginPath) &&
+                            string.Equals(ComputeFileHash(PluginPath), pluginSourceHash, StringComparison.OrdinalIgnoreCase);
+        if (pluginCurrent)
+            return "OBS plugin already current.";
+
+        if (IsProcessRunning("obs64"))
+        {
+            throw new InvalidOperationException(
+                "OBS is running and the plugin binary has changed. Stop recording and close OBS before updating the plugin.");
+        }
+
+        var pluginBinDirectory = Path.GetDirectoryName(PluginPath)
+                                 ?? throw new InvalidOperationException("The OBS plugin directory could not be resolved.");
+        var pluginRoot = Directory.GetParent(pluginBinDirectory)?.Parent?.FullName
+                         ?? throw new InvalidOperationException("The OBS plugin root directory could not be resolved.");
+        Directory.CreateDirectory(pluginBinDirectory);
+        File.Copy(ReleasePluginPath, PluginPath, overwrite: true);
+
+        var pluginDataSource = Path.Combine(RepoRoot, "OBSPlugin", "win-openxr", "data");
+        if (!Directory.Exists(pluginDataSource))
+            throw new DirectoryNotFoundException($"The OBS plugin data directory was not found: {pluginDataSource}");
+        CopyDirectoryContents(pluginDataSource, Path.Combine(pluginRoot, "data"));
+        return "Updated the OBS plugin.";
+    }
+
+    private string RegisterLayer(string manifestPath)
+    {
+        var manifestFullPath = Path.GetFullPath(manifestPath);
+        EnsureFile(manifestFullPath, "installed layer manifest");
+        var libraryPath = ResolveManifestLibraryPath(manifestFullPath);
+        EnsureFile(libraryPath, "layer binary referenced by the installed manifest");
+
+        using var key = Registry.CurrentUser.CreateSubKey(LayerRegistryKey, writable: true)
+                        ?? throw new InvalidOperationException("Could not open the current-user OpenXR implicit-layer registry key.");
+        foreach (var valueName in key.GetValueNames())
+        {
+            if (Path.GetFileName(valueName).Equals(LayerManifestName, StringComparison.OrdinalIgnoreCase) &&
+                !valueName.Equals(manifestFullPath, StringComparison.OrdinalIgnoreCase))
+            {
+                key.DeleteValue(valueName, throwOnMissingValue: false);
+            }
+        }
+        key.SetValue(manifestFullPath, 0, RegistryValueKind.DWord);
+        return $"Registered OpenXR OBS Mirror for the current user: {manifestFullPath}";
+    }
+
+    private string UnregisterLayer()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(LayerRegistryKey, writable: true);
+        if (key is null)
+            return "No current-user OpenXR implicit-layer registry key exists.";
+
+        var removed = 0;
+        foreach (var valueName in key.GetValueNames())
+        {
+            if (!Path.GetFileName(valueName).Equals(LayerManifestName, StringComparison.OrdinalIgnoreCase))
+                continue;
+            key.DeleteValue(valueName, throwOnMissingValue: false);
+            removed++;
+        }
+        return $"Removed {removed} OpenXR OBS Mirror registration(s) for the current user.";
+    }
+
+    private void WriteInstalledManifest(string versionedLayerName)
+    {
+        var root = JsonNode.Parse(File.ReadAllText(ReleaseLayerManifestPath)) as JsonObject
+                   ?? throw new InvalidDataException("The release layer manifest does not contain a JSON object.");
+        var apiLayer = root["api_layer"] as JsonObject
+                       ?? throw new InvalidDataException("The release layer manifest does not contain api_layer.");
+        apiLayer["library_path"] = $".\\{versionedLayerName}";
+
+        var temporaryPath = $"{InstalledManifestPath}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            File.WriteAllText(
+                temporaryPath,
+                root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }),
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            File.Move(temporaryPath, InstalledManifestPath, overwrite: true);
+        }
+        finally
+        {
+            File.Delete(temporaryPath);
+        }
+    }
+
+    private static void CopyDirectoryContents(string sourceDirectory, string destinationDirectory)
+    {
+        Directory.CreateDirectory(destinationDirectory);
+        foreach (var file in Directory.EnumerateFiles(sourceDirectory))
+            File.Copy(file, Path.Combine(destinationDirectory, Path.GetFileName(file)), overwrite: true);
+        foreach (var directory in Directory.EnumerateDirectories(sourceDirectory))
+            CopyDirectoryContents(directory, Path.Combine(destinationDirectory, Path.GetFileName(directory)));
+    }
+
+    private static void CopyFileUnlessCurrent(string sourcePath, string destinationPath, string? sourceHash = null)
+    {
+        sourceHash ??= ComputeFileHash(sourcePath);
+        if (File.Exists(destinationPath) &&
+            string.Equals(ComputeFileHash(destinationPath), sourceHash, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)
+                                  ?? throw new InvalidOperationException($"The destination directory could not be resolved: {destinationPath}"));
+        File.Copy(sourcePath, destinationPath, overwrite: true);
+    }
+
+    private static string ComputeFileHash(string path)
+    {
+        EnsureFile(path, "file to hash");
+        using var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        return Convert.ToHexString(SHA256.HashData(stream));
     }
 
     public void LaunchObs()
@@ -249,17 +382,6 @@ public sealed class OBSMirrorService
         var smoothing = Math.Clamp(Convert.ToInt32(key?.GetValue("CameraSmoothing", 35) ?? 35), 0, 100);
         var cropTenths = Math.Clamp(Convert.ToInt32(key?.GetValue("SmoothingCropTenths", 80) ?? 80), 0, 250);
         return (managed, smoothing, cropTenths / 10.0);
-    }
-
-    private (bool Enabled, int Strength) ReadOverscanBoundaryCompensation()
-    {
-        using var key = Registry.CurrentUser.OpenSubKey(ConfigKey);
-        var enabled = Convert.ToInt32(key?.GetValue("OverscanBoundaryCompensation", 0) ?? 0) != 0;
-        var strength = Math.Clamp(
-            Convert.ToInt32(key?.GetValue("OverscanBoundaryCompensationStrength", 100) ?? 100),
-            0,
-            100);
-        return (enabled, strength);
     }
 
     private bool ReadMirrorQuadLayers()
@@ -532,75 +654,6 @@ public sealed class OBSMirrorService
     {
         if (!File.Exists(path))
             throw new FileNotFoundException($"The {description} was not found.", path);
-    }
-
-    private static async Task<string> RunPowerShellAsync(string scriptPath, IEnumerable<string> scriptArguments)
-    {
-        var startInfo = new ProcessStartInfo(ResolvePowerShellExecutable())
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        startInfo.ArgumentList.Add("-NoProfile");
-        startInfo.ArgumentList.Add("-NonInteractive");
-        startInfo.ArgumentList.Add("-ExecutionPolicy");
-        startInfo.ArgumentList.Add("Bypass");
-        startInfo.ArgumentList.Add("-File");
-        startInfo.ArgumentList.Add(scriptPath);
-        foreach (var argument in scriptArguments)
-            startInfo.ArgumentList.Add(argument);
-
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("PowerShell could not be started.");
-        var outputTask = process.StandardOutput.ReadToEndAsync();
-        var errorTask = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        var output = (await outputTask).Trim();
-        var error = (await errorTask).Trim();
-        if (process.ExitCode != 0)
-            throw new InvalidOperationException(string.IsNullOrEmpty(error) ? output : error);
-        return string.IsNullOrWhiteSpace(output) ? "Completed successfully." : output;
-    }
-
-    private static string ResolvePowerShellExecutable()
-    {
-        // Windows PowerShell is part of supported Windows installations and is
-        // also the host used by the installer. PowerShell 7 (`pwsh`) is optional
-        // and must not be a prerequisite for Control Center actions.
-        var systemDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System);
-        if (!string.IsNullOrWhiteSpace(systemDirectory))
-        {
-            var windowsPowerShell = Path.Combine(
-                systemDirectory,
-                "WindowsPowerShell",
-                "v1.0",
-                "powershell.exe");
-            if (File.Exists(windowsPowerShell))
-                return windowsPowerShell;
-        }
-
-        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-        if (!string.IsNullOrWhiteSpace(programFiles))
-        {
-            var powerShell7 = Path.Combine(programFiles, "PowerShell", "7", "pwsh.exe");
-            if (File.Exists(powerShell7))
-                return powerShell7;
-        }
-
-        foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
-                     .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            var powerShell7 = Path.Combine(directory.Trim('"'), "pwsh.exe");
-            if (File.Exists(powerShell7))
-                return powerShell7;
-        }
-
-        throw new FileNotFoundException(
-            "Neither Windows PowerShell nor PowerShell 7 could be found. " +
-            "Windows PowerShell is normally available at " +
-            @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe.");
     }
 
     private static string FindRepoRoot()

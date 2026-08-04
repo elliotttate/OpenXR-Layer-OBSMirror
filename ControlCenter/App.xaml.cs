@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using OBSMirror.ControlCenter.Services;
 
 namespace OBSMirror.ControlCenter;
 
@@ -31,11 +32,18 @@ public partial class App : Application
         };
     }
 
-    protected override void OnLaunched(LaunchActivatedEventArgs args)
+    protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         LogStartup("App.OnLaunched entered");
         try
         {
+            if (ElevatedInstallService.TryGetHelperResultPath(out var resultPath))
+            {
+                LogStartup("Elevated OBS plugin installer started");
+                await ElevatedInstallService.RunHelperAndExitAsync(resultPath);
+                return;
+            }
+
             _window = new MainWindow();
             LogStartup("MainWindow constructed");
             _window.Activate();

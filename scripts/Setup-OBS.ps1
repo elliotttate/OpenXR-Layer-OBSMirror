@@ -11,6 +11,26 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Get-Sha256 {
+    param([Parameter(Mandatory)][string]$LiteralPath)
+
+    $stream = [IO.File]::Open(
+        [IO.Path]::GetFullPath($LiteralPath),
+        [IO.FileMode]::Open,
+        [IO.FileAccess]::Read,
+        [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)
+    try {
+        $sha256 = [Security.Cryptography.SHA256]::Create()
+        try {
+            return ([BitConverter]::ToString($sha256.ComputeHash($stream))).Replace('-', '')
+        } finally {
+            $sha256.Dispose()
+        }
+    } finally {
+        $stream.Dispose()
+    }
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 if (-not $LayerBuildDirectory) {
     $LayerBuildDirectory = Join-Path $repoRoot 'bin\x64\Release'
@@ -42,7 +62,7 @@ if (-not $SkipPluginInstall) {
     New-Item -ItemType Directory -Path $pluginBinDirectory, $pluginDataDirectory -Force | Out-Null
 }
 
-$layerSourceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $layerDll).Hash
+$layerSourceHash = Get-Sha256 -LiteralPath $layerDll
 $versionedLayerName = "XR_APILAYER_NOVENDOR_OBSMirror.$($layerSourceHash.Substring(0, 12).ToLowerInvariant()).dll"
 $versionedLayerPath = Join-Path $layerInstall $versionedLayerName
 Copy-Item -LiteralPath $layerDll -Destination $versionedLayerPath -Force
@@ -61,18 +81,18 @@ foreach ($scriptName in @('Install-Layer.ps1', 'Uninstall-Layer.ps1')) {
 
 $pluginDestination = Join-Path $pluginBinDirectory 'win-openxr.dll'
 if (-not $SkipPluginInstall) {
-    $pluginSourceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $PluginBinary).Hash
+    $pluginSourceHash = Get-Sha256 -LiteralPath $PluginBinary
     $pluginAlreadyCurrent = (Test-Path -LiteralPath $pluginDestination -PathType Leaf) -and
-        ((Get-FileHash -Algorithm SHA256 -LiteralPath $pluginDestination).Hash -eq $pluginSourceHash)
+        ((Get-Sha256 -LiteralPath $pluginDestination) -eq $pluginSourceHash)
     if ($runningOBS -and -not $pluginAlreadyCurrent) {
         Write-Warning 'OBS is running; close it before installing the updated plugin binary.'
     } elseif ($pluginAlreadyCurrent) {
         Write-Verbose "OBS plugin is already current; skipping the in-use DLL copy."
     } else {
         Copy-Item -LiteralPath $PluginBinary -Destination $pluginDestination -Force
+        Copy-Item -Path (Join-Path $repoRoot 'OBSPlugin\win-openxr\data\*') `
+            -Destination $pluginDataDirectory -Recurse -Force
     }
-    Copy-Item -Path (Join-Path $repoRoot 'OBSPlugin\win-openxr\data\*') `
-        -Destination $pluginDataDirectory -Recurse -Force
 }
 
 & (Join-Path $PSScriptRoot 'Install-Layer.ps1') -Scope CurrentUser `
@@ -81,9 +101,9 @@ if (-not $SkipPluginInstall) {
 [pscustomobject]@{
     LayerManifest = $installedManifest
     LayerBinary = $versionedLayerPath
-    LayerSHA256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $versionedLayerPath).Hash
+    LayerSHA256 = Get-Sha256 -LiteralPath $versionedLayerPath
     OBSPlugin = if (Test-Path -LiteralPath $pluginDestination -PathType Leaf) { $pluginDestination } else { $null }
     PluginSHA256 = if (Test-Path -LiteralPath $pluginDestination -PathType Leaf) {
-        (Get-FileHash -Algorithm SHA256 -LiteralPath $pluginDestination).Hash
+        Get-Sha256 -LiteralPath $pluginDestination
     } else { $null }
 }
