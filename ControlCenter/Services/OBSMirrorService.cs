@@ -296,6 +296,29 @@ public sealed class OBSMirrorService
     public string? FindObsExecutable() => ResolveObsExecutablePath();
 
     /// <summary>
+    /// Version of the build whose layer and OBS source are installed. Compared
+    /// against this app's own version so an older Control Center never
+    /// reinstalls its bundled payload over newer components - the automatic
+    /// update is only ever allowed to move components forward.
+    /// </summary>
+    public string InstalledComponentsVersion
+    {
+        get
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(ConfigKey);
+            return key?.GetValue("ComponentsVersion") as string ?? string.Empty;
+        }
+    }
+
+    public void RecordInstalledComponentsVersion(string version)
+    {
+        if (string.IsNullOrWhiteSpace(version))
+            return;
+        using var key = Registry.CurrentUser.CreateSubKey(ConfigKey, writable: true);
+        key?.SetValue("ComponentsVersion", version, RegistryValueKind.String);
+    }
+
+    /// <summary>
     /// A win-openxr.dll inside the OBS installation directory, which is where
     /// the plugin used to be installed by hand. OBS loads that folder before
     /// the shared plugin folder, so the stale copy wins the source

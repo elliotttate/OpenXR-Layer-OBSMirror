@@ -691,7 +691,7 @@ namespace {
                         if (swapchainState._dx11KeyedMutex)
                             acquired = swapchainState._dx11KeyedMutex->AcquireSync(0, kAcquireTimeoutMs) == S_OK;
                         if (acquired) {
-                            _d3d11Context->CopyResource(swapchainState._dx11LastTexture.Get(), textPtr);
+                            copyMipZero(swapchainState, textPtr);
                             if (swapchainState._dx11KeyedMutex)
                                 swapchainState._dx11KeyedMutex->ReleaseSync(0);
                             swapchainState._lastCopiedIndex = idx;
@@ -709,8 +709,7 @@ namespace {
                             swapchainState._commandAllocators[idx]->Reset();
                             swapchainState._commandLists[idx]->Reset(swapchainState._commandAllocators[idx].Get(),
                                                                      nullptr);
-                            swapchainState._commandLists[idx]->CopyResource(swapchainState._dx12LastTexture.Get(),
-                                                                            textPtr);
+                            copyMipZero(swapchainState, swapchainState._commandLists[idx].Get(), textPtr);
                             swapchainState._commandLists[idx]->Close();
                             ID3D12CommandList* set[] = {swapchainState._commandLists[idx].Get()};
                             _d3d12CommandQueue->ExecuteCommandLists(1, set);
@@ -759,6 +758,7 @@ namespace {
                                          const XrSwapchainImageReleaseInfo* releaseInfo) override {
             return updateSwapChainImages(swapchain, releaseInfo, true);
         }
+
 
         XrResult xrLocateViews(XrSession session,
                                const XrViewLocateInfo* viewLocateInfo,
@@ -1059,6 +1059,56 @@ namespace {
             uint32_t _copySkipStreak = 0;
             bool _copySkipWarned = false;
         };
+
+        // CopyResource silently does nothing unless both resources have
+        // identical descriptions - including mip count. Applications that ask
+        // for a mipped swapchain (UEVR requests four levels) would therefore
+        // publish a texture that was never written, and OBS would show black
+        // while every other signal looked healthy. Copy mip 0 of each array
+        // slice explicitly so the mirror never depends on that match.
+        void copyMipZero(const Swapchain& state, ID3D11Texture2D* source) {
+            const uint32_t sourceMips = std::max(state._createInfo.mipCount, 1u);
+            const uint32_t arraySize = std::max(state._createInfo.arraySize, 1u);
+            noteMippedSwapchain(sourceMips);
+            for (uint32_t slice = 0; slice < arraySize; ++slice) {
+                _d3d11Context->CopySubresourceRegion(state._dx11LastTexture.Get(),
+                                                     D3D11CalcSubresource(0, slice, 1),
+                                                     0,
+                                                     0,
+                                                     0,
+                                                     source,
+                                                     D3D11CalcSubresource(0, slice, sourceMips),
+                                                     nullptr);
+            }
+        }
+
+        void copyMipZero(const Swapchain& state, ID3D12GraphicsCommandList* commandList, ID3D12Resource* source) {
+            const uint32_t sourceMips = std::max(state._createInfo.mipCount, 1u);
+            const uint32_t arraySize = std::max(state._createInfo.arraySize, 1u);
+            noteMippedSwapchain(sourceMips);
+            for (uint32_t slice = 0; slice < arraySize; ++slice) {
+                D3D12_TEXTURE_COPY_LOCATION destination{};
+                destination.pResource = state._dx12LastTexture.Get();
+                destination.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                // The destination has a single mip, so its subresource index
+                // is just the slice.
+                destination.SubresourceIndex = slice;
+
+                D3D12_TEXTURE_COPY_LOCATION origin{};
+                origin.pResource = source;
+                origin.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                origin.SubresourceIndex = slice * sourceMips;
+
+                commandList->CopyTextureRegion(&destination, 0, 0, 0, &origin, nullptr);
+            }
+        }
+
+        void noteMippedSwapchain(uint32_t sourceMips) {
+            if (sourceMips > 1 && !_mippedSwapchainLogged) {
+                _mippedSwapchainLogged = true;
+                Log("Application swapchains have %u mip levels; mirroring the base level only\n", sourceMips);
+            }
+        }
 
         // Why the most recent frame did not (or did) reach OBS, ordered by how
         // far the frame progressed through the mirror pipeline.
@@ -1465,6 +1515,7 @@ namespace {
         ULONGLONG _lastMirrorHealthLogTick = 0;
         bool _untrackedViewSpaceLogged = false;
         bool _monoProjectionLogged = false;
+        bool _mippedSwapchainLogged = false;
         // Shape of the most recent frame submission, for the diagnostics above.
         uint32_t _diagSubmittedLayers = 0;
         uint32_t _diagProjectionViews = 0;

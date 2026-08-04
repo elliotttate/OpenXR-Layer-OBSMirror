@@ -856,6 +856,26 @@ public sealed partial class MainWindow : Window
         if (!layerOutdated && !pluginOutdated)
             return;
 
+        // "Different from my payload" is not the same as "older than my
+        // payload". Without this guard an older Control Center reinstalls its
+        // own bundled layer over newer components every time it refreshes,
+        // silently undoing an update (or a developer build).
+        var installedVersion = _service.InstalledComponentsVersion;
+        if (!string.IsNullOrWhiteSpace(installedVersion) &&
+            AppUpdateService.CompareVersions(installedVersion, AppUpdateService.CurrentVersion) > 0)
+        {
+            if (_lastAutoUpdateKey != installedVersion)
+            {
+                _lastAutoUpdateKey = installedVersion;
+                ShowMessage(
+                    "Newer components are installed",
+                    $"The installed layer and OBS source come from {installedVersion}, which is newer than this " +
+                    $"Control Center ({AppUpdateService.CurrentVersion}). They were left alone; update the app to match.",
+                    InfoBarSeverity.Informational);
+            }
+            return;
+        }
+
         // The plugin DLL cannot be replaced while OBS holds it; the layer
         // still updates now and the plugin follows once OBS has closed. A
         // watcher finishes the job so the user never has to press Refresh.
@@ -879,6 +899,11 @@ public sealed partial class MainWindow : Window
                 output = await _service.InstallLayerOnlyAsync();
             if (pluginOutdated && !pluginDeferred)
                 output = $"{output} {await ElevatedInstallService.InstallPluginElevatedAsync()}".Trim();
+
+            // Record what the installed components came from, so an older
+            // build can recognise them as newer and leave them alone.
+            if (!pluginDeferred)
+                _service.RecordInstalledComponentsVersion(AppUpdateService.CurrentVersion);
 
             var restartRequired = layerOutdated && MarkVrRestartRequired("the OpenXR layer update");
             var followUp =
@@ -933,6 +958,7 @@ public sealed partial class MainWindow : Window
             var output = snapshot.PluginCurrent
                 ? await _service.SetupAsync(snapshot.ObsRunning)
                 : $"{await _service.InstallLayerOnlyAsync()} {await ElevatedInstallService.InstallPluginElevatedAsync()}";
+            _service.RecordInstalledComponentsVersion(AppUpdateService.CurrentVersion);
             var restartRequired = layerWillChange && MarkVrRestartRequired("the OpenXR layer update");
             ShowMessage(
                 "Installation complete",
