@@ -928,6 +928,7 @@ namespace {
                                     uint32_t eyeIndex = _mirror->getEyeIndex();
                                     if (eyeIndex >= projLayer->viewCount)
                                         eyeIndex = 0;
+                                    logSubmissionDetail(projLayer, eyeIndex);
                                     if (!stereo && !_monoProjectionLogged) {
                                         _monoProjectionLogged = true;
                                         Log("The application submits a projection layer with a single view; "
@@ -1100,6 +1101,44 @@ namespace {
                 origin.SubresourceIndex = slice * sourceMips;
 
                 commandList->CopyTextureRegion(&destination, 0, 0, 0, &origin, nullptr);
+            }
+        }
+
+        // Records the exact shape of the first frames a game submits: which
+        // swapchain each view uses, the pose it was rendered from, and the FOV
+        // compared with what xrLocateViews handed out. Alternate-eye renderers
+        // and games that ignore the located FOV are only distinguishable here.
+        void logSubmissionDetail(const XrCompositionLayerProjection* projLayer, uint32_t eyeIndex) {
+            if (_submissionLogFrames >= 24)
+                return;
+            ++_submissionLogFrames;
+
+            for (uint32_t v = 0; v < projLayer->viewCount && v < 2; ++v) {
+                const XrCompositionLayerProjectionView& view = projLayer->views[v];
+                const XrFovf located = v < _projectionViews.size() ? _projectionViews[v].fov : XrFovf{};
+                Log("Submission %u: view %u swapchain %p rect %d,%d %dx%d array %u pos %.3f,%.3f,%.3f "
+                    "fov %.4f,%.4f,%.4f,%.4f located %.4f,%.4f,%.4f,%.4f%s%s\n",
+                    _submissionLogFrames,
+                    v,
+                    view.subImage.swapchain,
+                    view.subImage.imageRect.offset.x,
+                    view.subImage.imageRect.offset.y,
+                    view.subImage.imageRect.extent.width,
+                    view.subImage.imageRect.extent.height,
+                    view.subImage.imageArrayIndex,
+                    view.pose.position.x,
+                    view.pose.position.y,
+                    view.pose.position.z,
+                    view.fov.angleLeft,
+                    view.fov.angleRight,
+                    view.fov.angleUp,
+                    view.fov.angleDown,
+                    located.angleLeft,
+                    located.angleRight,
+                    located.angleUp,
+                    located.angleDown,
+                    fovNearEqual(view.fov, located) ? " [fov matches located]" : " [FOV DIFFERS - image is scaled]",
+                    v == eyeIndex ? " <= mirrored" : "");
             }
         }
 
@@ -1516,6 +1555,7 @@ namespace {
         bool _untrackedViewSpaceLogged = false;
         bool _monoProjectionLogged = false;
         bool _mippedSwapchainLogged = false;
+        uint32_t _submissionLogFrames = 0;
         // Shape of the most recent frame submission, for the diagnostics above.
         uint32_t _diagSubmittedLayers = 0;
         uint32_t _diagProjectionViews = 0;
