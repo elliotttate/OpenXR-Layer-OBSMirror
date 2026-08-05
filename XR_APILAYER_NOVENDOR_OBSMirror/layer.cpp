@@ -337,6 +337,9 @@ namespace {
                     }
                     _projectionViews.clear();
                     _originalViewFovs.clear();
+                    // The swapchains and poses it references are gone; a new
+                    // session has to observe the pattern from scratch.
+                    _aer = {};
                     // Release the game's graphics objects so the layer does not
                     // keep the game's device alive after the session ends.
                     _d3d11Context.Reset();
@@ -1165,6 +1168,155 @@ namespace {
             }
         }
 
+        // ---- Alternate-eye rendering ----
+
+        // Mods of the R.E.A.L. VR family render one eye per frame and reproject
+        // the other, so what sits behind a fixed view index alternates between
+        // two viewpoints an eye separation apart and the recording shudders
+        // sideways. The two references below are the last sample seen in each
+        // of the two alternating phases; because each one is refreshed every
+        // time its phase comes round, both travel with the player and the test
+        // stays valid no matter how the head moves.
+        struct AlternateEyeState {
+            XrVector3f _position[2]{};
+            XrSwapchain _swapchain[2]{};
+            uint32_t _arrayIndex[2]{};
+            bool _seen[2] = {false, false};
+            uint32_t _phase = 0;
+            uint32_t _alternatingFrames = 0;
+            uint32_t _steadyFrames = 0;
+            uint32_t _heldFrames = 0;
+            uint32_t _pinnedPhase = 0;
+            bool _pinned = false;
+        };
+
+        // An eye separation is around 60 mm: below 20 mm the jump is head
+        // motion or pose noise, above 250 mm it is a teleport, not an eye.
+        static constexpr float kAerMinSeparation = 0.02f;
+        static constexpr float kAerMaxSeparation = 0.25f;
+        // The same-phase sample (two frames back) has to be far closer than the
+        // opposite-phase one, otherwise the "alternation" is just a head
+        // travelling in a straight line.
+        static constexpr float kAerPhaseRatio = 0.5f;
+        static constexpr uint32_t kAerConfirmFrames = 20;
+        static constexpr uint32_t kAerReleaseFrames = 30;
+        // A hiccup in the application's pattern (the same eye submitted twice)
+        // costs two holds in a row; ride those out rather than re-pinning, or
+        // every hiccup would swap the recorded eye. Three frames of held image
+        // is still under 40 ms at headset frame rates.
+        static constexpr uint32_t kAerMaxHeldFrames = 3;
+
+        static float poseDistance(const XrVector3f& a, const XrVector3f& b) {
+            const float dx = a.x - b.x;
+            const float dy = a.y - b.y;
+            const float dz = a.z - b.z;
+            return sqrtf(dx * dx + dy * dy + dz * dz);
+        }
+
+        bool matchesAlternateEyeSource(uint32_t phase, const XrCompositionLayerProjectionView& view) const {
+            return _aer._swapchain[phase] == view.subImage.swapchain &&
+                   _aer._arrayIndex[phase] == view.subImage.imageArrayIndex;
+        }
+
+        // Keep the eye the user picked in OBS where the located view poses can
+        // tell the two viewpoints apart, rather than whichever phase the
+        // pattern happened to start on.
+        uint32_t pinnedAlternateEyePhase(uint32_t eyeIndex) const {
+            if (eyeIndex < _projectionViews.size() && _aer._seen[0] && _aer._seen[1]) {
+                const XrVector3f& located = _projectionViews[eyeIndex].pose.position;
+                return poseDistance(_aer._position[0], located) <= poseDistance(_aer._position[1], located) ? 0u : 1u;
+            }
+            return _aer._phase;
+        }
+
+        // Returns false when the view about to be mirrored is the eye we are
+        // not publishing. Applications that do not alternate never reach the
+        // pinned state, so they always get true and mirror unchanged.
+        bool trackAlternateEyeRendering(const XrCompositionLayerProjectionView& view, uint32_t eyeIndex) {
+            const XrVector3f position = view.pose.position;
+            const uint32_t other = 1 - _aer._phase;
+
+            bool alternating = false;
+            if (_aer._seen[_aer._phase]) {
+                // A view fed from two swapchain images in strict rotation is
+                // alternate-eye rendering even when the mod submits a single
+                // pose for both eyes; three or more sources in rotation never
+                // match the opposite phase and so never qualify.
+                if (!matchesAlternateEyeSource(_aer._phase, view)) {
+                    alternating = !_aer._seen[other] || matchesAlternateEyeSource(other, view);
+                }
+                if (!alternating) {
+                    const float sinceLast = poseDistance(position, _aer._position[_aer._phase]);
+                    if (sinceLast >= kAerMinSeparation && sinceLast <= kAerMaxSeparation) {
+                        alternating = !_aer._seen[other] ||
+                                      poseDistance(position, _aer._position[other]) <= sinceLast * kAerPhaseRatio;
+                    }
+                }
+            }
+
+            const uint32_t phase = alternating ? other : _aer._phase;
+            _aer._position[phase] = position;
+            _aer._swapchain[phase] = view.subImage.swapchain;
+            _aer._arrayIndex[phase] = view.subImage.imageArrayIndex;
+            _aer._seen[phase] = true;
+            _aer._phase = phase;
+
+            if (alternating) {
+                _aer._steadyFrames = 0;
+                if (!_aer._pinned && ++_aer._alternatingFrames >= kAerConfirmFrames) {
+                    _aer._pinned = true;
+                    _aer._heldFrames = 0;
+                    _aer._pinnedPhase = pinnedAlternateEyePhase(eyeIndex);
+                    logAlternateEyeState(true);
+                }
+            } else {
+                // The opposite reference is now old enough that comparing
+                // against it would say more about where the player has walked
+                // than about the eyes; drop it so alternation can be picked up
+                // again from two fresh samples.
+                _aer._seen[other] = false;
+                _aer._alternatingFrames = 0;
+                if (_aer._pinned && ++_aer._steadyFrames >= kAerReleaseFrames) {
+                    _aer._pinned = false;
+                    logAlternateEyeState(false);
+                }
+            }
+
+            bool publish = true;
+            if (_aer._pinned && phase != _aer._pinnedPhase) {
+                // A clean A/B pattern never holds twice in a row, so a run of
+                // holds means the application stopped feeding the pinned eye;
+                // re-pinning to the eye that is actually arriving beats
+                // freezing the recording until the release counter expires.
+                if (_aer._heldFrames < kAerMaxHeldFrames)
+                    publish = false;
+                else
+                    _aer._pinnedPhase = phase;
+            }
+            _aer._heldFrames = publish ? 0 : _aer._heldFrames + 1;
+            return publish;
+        }
+
+        void logAlternateEyeState(bool detected) {
+            if (_aerTransitionLogs >= 8)
+                return;
+            ++_aerTransitionLogs;
+            if (detected) {
+                const bool alternatingSources = _aer._swapchain[0] != _aer._swapchain[1] ||
+                                                _aer._arrayIndex[0] != _aer._arrayIndex[1];
+                Log("Alternate-eye rendering detected: the mirrored view alternates between two viewpoints %.0f mm "
+                    "apart%s. Pinning the recording to one eye - the mirror now updates on every other submitted "
+                    "frame, but stops moving between the two eye positions.\n",
+                    poseDistance(_aer._position[0], _aer._position[1]) * 1000.0f,
+                    alternatingSources ? " on alternating swapchain images" : " from one swapchain image");
+            } else {
+                Log("Alternate-eye rendering stopped; mirroring every submitted frame again\n");
+            }
+            if (_aerTransitionLogs == 8) {
+                Log("Alternate-eye detection keeps changing; further transitions will not be logged\n");
+            }
+        }
+
         void noteMippedSwapchain(uint32_t sourceMips) {
             if (sourceMips > 1 && !_mippedSwapchainLogged) {
                 _mippedSwapchainLogged = true;
@@ -1579,6 +1731,9 @@ namespace {
         bool _monoProjectionLogged = false;
         bool _mippedSwapchainLogged = false;
         uint32_t _submissionLogFrames = 0;
+        // Alternate-eye rendering tracking for the mirrored view.
+        AlternateEyeState _aer;
+        uint32_t _aerTransitionLogs = 0;
         // Shape of the most recent frame submission, for the diagnostics above.
         uint32_t _diagSubmittedLayers = 0;
         uint32_t _diagProjectionViews = 0;
