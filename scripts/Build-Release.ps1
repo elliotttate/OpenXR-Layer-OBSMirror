@@ -54,7 +54,8 @@ if ($LASTEXITCODE -ne 0) { throw "OBS plugin build failed (exit $LASTEXITCODE)."
 
 $controlCenterOutput = Join-Path $payloadRoot 'ControlCenter'
 & (Join-Path $PSScriptRoot 'Build-ControlCenter.ps1') `
-    -Configuration Release -OutputDirectory $controlCenterOutput
+    -Configuration Release -OutputDirectory $controlCenterOutput `
+    -Version $Version -FileVersion $FileVersion
 if ($LASTEXITCODE -ne 0) { throw "Control Center build failed (exit $LASTEXITCODE)." }
 
 $payloadDirectories = @(
