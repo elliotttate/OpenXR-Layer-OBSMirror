@@ -23,6 +23,12 @@ public sealed record SystemSnapshot(
     bool OverscanEnabled,
     int HorizontalPercent,
     int VerticalPercent,
+    // The runtime's recommended per-eye render size before overscan, learned
+    // from a running session and remembered afterwards. Its aspect ratio is
+    // the shape a recording takes at 100% overscan; zero until a session with
+    // a diagnostics-carrying layer has run at least once.
+    int BaseViewWidth,
+    int BaseViewHeight,
     bool CameraSmoothingManaged,
     int CameraSmoothing,
     double SmoothingCrop,

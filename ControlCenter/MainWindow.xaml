@@ -320,7 +320,17 @@
                                         </StackPanel>
 
                                         <StackPanel Spacing="9">
-                                            <TextBlock Text="PRESETS" Style="{StaticResource EyebrowStyle}" />
+                                            <TextBlock Text="RECORDING SHAPE" Style="{StaticResource EyebrowStyle}" />
+                                            <TextBlock Text="Headsets render each eye almost square, so a recording is square until the horizontal expansion outruns the vertical one." Style="{StaticResource MutedTextStyle}" FontSize="12" TextWrapping="Wrap" />
+                                            <StackPanel Orientation="Horizontal" Spacing="9">
+                                                <Button Tag="native" Click="Shape_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Headset native" />
+                                                <Button Tag="1.77778" Click="Shape_Click" Style="{StaticResource SecondaryButtonStyle}" Content="16 : 9" />
+                                                <Button Tag="widest" Click="Shape_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Widest possible" />
+                                            </StackPanel>
+                                        </StackPanel>
+
+                                        <StackPanel Spacing="9">
+                                            <TextBlock Text="EXTRA ROOM ON EVERY EDGE" Style="{StaticResource EyebrowStyle}" />
                                             <StackPanel Orientation="Horizontal" Spacing="9">
                                                 <Button Tag="115,108" Click="Preset_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Balanced  115 × 108" />
                                                 <Button Tag="120,110" Click="Preset_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Wide  120 × 110" />
@@ -339,9 +349,9 @@
                                         </Border>
                                         <Border CornerRadius="14" Padding="18" Background="#80333A4A">
                                             <StackPanel Spacing="7">
-                                                <TextBlock Text="RENDER-TARGET SCALE" Style="{StaticResource EyebrowStyle}" />
-                                                <TextBlock x:Name="ExpectedTextureText" Text="1.15×  ×  1.08×" FontSize="24" FontWeight="SemiBold" />
-                                                <TextBlock Text="relative to the active runtime's recommended per-eye size" Style="{StaticResource MutedTextStyle}" FontSize="12" />
+                                                <TextBlock Text="RECORDING FRAME" Style="{StaticResource EyebrowStyle}" />
+                                                <TextBlock x:Name="ExpectedTextureText" Text="1.15×  ×  1.08×" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                <TextBlock x:Name="FrameShapeText" Style="{StaticResource MutedTextStyle}" FontSize="12" TextWrapping="Wrap" />
                                             </StackPanel>
                                         </Border>
                                         <InfoBar IsOpen="True" IsClosable="False" Severity="Warning" Title="Restart the VR app"
@@ -350,10 +360,7 @@
                                 </Grid>
                             </Border>
 
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-                                <Button Click="DisableOverscan_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Disable" />
-                                <Button Click="ApplyOverscan_Click" Style="{StaticResource PrimaryButtonStyle}" Content="Apply settings" />
-                            </StackPanel>
+                            <TextBlock Text="Changes save as you make them. Restart the VR application to apply them." Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Right" />
                         </StackPanel>
                     </ScrollViewer>
 
@@ -431,10 +438,7 @@
                                 </Grid>
                             </Border>
 
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-                                <Button Click="ReleaseSmoothing_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Use OBS source settings" />
-                                <Button Click="ApplySmoothing_Click" Style="{StaticResource PrimaryButtonStyle}" Content="Apply smoothing" />
-                            </StackPanel>
+                            <TextBlock Text="Changes save as you make them and reach the OBS source live. Turn the override off to go back to the values stored on the source." Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Right" TextWrapping="Wrap" />
                         </StackPanel>
                     </ScrollViewer>
 

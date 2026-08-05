@@ -171,6 +171,44 @@ pwsh -File .\scripts\Set-RecordingOverscan.ps1 -Enable -HorizontalPercent 120 -V
 pwsh -File .\scripts\Set-RecordingOverscan.ps1 -Disable
 ```
 
+### Why a recording still looks square
+
+The capture is one eye of the headset, and headsets render each eye at close to
+a 1:1 aspect — SteamVR asks for 3344 × 3344 on an Index-class headset, for
+example. The two expansion percentages scale that square, so what decides the
+recording's shape is the *ratio* between them, not either one alone: 130% × 115%
+still comes out at 1.13:1. A widescreen recording needs the horizontal
+expansion to outrun the vertical one by the target aspect — 178% × 100% for
+16:9.
+
+The Control Center's overscan page does that arithmetic. Its **Recording shape**
+buttons set both sliders from a target aspect, and the **Recording frame** card
+reports the pixel size and shape the current settings produce, using the per-eye
+size the layer learned from the last VR session.
+
+Vertical expansion cannot make a recording wider, so when the goal is a
+widescreen frame it only spends GPU time on pixels the frame will not show.
+That is why the shape buttons leave it at 100%.
+
+### Black bars beside the picture
+
+Bars appear when a nearly-square mirror is placed on a 16:9 canvas: the scene
+item preserves the source's aspect, so the canvas shows through either side.
+There are two ways to remove them.
+
+- **Fill the recording canvas** on the OBS source crops the mirror to the
+  canvas's shape, centred, so the source fills the frame with no bars and no
+  manual crop values. It is free and takes effect immediately, but a square
+  mirror on a 16:9 canvas loses roughly 22% off the top and the bottom.
+- **178% horizontal overscan** (the *16:9* shape button) makes the mirror
+  itself 16:9, so there is nothing to crop and nothing to lose — the recording
+  keeps the whole headset view and adds to it. It costs 78% more rendered
+  pixels and a VR application restart.
+
+The two combine: at any horizontal expansion of 178% or more, filling the canvas
+has nothing left to trim from the headset view. Below that, the trim comes out of
+the overscan guard band first and then out of the headset view.
+
 The setting is read once when the VR application starts, so restart the application
 after changing it. Caveats:
 

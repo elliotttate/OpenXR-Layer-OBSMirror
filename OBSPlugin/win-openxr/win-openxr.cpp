@@ -63,7 +63,7 @@ using obs_mirror_ipc::kMirrorTextureCount;
 
 // Logged at load and published through the shared diagnostics block so the
 // layer log records which plugin build it talked to.
-static const char *const kPluginVersion = "0.3.0-beta.9";
+static const char *const kPluginVersion = "0.3.0-beta.10";
 
 struct win_openxrmirror {
 	obs_source_t *source;
@@ -95,6 +95,13 @@ struct win_openxrmirror {
 	int captureeye = 1; // left = 0, right = 1, both = 2
 	int croppreset;
 	crop crop;
+
+	// Trim the mirror to the recording canvas's aspect so the source fills
+	// the frame instead of sitting between bars. canvas_* records the size
+	// the crop was computed against, so a canvas resize re-crops.
+	bool fill_canvas = false;
+	uint32_t canvas_width = 0;
+	uint32_t canvas_height = 0;
 
 	float blend = 0.0f;
 	float blendPos = 0.0f;
@@ -484,6 +491,40 @@ static void win_openxrmirror_init(void *data, bool forced = false)
 	context->width = desc.Width;
 	context->height = desc.Height;
 
+	// A headset renders each eye at close to a 1:1 aspect, so the mirror
+	// arrives almost square and a 16:9 canvas shows bars beside it. Trimming
+	// the long axis to the canvas shape makes the source fill the frame
+	// exactly, with no manual crop arithmetic and nothing for the scene item
+	// to letterbox. With recording overscan enabled the trim comes out of
+	// the overscan guard band instead of the headset view.
+	struct obs_video_info ovi = {};
+	if (context->fill_canvas && obs_get_video_info(&ovi) && ovi.base_width > 0 &&
+	    ovi.base_height > 0 && context->width > 0 && context->height > 0) {
+		context->canvas_width = ovi.base_width;
+		context->canvas_height = ovi.base_height;
+		const double target =
+			(double)ovi.base_width / (double)ovi.base_height;
+		const double current =
+			(double)context->width / (double)context->height;
+		if (current > target) {
+			const unsigned int trimmed = std::max(
+				(unsigned int)(context->height * target), 1u);
+			if (trimmed < context->width) {
+				context->x += (context->width - trimmed) / 2;
+				context->width = trimmed;
+			}
+		} else if (current < target) {
+			const unsigned int trimmed = std::max(
+				(unsigned int)(context->width / target), 1u);
+			if (trimmed < context->height) {
+				context->y += (context->height - trimmed) / 2;
+				context->height = trimmed;
+			}
+		}
+		desc.Width = context->width;
+		desc.Height = context->height;
+	}
+
 	// Create cropped, linear texture
 	// Using linear here will cause correct sRGB gamma to be applied
 	DxgiFormatInfo info{};
@@ -563,10 +604,11 @@ static void win_openxrmirror_init(void *data, bool forced = false)
 	info("mirror capture initialized: source %ux%u, cropped output %ux%u format %d, generation %u",
 	     context->device_width, context->device_height, context->width,
 	     context->height, (int)desc.Format, context->surface_generation);
-	info("capture settings: eye %d, crop %.1f%% top / %.1f%% right / %.1f%% bottom / %.1f%% left, overlap %.1f%%, blend %.1f%% at %.1f%%",
+	info("capture settings: eye %d, crop %.1f%% top / %.1f%% right / %.1f%% bottom / %.1f%% left, overlap %.1f%%, blend %.1f%% at %.1f%%, fill canvas %s",
 	     context->captureeye, context->crop.top, context->crop.right,
 	     context->crop.bottom, context->crop.left, context->overlap,
-	     context->blend, context->blendPos);
+	     context->blend, context->blendPos,
+	     context->fill_canvas ? "yes" : "no");
 	should_log_stage(context, STAGE_CONNECTED);
 
 	context->last_index = context->surface->lastProcessedIndex.load();
@@ -611,9 +653,12 @@ static void win_openxrmirror_update(void *data, obs_data_t *settings)
 	newCrop.bottom =
 		std::clamp(obs_data_get_double(settings, "cropbottom"), 0.0, 100.0);
 
+	const bool fillCanvas = obs_data_get_bool(settings, "fillcanvas");
+
 	// Eye selection and crop change the texture layout and need a rebuild;
 	// the blend parameters are consumed live by the layer every frame.
 	const bool needsReinit = captureeye != context->captureeye ||
+				 fillCanvas != context->fill_canvas ||
 				 newCrop.top != context->crop.top ||
 				 newCrop.left != context->crop.left ||
 				 newCrop.bottom != context->crop.bottom ||
@@ -621,6 +666,7 @@ static void win_openxrmirror_update(void *data, obs_data_t *settings)
 
 	context->captureeye = captureeye;
 	context->crop = newCrop;
+	context->fill_canvas = fillCanvas;
 
 	context->overlap = static_cast<float>(
 		std::clamp(obs_data_get_double(settings, "eyeoverlap"), 0.0, 100.0));
@@ -656,6 +702,11 @@ static void win_openxrmirror_defaults(obs_data_t *settings)
 	obs_data_set_default_double(settings, "eyeblendpos", 50);
 	obs_data_set_default_double(settings, "camerasmoothing", 0);
 	obs_data_set_default_double(settings, "smoothingcrop", 8);
+	// On by default: a headset renders each eye almost square, so without
+	// this every source sits between bars on a 16:9 canvas. It is a no-op
+	// for a source that already matches the canvas shape, including anyone
+	// who reached that shape with the manual crop sliders.
+	obs_data_set_default_bool(settings, "fillcanvas", true);
 	obs_data_set_default_double(settings, "cropleft", 0);
 	obs_data_set_default_double(settings, "cropright", 0);
 	obs_data_set_default_double(settings, "croptop", 0);
@@ -726,6 +777,19 @@ static void win_openxrmirror_render(void *data, gs_effect_t *effect)
 		info("Mirror surface changed; reconnecting to generation %u",
 		     context->surface->surfaceGeneration.load(std::memory_order_relaxed));
 		win_openxrmirror_deinit(data);
+	}
+
+	// The canvas shape is baked into the crop, so follow a resolution change
+	// in Settings instead of leaving the source cropped to the old shape.
+	if (context->initialized && context->fill_canvas) {
+		struct obs_video_info ovi = {};
+		if (obs_get_video_info(&ovi) &&
+		    (ovi.base_width != context->canvas_width ||
+		     ovi.base_height != context->canvas_height)) {
+			info("Recording canvas is now %ux%u; recropping the mirror to match",
+			     ovi.base_width, ovi.base_height);
+			win_openxrmirror_deinit(data);
+		}
 	}
 
 	if (context->active && !context->initialized) {
@@ -934,6 +998,9 @@ static obs_properties_t *win_openxrmirror_properties(void *data)
 	p = obs_properties_add_float_slider(props, "smoothingcrop",
 					    obs_module_text("SmoothingCrop"), 0.0,
 					    25.0, 0.5);
+
+	obs_properties_add_bool(props, "fillcanvas",
+				obs_module_text("FillCanvas"));
 
 	p = obs_properties_add_list(props, "croppreset",
 				    obs_module_text("CropPreset"),

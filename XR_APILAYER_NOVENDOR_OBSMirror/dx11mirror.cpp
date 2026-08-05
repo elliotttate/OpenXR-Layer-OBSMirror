@@ -1623,4 +1623,17 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
             return;
         strncpy_s(_diag->applicationName, applicationName, _TRUNCATE);
     }
+
+    void D3D11Mirror::setBaseViewSize(const uint32_t width, const uint32_t height) {
+        if (!_diag || width == 0 || height == 0)
+            return;
+        if (_diag->baseViewWidth == width && _diag->baseViewHeight == height)
+            return;
+        _diag->baseViewWidth = width;
+        _diag->baseViewHeight = height;
+        Log("Runtime recommends %u x %u per eye before overscan (recording shape %.3f:1)\n",
+            width,
+            height,
+            static_cast<float>(width) / static_cast<float>(height));
+    }
 } // Mirror namespace

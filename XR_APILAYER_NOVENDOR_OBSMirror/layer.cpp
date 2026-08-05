@@ -287,6 +287,18 @@ namespace {
             const XrResult result = OpenXrApi::xrEnumerateViewConfigurationViews(
                 instance, systemId, viewConfigurationType, viewCapacityInput, viewCountOutput, views);
 
+            if (XR_SUCCEEDED(result) && viewConfigurationType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO && views &&
+                viewCountOutput && *viewCountOutput > 0 && viewCapacityInput >= *viewCountOutput) {
+                // Capture the recommendation before overscan grows it: its
+                // aspect ratio is the shape a recording takes at 100%, which
+                // is what the Control Center needs to predict the frame shape
+                // a given overscan setting produces.
+                _baseViewWidth = views[0].recommendedImageRectWidth;
+                _baseViewHeight = views[0].recommendedImageRectHeight;
+                if (_mirror)
+                    _mirror->setBaseViewSize(_baseViewWidth, _baseViewHeight);
+            }
+
             if (XR_SUCCEEDED(result) && _overscanRequested &&
                 viewConfigurationType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO && views && viewCountOutput &&
                 *viewCountOutput > 0 && viewCapacityInput >= *viewCountOutput) {
@@ -337,6 +349,7 @@ namespace {
                     }
                     _projectionViews.clear();
                     _originalViewFovs.clear();
+                    _lastMirroredExtent = {0, 0};
                     // The swapchains and poses it references are gone; a new
                     // session has to observe the pattern from scratch.
                     _aer = {};
@@ -901,10 +914,24 @@ namespace {
                     const XrCompositionLayerProjectionView* projView = &_projectionViews[0];
                     const XrCompositionLayerProjection* projLayer = nullptr;
 
+                    // This rect sizes the mirror ring on frames that carry
+                    // only quad layers. Applications routinely render at their
+                    // own scale rather than the runtime's recommendation, so
+                    // falling back to the recommendation rebuilt the ring at
+                    // the wrong size - and OBS dropped and reattached at a
+                    // different source resolution - every time a frame arrived
+                    // without a projection layer. Reuse whatever the
+                    // projection path last mirrored instead.
                     _projectionViews[0].subImage.imageRect.offset.x = 0;
                     _projectionViews[0].subImage.imageRect.offset.y = 0;
-                    _projectionViews[0].subImage.imageRect.extent.width = _xrViewsList[0].recommendedImageRectWidth;
-                    _projectionViews[0].subImage.imageRect.extent.height = _xrViewsList[0].recommendedImageRectHeight;
+                    if (_lastMirroredExtent.width > 0 && _lastMirroredExtent.height > 0) {
+                        _projectionViews[0].subImage.imageRect.extent = _lastMirroredExtent;
+                    } else {
+                        _projectionViews[0].subImage.imageRect.extent.width =
+                            _xrViewsList[0].recommendedImageRectWidth;
+                        _projectionViews[0].subImage.imageRect.extent.height =
+                            _xrViewsList[0].recommendedImageRectHeight;
+                    }
 
                     const bool includeQuadLayers = mirrorQuadLayers();
                     // Set when the mirrored view belongs to the eye we are not
@@ -962,6 +989,7 @@ namespace {
                                             const XrFovf& mirrorFov = eyeIndex < _projectionViews.size()
                                                                                 ? _projectionViews[eyeIndex].fov
                                                                                 : _projectionViews[0].fov;
+                                            _lastMirroredExtent = projView->subImage.imageRect.extent;
                                             const bool drew =
                                                 _mirror->Blend(projView,
                                                                mirrorFov,
@@ -986,6 +1014,7 @@ namespace {
                                         auto& swapchainState2 = _swapchains[projView2->subImage.swapchain];
                                         if ((swapchainState._dx11LastTexture || swapchainState._dx12LastTexture) &&
                                             (swapchainState2._dx11LastTexture || swapchainState2._dx12LastTexture)) {
+                                            _lastMirroredExtent = projView->subImage.imageRect.extent;
                                             const bool drew =
                                                 _mirror->Blend(projView,
                                                                _projectionViews[0].fov,
@@ -1686,6 +1715,7 @@ namespace {
                 Log("Mirror initialization failed; OBS mirroring disabled\n");
             } else {
                 _mirror->setApplicationInfo(GetApplicationName().c_str());
+                _mirror->setBaseViewSize(_baseViewWidth, _baseViewHeight);
             }
         }
 
@@ -1717,6 +1747,15 @@ namespace {
 
         std::vector<XrViewConfigurationView> _xrViewsList{};
         std::vector<XrCompositionLayerProjectionView> _projectionViews{};
+
+        // The runtime's recommended per-eye size before overscan scaled it,
+        // published for the Control Center's recording-shape calculation.
+        uint32_t _baseViewWidth = 0;
+        uint32_t _baseViewHeight = 0;
+        // Size of the image the projection path most recently mirrored; keeps
+        // the mirror ring from being rebuilt at the runtime's recommended size
+        // on frames that carry only quad layers.
+        XrExtent2Di _lastMirroredExtent{0, 0};
 
         std::map<XrSession, Session> _sessions;
         std::map<XrSwapchain, Swapchain> _swapchains;

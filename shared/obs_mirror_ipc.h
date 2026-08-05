@@ -62,6 +62,14 @@ namespace obs_mirror_ipc {
         // OBS plugin, so this is how the layer tells the consumers apart. ----
         std::uint32_t previewMagic{0};
         std::uint32_t previewPid{0};
+
+        // ---- Written by the OpenXR layer ----
+        // The runtime's recommended per-eye render size before recording
+        // overscan scales it. Its aspect ratio is the shape the recording
+        // takes at 100% overscan, so the Control Center multiplies it by the
+        // overscan percentages to tell the user what shape a setting produces.
+        std::uint32_t baseViewWidth{0};
+        std::uint32_t baseViewHeight{0};
     };
 
     // Lives in a named shared-memory section written concurrently by the OpenXR
@@ -115,7 +123,9 @@ namespace obs_mirror_ipc {
                       offsetof(MirrorDiagnostics, layerHeartbeat) == 20 &&
                       offsetof(MirrorDiagnostics, applicationName) == 68 &&
                       offsetof(MirrorDiagnostics, previewMagic) == 184 &&
-                      offsetof(MirrorDiagnostics, previewPid) == 188,
+                      offsetof(MirrorDiagnostics, previewPid) == 188 &&
+                      offsetof(MirrorDiagnostics, baseViewWidth) == 192 &&
+                      offsetof(MirrorDiagnostics, baseViewHeight) == 196,
                   "MirrorDiagnostics layout changed - update MirrorPreviewService.cs to match");
     // Named pagefile-backed sections are page-granular, so as long as the whole
     // struct fits in one page every old/new layer+plugin pairing can map its

@@ -1,4 +1,4 @@
-using Microsoft.UI;
+﻿using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using OBSMirror.ControlCenter.Models;
 using OBSMirror.ControlCenter.Services;
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Graphics;
@@ -38,6 +39,12 @@ public sealed partial class MainWindow : Window
     private string _lastAutoUpdateKey = string.Empty;
     private bool _loadingControls;
     private bool _loadingSmoothingControls;
+    // Settings save themselves as the controls move. The delay collapses a
+    // slider drag into a single write instead of one per pixel of travel.
+    private readonly DispatcherTimer _overscanSaveTimer =
+        new() { Interval = TimeSpan.FromMilliseconds(450) };
+    private readonly DispatcherTimer _smoothingSaveTimer =
+        new() { Interval = TimeSpan.FromMilliseconds(450) };
     private bool _loadingQuadLayerControls;
     private bool _loadingLayerRegistrationControls;
 
@@ -51,6 +58,17 @@ public sealed partial class MainWindow : Window
         ConfigureOverscanSlider(VerticalSlider, 108);
         ConfigureSlider(SmoothingSlider, 0, 100, 1, 35);
         ConfigureSlider(SmoothingCropSlider, 0, 25, 0.5, 8);
+
+        _overscanSaveTimer.Tick += (_, _) =>
+        {
+            _overscanSaveTimer.Stop();
+            _ = SaveOverscanAsync();
+        };
+        _smoothingSaveTimer.Tick += (_, _) =>
+        {
+            _smoothingSaveTimer.Stop();
+            _ = SaveSmoothingAsync();
+        };
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
         SystemBackdrop = new MicaBackdrop();
@@ -437,14 +455,49 @@ public sealed partial class MainWindow : Window
 
     private void OverscanToggle_Toggled(object sender, RoutedEventArgs e)
     {
-        if (!_loadingControls)
-            UpdateOverscanPreview();
+        if (_loadingControls)
+            return;
+        UpdateOverscanPreview();
+        QueueOverscanSave();
     }
 
     private void OverscanSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
     {
-        if (!_loadingControls && HorizontalValueText is not null)
-            UpdateOverscanPreview();
+        if (_loadingControls || HorizontalValueText is null)
+            return;
+        UpdateOverscanPreview();
+        QueueOverscanSave();
+    }
+
+    private void QueueOverscanSave()
+    {
+        _overscanSaveTimer.Stop();
+        _overscanSaveTimer.Start();
+    }
+
+    private async Task SaveOverscanAsync()
+    {
+        try
+        {
+            var horizontal = (int)Math.Round(HorizontalSlider.Value);
+            var vertical = (int)Math.Round(VerticalSlider.Value);
+            var enabled = OverscanToggle.IsOn;
+            if (_snapshot is { } snapshot &&
+                snapshot.OverscanEnabled == enabled &&
+                snapshot.HorizontalPercent == horizontal &&
+                snapshot.VerticalPercent == vertical)
+                return;
+
+            _service.ApplyOverscan(enabled, horizontal, vertical);
+            // A running application already built its swapchains from the old
+            // values, so this is the one thing the user still has to act on.
+            MarkVrRestartRequired("the overscan change");
+            await RefreshSnapshotAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowMessage("Could not save overscan", ex.Message, InfoBarSeverity.Error);
+        }
     }
 
     private void UpdateOverscanPreview()
@@ -456,7 +509,94 @@ public sealed partial class MainWindow : Window
         var pixelCost = horizontal / 100.0 * (vertical / 100.0) - 1.0;
         PixelCostText.Text = $"+{pixelCost * 100:0.0}%";
         ScaleSummaryText.Text = $"{horizontal / 100.0:0.00}× horizontal  •  {vertical / 100.0:0.00}× vertical";
-        ExpectedTextureText.Text = $"{horizontal / 100.0:0.00}×  ×  {vertical / 100.0:0.00}×";
+
+        // The per-eye size the runtime recommends is what overscan multiplies,
+        // so its shape - not the slider percentages - decides how wide the
+        // recording ends up. Report real pixels once a session has taught us
+        // that size, and fall back to the raw scales before then.
+        if (_snapshot is { BaseViewWidth: > 0, BaseViewHeight: > 0 } snapshot)
+        {
+            var width = (int)Math.Round(snapshot.BaseViewWidth * (horizontal / 100.0));
+            var height = (int)Math.Round(snapshot.BaseViewHeight * (vertical / 100.0));
+            ExpectedTextureText.Text = $"{width} × {height}";
+            FrameShapeText.Text =
+                $"{(double)width / height:0.00} : 1 per eye, from the runtime's {snapshot.BaseViewWidth} × {snapshot.BaseViewHeight} " +
+                $"({(double)snapshot.BaseViewWidth / snapshot.BaseViewHeight:0.00} : 1). " +
+                "The application's own render scale multiplies both axes, so the shape holds.";
+        }
+        else
+        {
+            ExpectedTextureText.Text = $"{horizontal / 100.0:0.00}×  ×  {vertical / 100.0:0.00}×";
+            FrameShapeText.Text =
+                "relative to the runtime's recommended per-eye size. Run a VR application once and this will " +
+                "show the recording's real pixel size and shape.";
+        }
+    }
+
+    // Horizontal and vertical expansion are what decide the recording's shape,
+    // but only relative to a per-eye render that is already nearly square.
+    // Solve for the percentages that reach a requested frame shape instead of
+    // leaving the user to work the ratio out from two independent sliders.
+    private void Shape_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string tag })
+            return;
+
+        const int maxPercent = 200;
+        var baseAspect = _snapshot is { BaseViewWidth: > 0, BaseViewHeight: > 0 } snapshot
+            ? (double)snapshot.BaseViewWidth / snapshot.BaseViewHeight
+            : 1.0;
+
+        int horizontal;
+        int vertical;
+        if (tag == "native")
+        {
+            horizontal = 100;
+            vertical = 100;
+        }
+        else if (tag == "widest")
+        {
+            horizontal = maxPercent;
+            vertical = 100;
+        }
+        else if (double.TryParse(tag, NumberStyles.Float, CultureInfo.InvariantCulture, out var target) && target > 0)
+        {
+            // Grow only the axis that needs it, so the pixel cost is the
+            // smallest one that reaches the requested shape.
+            var ratio = target / baseAspect;
+            if (ratio >= 1.0)
+            {
+                vertical = 100;
+                horizontal = Math.Clamp((int)Math.Round(100 * ratio), 100, maxPercent);
+            }
+            else
+            {
+                horizontal = 100;
+                vertical = Math.Clamp((int)Math.Round(100 / ratio), 100, maxPercent);
+            }
+        }
+        else
+        {
+            return;
+        }
+
+        HorizontalSlider.Value = horizontal;
+        VerticalSlider.Value = vertical;
+        OverscanToggle.IsOn = horizontal > 100 || vertical > 100;
+        UpdateOverscanPreview();
+
+        var reached = baseAspect * horizontal / vertical;
+        if (tag != "native" && tag != "widest" &&
+            double.TryParse(tag, NumberStyles.Float, CultureInfo.InvariantCulture, out var wanted) &&
+            Math.Abs(reached - wanted) > 0.02)
+        {
+            ShowMessage(
+                "As wide as this build allows",
+                $"A {wanted:0.00} : 1 frame needs more than {maxPercent}% horizontal expansion from this headset's " +
+                $"{baseAspect:0.00} : 1 per-eye render. The sliders are set to the widest reachable shape, " +
+                $"{reached:0.00} : 1.",
+                InfoBarSeverity.Informational);
+        }
     }
 
     private void AppWindow_Changed(AppWindow sender, AppWindowChangedEventArgs args)
@@ -677,14 +817,46 @@ public sealed partial class MainWindow : Window
 
     private void SmoothingControl_Changed(object sender, RoutedEventArgs e)
     {
-        if (!_loadingSmoothingControls && SmoothingValueText is not null)
-            UpdateSmoothingPreview();
+        if (_loadingSmoothingControls || SmoothingValueText is null)
+            return;
+        UpdateSmoothingPreview();
+        QueueSmoothingSave();
     }
 
     private void SmoothingSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
     {
-        if (!_loadingSmoothingControls && SmoothingValueText is not null && SmoothingCropValueText is not null)
-            UpdateSmoothingPreview();
+        if (_loadingSmoothingControls || SmoothingValueText is null || SmoothingCropValueText is null)
+            return;
+        UpdateSmoothingPreview();
+        QueueSmoothingSave();
+    }
+
+    private void QueueSmoothingSave()
+    {
+        _smoothingSaveTimer.Stop();
+        _smoothingSaveTimer.Start();
+    }
+
+    private async Task SaveSmoothingAsync()
+    {
+        try
+        {
+            var managed = SmoothingManagedToggle.IsOn;
+            var smoothing = (int)Math.Round(SmoothingSlider.Value);
+            var crop = SmoothingCropSlider.Value;
+            if (_snapshot is { } snapshot &&
+                snapshot.CameraSmoothingManaged == managed &&
+                snapshot.CameraSmoothing == smoothing &&
+                Math.Abs(snapshot.SmoothingCrop - crop) < 0.01)
+                return;
+
+            _service.ApplyCameraSmoothing(managed, smoothing, crop);
+            await RefreshSnapshotAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowMessage("Could not save camera smoothing", ex.Message, InfoBarSeverity.Error);
+        }
     }
 
     private void UpdateSmoothingPreview()
@@ -757,48 +929,6 @@ public sealed partial class MainWindow : Window
         UpdateSmoothingPreview();
     }
 
-    private async void ApplySmoothing_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            SmoothingManagedToggle.IsOn = true;
-            _service.ApplyCameraSmoothing(
-                managed: true,
-                smoothing: (int)Math.Round(SmoothingSlider.Value),
-                crop: SmoothingCropSlider.Value);
-            var appliesLive = _snapshot is { PluginInstalled: true, PluginCurrent: true };
-            ShowMessage(
-                "Camera smoothing saved",
-                appliesLive
-                    ? "The OBS mirror source picks up the new recording-camera values live."
-                    : "Install the available OBS source update and restart OBS to enable live control.",
-                appliesLive ? InfoBarSeverity.Success : InfoBarSeverity.Warning);
-            await RefreshSnapshotAsync();
-        }
-        catch (Exception ex)
-        {
-            ShowMessage("Could not save camera smoothing", ex.Message, InfoBarSeverity.Error);
-        }
-    }
-
-    private async void ReleaseSmoothing_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            SmoothingManagedToggle.IsOn = false;
-            _service.ApplyCameraSmoothing(
-                managed: false,
-                smoothing: (int)Math.Round(SmoothingSlider.Value),
-                crop: SmoothingCropSlider.Value);
-            ShowMessage("OBS source settings restored", "The mirror source now uses the smoothing values stored in OBS.", InfoBarSeverity.Success);
-            await RefreshSnapshotAsync();
-        }
-        catch (Exception ex)
-        {
-            ShowMessage("Could not release camera smoothing", ex.Message, InfoBarSeverity.Error);
-        }
-    }
-
     private void Preset_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string tag })
@@ -810,50 +940,6 @@ public sealed partial class MainWindow : Window
         VerticalSlider.Value = vertical;
         OverscanToggle.IsOn = true;
         UpdateOverscanPreview();
-    }
-
-    private async void ApplyOverscan_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var horizontal = (int)Math.Round(HorizontalSlider.Value);
-            var vertical = (int)Math.Round(VerticalSlider.Value);
-            var changed = _snapshot is null ||
-                          _snapshot.OverscanEnabled != OverscanToggle.IsOn ||
-                          _snapshot.HorizontalPercent != horizontal ||
-                          _snapshot.VerticalPercent != vertical;
-            _service.ApplyOverscan(
-                OverscanToggle.IsOn,
-                horizontal,
-                vertical);
-            var restartRequired = changed && MarkVrRestartRequired("the overscan change");
-            ShowMessage(
-                "Overscan settings saved",
-                restartRequired
-                    ? "The running VR application must be restarted to rebuild its FOV and render targets."
-                    : "No running VR application needs a restart; the next launch will use these settings.",
-                InfoBarSeverity.Success);
-            await RefreshSnapshotAsync();
-        }
-        catch (Exception ex)
-        {
-            ShowMessage("Could not save overscan", ex.Message, InfoBarSeverity.Error);
-        }
-    }
-
-    private async void DisableOverscan_Click(object sender, RoutedEventArgs e)
-    {
-        var changed = _snapshot?.OverscanEnabled != false;
-        OverscanToggle.IsOn = false;
-        _service.ApplyOverscan(false, (int)Math.Round(HorizontalSlider.Value), (int)Math.Round(VerticalSlider.Value));
-        var restartRequired = changed && MarkVrRestartRequired("the overscan change");
-        ShowMessage(
-            "Overscan disabled",
-            restartRequired
-                ? "The running VR application must be restarted to return to the runtime-native render size."
-                : "No running VR application needs a restart; the next launch will use the runtime-native render size.",
-            InfoBarSeverity.Success);
-        await RefreshSnapshotAsync();
     }
 
     // Installed components follow the built release artifacts automatically;

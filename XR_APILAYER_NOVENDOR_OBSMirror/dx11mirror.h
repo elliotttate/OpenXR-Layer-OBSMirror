@@ -93,6 +93,11 @@ namespace Mirror
         /// log can identify which application is (or is not) feeding frames.
         void setApplicationInfo(const char* applicationName);
 
+        /// Publishes the runtime's recommended per-eye render size before
+        /// recording overscan scales it, so the Control Center can work out
+        /// what shape the recording will be at a given overscan setting.
+        void setBaseViewSize(uint32_t width, uint32_t height);
+
       private:
         struct SourceData {
             ComPtr<ID3D11Texture2D> _texture = nullptr;

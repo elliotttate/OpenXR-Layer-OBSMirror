@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.MemoryMappedFiles;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -59,6 +60,7 @@ public sealed class OBSMirrorService
     public SystemSnapshot GetSnapshot()
     {
         var (enabled, horizontal, vertical) = ReadOverscan();
+        var baseViewSize = ReadBaseViewSize();
         var (smoothingManaged, cameraSmoothing, smoothingCrop) = ReadCameraSmoothing();
         var mirrorQuadLayers = ReadMirrorQuadLayers();
         var runtime = ResolveRuntimeSelection();
@@ -98,6 +100,8 @@ public sealed class OBSMirrorService
             OverscanEnabled: enabled,
             HorizontalPercent: horizontal,
             VerticalPercent: vertical,
+            BaseViewWidth: baseViewSize.Width,
+            BaseViewHeight: baseViewSize.Height,
             CameraSmoothingManaged: smoothingManaged,
             CameraSmoothing: cameraSmoothing,
             SmoothingCrop: smoothingCrop,
@@ -610,6 +614,64 @@ public sealed class OBSMirrorService
         var horizontal = Math.Clamp(Convert.ToInt32(key?.GetValue("OverscanHorizontalPercent", 115) ?? 115), 100, 200);
         var vertical = Math.Clamp(Convert.ToInt32(key?.GetValue("OverscanVerticalPercent", 108) ?? 108), 100, 200);
         return (enabled, horizontal, vertical);
+    }
+
+    // Offsets into the shared mirror surface; shared/obs_mirror_ipc.h pins them
+    // with static_asserts. The layer publishes the pre-overscan per-eye size
+    // there once a session is running.
+    private const string MirrorSurfaceName = "OpenXROBSMirrorSurface";
+    private const int DiagLayerMagicOffset = 64;
+    private const int DiagBaseViewWidthOffset = 256;
+    private const int DiagBaseViewHeightOffset = 260;
+    private const uint DiagnosticsMagic = 0x4D52584F; // "OXRM"
+
+    /// The runtime's recommended per-eye size before overscan. Read from a
+    /// running session when there is one and remembered afterwards, so the
+    /// overscan page can still say what shape a setting produces once the
+    /// application has exited.
+    private (int Width, int Height) ReadBaseViewSize()
+    {
+        var live = ReadLiveBaseViewSize();
+        if (live is { Width: > 0, Height: > 0 })
+        {
+            try
+            {
+                using var writable = Registry.CurrentUser.CreateSubKey(ConfigKey, writable: true);
+                writable?.SetValue("BaseViewWidth", live.Value.Width, RegistryValueKind.DWord);
+                writable?.SetValue("BaseViewHeight", live.Value.Height, RegistryValueKind.DWord);
+            }
+            catch (Exception)
+            {
+                // Caching is an optimisation; the live value is already good.
+            }
+            return live.Value;
+        }
+
+        using var key = Registry.CurrentUser.OpenSubKey(ConfigKey);
+        var width = Math.Clamp(Convert.ToInt32(key?.GetValue("BaseViewWidth", 0) ?? 0), 0, 32768);
+        var height = Math.Clamp(Convert.ToInt32(key?.GetValue("BaseViewHeight", 0) ?? 0), 0, 32768);
+        return (width, height);
+    }
+
+    private static (int Width, int Height)? ReadLiveBaseViewSize()
+    {
+        try
+        {
+            using var mapping = MemoryMappedFile.OpenExisting(MirrorSurfaceName, MemoryMappedFileRights.Read);
+            using var view = mapping.CreateViewAccessor(0, 4096, MemoryMappedFileAccess.Read);
+            if (view.ReadUInt32(DiagLayerMagicOffset) != DiagnosticsMagic)
+                return null;
+            var width = view.ReadUInt32(DiagBaseViewWidthOffset);
+            var height = view.ReadUInt32(DiagBaseViewHeightOffset);
+            if (width == 0 || height == 0 || width > 32768 || height > 32768)
+                return null;
+            return ((int)width, (int)height);
+        }
+        catch (Exception)
+        {
+            // No VR application running, or a layer that predates this field.
+            return null;
+        }
     }
 
     private (bool Managed, int Smoothing, double Crop) ReadCameraSmoothing()
