@@ -1063,10 +1063,11 @@ namespace {
 
         // CopyResource silently does nothing unless both resources have
         // identical descriptions - including mip count. Applications that ask
-        // for a mipped swapchain (UEVR requests four levels) would therefore
-        // publish a texture that was never written, and OBS would show black
-        // while every other signal looked healthy. Copy mip 0 of each array
-        // slice explicitly so the mirror never depends on that match.
+        // for a mipped swapchain (the R.E.A.L. VR mod requests four levels)
+        // would therefore publish a texture that was never written, and OBS
+        // would show black while every other signal looked healthy. Copy mip 0
+        // of each array slice explicitly so the mirror never depends on that
+        // match.
         void copyMipZero(const Swapchain& state, ID3D11Texture2D* source) {
             const uint32_t sourceMips = std::max(state._createInfo.mipCount, 1u);
             const uint32_t arraySize = std::max(state._createInfo.arraySize, 1u);
