@@ -240,7 +240,44 @@ namespace LAYER_NAMESPACE
 
 	XrResult OpenXrApi::xrGetInstanceProcAddrInternal(XrInstance instance, const char* name, PFN_xrVoidFunction* function)
 	{
+		// A layer above us is free to resolve functions through the next
+		// layer's xrGetInstanceProcAddr - ours - before it calls
+		// nextCreateApiLayerInstance, and the singleton is also reset when an
+		// instance is destroyed. In both cases we have no downstream dispatch
+		// to forward to yet, so answering honestly is the only option; calling
+		// through the null pointer took the host application down with an
+		// access violation at address zero.
+		if (!m_xrGetInstanceProcAddr)
+		{
+			if (function)
+			{
+				*function = nullptr;
+			}
+			static bool reported = false;
+			if (!reported)
+			{
+				reported = true;
+				ErrorLog(fmt::format("xrGetInstanceProcAddr({}) was called before the layer chain was established; "
+				                     "reporting the function as unsupported. A layer above this one resolves "
+				                     "functions before creating the instance below it.\\n",
+				                     name ? name : "(null)"));
+			}
+			return XR_ERROR_FUNCTION_UNSUPPORTED;
+		}
+
+		if (!name || !function)
+		{
+			return XR_ERROR_VALIDATION_FAILURE;
+		}
+
 		XrResult result = m_xrGetInstanceProcAddr(instance, name, function);
+
+		// Only a successful lookup leaves a function pointer to wrap; on
+		// failure *function is untouched and must not be dereferenced.
+		if (XR_FAILED(result) || !*function)
+		{
+			return result;
+		}
 
 		const std::string apiName(name);
 
