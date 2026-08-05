@@ -281,6 +281,20 @@ public sealed partial class MainWindow : Window
                 "reports as current. Removing the old copy leaves the installed source in place.";
         }
 
+        // Only openxr_loader.dll inserts API layers, so a title that reaches the
+        // headset through LibOVR or OpenVR cannot be captured at all. Without
+        // this the dashboard just waits forever and reports nothing wrong.
+        var showNonOpenXrVrWarning = !string.IsNullOrWhiteSpace(snapshot.NonOpenXrVrApp) &&
+                                     _lastPreviewResult?.Connected != true;
+        NonOpenXrVrInfoBar.IsOpen = showNonOpenXrVrWarning;
+        if (showNonOpenXrVrWarning)
+        {
+            NonOpenXrVrInfoBar.Message =
+                $"{snapshot.NonOpenXrVrApp} is running VR through the {snapshot.NonOpenXrVrPath} path, not OpenXR. " +
+                "The capture layer can only attach to OpenXR applications — switch the VR mod or game to the " +
+                "OpenXR runtime, then start it again.";
+        }
+
         var runtimeConfigured = !snapshot.RuntimeName.Equals("Not configured", StringComparison.OrdinalIgnoreCase);
         var runtimeOkay = runtimeConfigured && !snapshot.SimulatorRuntimeOverrideActive;
         SetStatus(RuntimeDot, RuntimeStatusText, runtimeOkay,

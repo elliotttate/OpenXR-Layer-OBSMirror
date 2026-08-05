@@ -904,6 +904,9 @@ namespace {
                     _projectionViews[0].subImage.imageRect.extent.height = _xrViewsList[0].recommendedImageRectHeight;
 
                     const bool includeQuadLayers = mirrorQuadLayers();
+                    // Set when the mirrored view belongs to the eye we are not
+                    // publishing this frame (see trackAlternateEyeRendering).
+                    bool holdPublish = false;
                     uint32_t count = frameEndInfo->layerCount;
                     _diagSubmittedLayers = count;
                     _diagSawProjectionLayer = false;
@@ -913,6 +916,9 @@ namespace {
                         if (!hdr)
                             continue;
                         if (hdr->type == XR_TYPE_COMPOSITION_LAYER_PROJECTION) {
+                            // Several projection layers in one submission are
+                            // still a single frame for the eye tracking below.
+                            const bool firstProjectionLayer = !projLayer;
                             projLayer = reinterpret_cast<const XrCompositionLayerProjection*>(hdr);
                             _diagSawProjectionLayer = true;
                             _diagProjectionViews = std::max(_diagProjectionViews, projLayer->viewCount);
@@ -935,7 +941,19 @@ namespace {
                                             "mirroring it as mono (the OBS eye selection has no effect here)\n");
                                     }
                                     projView = &projLayer->views[eyeIndex];
-                                    if (isSwapchainHandled(projView->subImage.swapchain)) {
+                                    // An alternate-eye application moves the
+                                    // viewpoint behind this view index by one
+                                    // eye separation on every other frame;
+                                    // mirroring both of them is what makes the
+                                    // recording shudder from side to side.
+                                    if (firstProjectionLayer)
+                                        holdPublish = !trackAlternateEyeRendering(*projView, eyeIndex);
+                                    if (holdPublish) {
+                                        // The frame is dropped on purpose, so
+                                        // keep reporting a healthy pipeline
+                                        // instead of flapping the state log.
+                                        outcome = std::max(outcome, MirrorOutcome::Mirroring);
+                                    } else if (isSwapchainHandled(projView->subImage.swapchain)) {
                                         auto& swapchainState = _swapchains[projView->subImage.swapchain];
                                         if (swapchainState._dx11LastTexture || swapchainState._dx12LastTexture) {
                                             const XrFovf& mirrorFov = eyeIndex < _projectionViews.size()
@@ -1007,7 +1025,11 @@ namespace {
                             }
                         }
                     }
-                    _mirror->copyToMirror();
+                    // Held frames are never copied into the mirror ring, so the
+                    // consumer keeps showing the last frame from the pinned
+                    // eye instead of one taken from the other viewpoint.
+                    if (!holdPublish)
+                        _mirror->copyToMirror();
                 }
                 if (outcome != MirrorOutcome::Unset)
                     noteMirrorOutcome(outcome);

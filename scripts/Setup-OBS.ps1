@@ -73,7 +73,14 @@ Copy-Item -LiteralPath $layerDll -Destination $versionedLayerPath -Force
 $installedManifest = Join-Path $layerInstall 'XR_APILAYER_NOVENDOR_OBSMirror.json'
 $manifestData = Get-Content -LiteralPath $layerManifest -Raw | ConvertFrom-Json
 $manifestData.api_layer.library_path = ".\$versionedLayerName"
-$manifestData | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $installedManifest -Encoding utf8
+# The OpenXR loader's JSON parser rejects a byte order mark and then skips the
+# layer without reporting anything, so the manifest must be written as plain
+# UTF-8. Windows PowerShell's -Encoding utf8 emits a BOM, and this script runs
+# under it from the installer, so write the bytes directly instead.
+[IO.File]::WriteAllText(
+    $installedManifest,
+    ($manifestData | ConvertTo-Json -Depth 10),
+    (New-Object Text.UTF8Encoding($false)))
 
 foreach ($scriptName in @('Install-Layer.ps1', 'Uninstall-Layer.ps1')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $scriptName) -Destination $layerInstall -Force

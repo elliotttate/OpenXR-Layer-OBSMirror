@@ -216,6 +216,10 @@ namespace Mirror
 
         float _fovVertRatio = 1.f;
         float _fovHorizRatio = 1.f;
+        // Ratios last written to the log; zero until the first rescale so any
+        // real scale is reported once.
+        float _loggedVertRatio = 0.f;
+        float _loggedHorizRatio = 0.f;
         XrFovf _hmdFov{0.0f, 0.0f, 0.0f, 0.0f};
         XrFovf _viewFov{0.0f, 0.0f, 0.0f, 0.0f};
 

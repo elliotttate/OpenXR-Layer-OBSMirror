@@ -1171,6 +1171,10 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
                 rect.offset.x + static_cast<int32_t>((rect.extent.width * _pMirrorSurfaceData->overlap) / 100);
             setTargetRect(rect);
 
+            // This eye has its own FOV pair; without this the quad would be
+            // scaled by whatever the first eye left behind - stale ratios from
+            // an earlier frame whenever the first eye took the fast copy path.
+            checkFOVs(hmdFov2, view2->fov);
             drawOrthoQuad();
         }
         return true;
@@ -1196,9 +1200,52 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
             const float viewdown = tanf(viewFov.angleDown);
             const float viewup = tanf(viewFov.angleUp);
 
-            // Modified FOV handling
-            _fovVertRatio = ((hmddown / viewdown) + (hmdup / viewup)) / 2.f;
-            _fovHorizRatio = ((hmdleft / viewleft) + (hmdright / viewright)) / 2.f;
+            // Mean of the two half-FOV ratios on one axis. A game that submits
+            // a degenerate or sign-flipped FOV would otherwise divide by zero
+            // and collapse the quad to nothing.
+            const auto axisRatio = [](float hmdA, float viewA, float hmdB, float viewB) {
+                if (fabsf(viewA) < 1e-6f || fabsf(viewB) < 1e-6f)
+                    return 1.f;
+                const float ratio = ((hmdA / viewA) + (hmdB / viewB)) / 2.f;
+                return ratio > 0.f ? ratio : 1.f;
+            };
+
+            const float vertRatio = axisRatio(hmddown, viewdown, hmdup, viewup);
+            const float horizRatio = axisRatio(hmdleft, viewleft, hmdright, viewright);
+
+            // The ratios are the ortho view extents the unit quad is drawn
+            // into, so below 1 the mirror zooms in and crops the perimeter a
+            // game renders beyond the headset FOV - what the headset shows.
+            // Above 1 it would instead draw the image smaller than the target
+            // and pad it with empty space; the game rendered nothing out there
+            // and the target is exactly the size of the submitted image, so
+            // fill it as the equal-FOV copy path does.
+            const bool clamped = vertRatio > 1.f || horizRatio > 1.f;
+            _fovVertRatio = std::min(vertRatio, 1.f);
+            _fovHorizRatio = std::min(horizRatio, 1.f);
+
+            // Report only real scale changes: runtimes with per-frame FOV
+            // jitter would otherwise log every frame.
+            if (fabsf(_fovHorizRatio - _loggedHorizRatio) > 0.002f ||
+                fabsf(_fovVertRatio - _loggedVertRatio) > 0.002f) {
+                _loggedHorizRatio = _fovHorizRatio;
+                _loggedVertRatio = _fovVertRatio;
+                Log("Mirror FOV rescale: located %.4f,%.4f,%.4f,%.4f submitted %.4f,%.4f,%.4f,%.4f -> mirror shows "
+                    "%.3f x %.3f of the rendered image%s\n",
+                    hmdFov.angleLeft,
+                    hmdFov.angleRight,
+                    hmdFov.angleUp,
+                    hmdFov.angleDown,
+                    viewFov.angleLeft,
+                    viewFov.angleRight,
+                    viewFov.angleUp,
+                    viewFov.angleDown,
+                    _fovHorizRatio,
+                    _fovVertRatio,
+                    clamped ? " (the game renders a narrower FOV than the runtime reported; filling instead of "
+                              "shrinking)"
+                            : "");
+            }
         }
     }
 

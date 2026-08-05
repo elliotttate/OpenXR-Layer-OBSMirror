@@ -219,6 +219,8 @@
                                                 <Button Click="RemoveConflictingPlugin_Click" Content="Remove the old copy" />
                                             </InfoBar.ActionButton>
                                         </InfoBar>
+                                        <InfoBar x:Name="NonOpenXrVrInfoBar" IsOpen="False" IsClosable="False" Severity="Warning"
+                                                 Title="The running VR app is not using OpenXR" />
                                     </StackPanel>
                                 </Border>
 

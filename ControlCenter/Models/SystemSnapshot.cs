@@ -32,4 +32,9 @@ public sealed record SystemSnapshot(
     // Empty unless a stale plugin copy inside the OBS installation is
     // shadowing the installed one.
     string ConflictingPluginPath,
+    // Empty unless a VR application is driving the headset without the OpenXR
+    // loader, which no API layer can ever attach to. NonOpenXrVrPath names the
+    // API it went through instead.
+    string NonOpenXrVrApp,
+    string NonOpenXrVrPath,
     DateTime CapturedAt);
