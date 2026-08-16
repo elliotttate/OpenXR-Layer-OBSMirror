@@ -287,6 +287,26 @@ public sealed partial class MainWindow : Window
             ? "OBS is running — the update installs when it closes"
             : snapshot.ObsRunning ? "OBS is running" : "OBS is not running";
 
+        var hasMachineLayer = !string.IsNullOrWhiteSpace(snapshot.MachineLayerManifestPaths);
+        MachineLayerInfoBar.IsOpen = hasMachineLayer;
+        if (hasMachineLayer)
+        {
+            MachineLayerInfoBar.Severity = snapshot.MachineLayerCurrent
+                ? InfoBarSeverity.Warning
+                : InfoBarSeverity.Error;
+            MachineLayerInfoBar.Title = snapshot.MachineLayerCurrent
+                ? "Machine-wide OBSMirror layer is registered"
+                : "A different machine-wide OBSMirror layer can take over";
+            MachineLayerInfoBar.Message = snapshot.MachineLayerCurrent
+                ? $"Windows also has OBSMirror registered for every user at {snapshot.MachineLayerManifestPaths}. " +
+                  "Elevated OpenXR applications ignore the per-user registration and use the machine-wide copy. " +
+                  "Run the VR launcher and game without administrator rights so normal updates apply."
+                : $"Windows has a different OBSMirror layer registered for every user at {snapshot.MachineLayerManifestPaths}. " +
+                  "It can override this install. Elevated OpenXR applications ignore the per-user registration, " +
+                  "so they may load that copy or no layer at all. Run the VR launcher and game without administrator rights. " +
+                  "Remove or update only the exact machine-wide entry after confirming it is left over.";
+        }
+
         // A stale copy inside the OBS folder wins source registration over the
         // installed one, so the capture silently runs old code and stays blank.
         var hasConflictingPlugin = !string.IsNullOrWhiteSpace(snapshot.ConflictingPluginPath);
