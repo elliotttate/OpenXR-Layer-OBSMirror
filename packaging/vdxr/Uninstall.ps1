@@ -94,6 +94,9 @@ if ($WhatIfPreference -or (Test-IsAdministrator)) {
         '-RemoveSharedPlugin'
     )
     Write-Host 'Administrator approval is required to remove the shared OBS plugin.' -ForegroundColor Yellow
+    if (-not $PSCmdlet.ShouldProcess($sharedPluginDirectory, 'Remove shared OBS plugin')) {
+        return
+    }
     $elevated = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -Verb RunAs -Wait -PassThru
     if ($elevated.ExitCode -ne 0) {
         throw "Shared OBS plugin removal failed or was cancelled (exit $($elevated.ExitCode))."
