@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory)]
     [ValidatePattern('^[^/]+/[^/]+$')]
     [string]$Repository,
-    [string]$Version = '1.0.1',
+    [string]$Version = '1.0.2',
     [switch]$CreateRepository,
     [switch]$Public
 )
@@ -23,7 +23,7 @@ $safeRepo = $repoRoot.Replace('\', '/')
 $tag = "vdxr-v$Version"
 $archive = Join-Path $repoRoot "artifacts\vdxr\VDXR-OBS-Mirror-$Version-win64.zip"
 $checksums = Join-Path $repoRoot 'artifacts\vdxr\SHA256SUMS.txt'
-$notes = Join-Path $repoRoot 'docs\release-notes\v1.0.1-vdxr.md'
+$notes = Join-Path $repoRoot "docs\release-notes\v$Version-vdxr.md"
 foreach ($file in @($archive, $checksums, $notes)) {
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing release file: $file" }
 }

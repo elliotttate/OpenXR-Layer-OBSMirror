@@ -4,6 +4,10 @@ A lightweight, PC-side headset-view mirror for Virtual Desktop's VDXR runtime.
 This release was tested with **Virtual Desktop Streamer 1.34.22**, **VDXR
 1.0.10**, and **OBS Studio 32.2.0 (64-bit)** on Windows 11.
 
+This is an unofficial community project. It is not affiliated with or endorsed
+by Virtual Desktop, OBS Studio, or their developers. See `NOTICE.md` for the
+corresponding source, dependency licenses, and detailed attribution.
+
 ## Install
 
 1. Close OBS Studio and every running OpenXR/VR application.
@@ -79,7 +83,10 @@ powershell -ExecutionPolicy Bypass -File .\Uninstall.ps1
 
 Based on [OpenXR-Layer-OBSMirror](https://github.com/elliotttate/OpenXR-Layer-OBSMirror)
 by Elliot Tate and the OpenXR layer template by Matthieu Bucchianeri. See
-`LICENSE`, `THIRD_PARTY`, `SOURCE-CHANGES.diff`, and `VDXR-COMPATIBILITY.md`.
+`LICENSE`, `LICENSE-OBS-GPL-2.0.txt`, `NOTICE.md`, `THIRD_PARTY`,
+`SOURCE-CHANGES.diff`, and `VDXR-COMPATIBILITY.md`. The corresponding source
+for this package is published at
+[zenmonkeyvr/VDXR-OBS-Mirror](https://github.com/zenmonkeyvr/VDXR-OBS-Mirror/tree/vdxr-v1.0.2).
 
 When reporting a problem, include the Virtual Desktop Streamer, VDXR, and OBS
 versions; GPU model; application name; OBS log; and OpenXR layer log. Do not

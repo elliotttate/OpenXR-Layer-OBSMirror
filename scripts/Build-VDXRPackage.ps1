@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = '1.0.1',
+    [string]$Version = '1.0.2',
     [string]$TargetOBS = '32.2.0',
     [string]$TargetVirtualDesktop = '1.34.22.0',
     [string]$TargetVDXR = '1.0.10',
@@ -59,9 +59,15 @@ Copy-Item -LiteralPath (Join-Path $templateRoot 'Install.ps1') -Destination $sta
 Copy-Item -LiteralPath (Join-Path $templateRoot 'Uninstall.ps1') -Destination $stage -Force
 Copy-Item -LiteralPath (Join-Path $templateRoot 'README.md') -Destination $stage -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot 'LICENSE') -Destination $stage -Force
+Copy-Item -LiteralPath (Join-Path $templateRoot 'LICENSE-OBS-GPL-2.0.txt') -Destination $stage -Force
+Copy-Item -LiteralPath (Join-Path $templateRoot 'NOTICE.md') -Destination $stage -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot 'THIRD_PARTY') -Destination $stage -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\VDXR-COMPATIBILITY.md') -Destination $stage -Force
-Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\release-notes\v1.0.1-vdxr.md') `
+$releaseNotes = Join-Path $repoRoot "docs\release-notes\v$Version-vdxr.md"
+if (-not (Test-Path -LiteralPath $releaseNotes -PathType Leaf)) {
+    throw "Release notes are missing: $releaseNotes"
+}
+Copy-Item -LiteralPath $releaseNotes `
     -Destination (Join-Path $stage 'RELEASE-NOTES.md') -Force
 
 $sourceDiff = Join-Path $stage 'SOURCE-CHANGES.diff'
