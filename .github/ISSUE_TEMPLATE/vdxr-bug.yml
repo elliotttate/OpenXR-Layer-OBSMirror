@@ -1,0 +1,50 @@
+name: VDXR capture problem
+description: Report a blank, incorrect, or incompatible VDXR mirror
+title: "[VDXR]: "
+labels: [bug, VDXR]
+body:
+  - type: markdown
+    attributes:
+      value: Please check logs for usernames or private paths before attaching them.
+  - type: input
+    id: vd
+    attributes:
+      label: Virtual Desktop Streamer version
+    validations:
+      required: true
+  - type: input
+    id: vdxr
+    attributes:
+      label: VDXR version
+    validations:
+      required: true
+  - type: input
+    id: obs
+    attributes:
+      label: OBS Studio version
+    validations:
+      required: true
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU and driver version
+    validations:
+      required: true
+  - type: input
+    id: app
+    attributes:
+      label: OpenXR application
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include reproduction steps and whether the source appears under OBS Installed Plugins.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log excerpts
+      description: Include OBS and XR_APILAYER_NOVENDOR_OBSMirror logs after removing private information.

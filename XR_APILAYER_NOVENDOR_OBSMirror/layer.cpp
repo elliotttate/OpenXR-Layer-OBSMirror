@@ -1037,6 +1037,20 @@ namespace {
                         } else if (hdr->type == XR_TYPE_COMPOSITION_LAYER_QUAD && includeQuadLayers) {
                             const XrCompositionLayerQuad* quadLayer =
                                 reinterpret_cast<const XrCompositionLayerQuad*>(hdr);
+                            // VDXR 1.34.22 started honoring the core OpenXR
+                            // eye-visibility field for quad composition layers.
+                            // Match the eye selected in OBS instead of leaking a
+                            // left-only HUD into the right-eye recording (or vice
+                            // versa). Stereo capture keeps any quad visible to at
+                            // least one eye; its two-eye projection is composited
+                            // by the existing stereo path.
+                            const uint32_t mirrorEye = _mirror->getEyeIndex();
+                            const bool quadVisible =
+                                mirrorEye >= 2 || quadLayer->eyeVisibility == XR_EYE_VISIBILITY_BOTH ||
+                                (mirrorEye == 0 && quadLayer->eyeVisibility == XR_EYE_VISIBILITY_LEFT) ||
+                                (mirrorEye == 1 && quadLayer->eyeVisibility == XR_EYE_VISIBILITY_RIGHT);
+                            if (!quadVisible)
+                                continue;
                             if (isSwapchainHandled(quadLayer->subImage.swapchain)) {
                                 auto& swapchainState = _swapchains[quadLayer->subImage.swapchain];
                                 if (swapchainState._lastAcquiredIndex != swapchainState._lastCopiedIndex) {

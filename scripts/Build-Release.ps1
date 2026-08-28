@@ -39,13 +39,17 @@ $vswhere = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe
 if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) {
     throw "Visual Studio locator not found: $vswhere"
 }
-$msbuild = & $vswhere -latest -version '[17.0,18.0)' -products * `
+$msbuild = & $vswhere -latest -version '[17.0,19.0)' -products * `
     -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' |
     Select-Object -First 1
-if (-not $msbuild) { throw 'Visual Studio 2022 MSBuild was not found.' }
+if (-not $msbuild) { throw 'Visual Studio 2022 or 2026 MSBuild was not found.' }
+
+$vsVersion = & $vswhere -latest -version '[17.0,19.0)' -products * `
+    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationVersion
+$platformToolset = if ([int]([Version]$vsVersion).Major -ge 18) { 'v145' } else { 'v143' }
 
 & $msbuild (Join-Path $repoRoot 'OpenXR-Layer-OBSMirror.sln') /m `
-    /t:Build /p:Configuration=Release /p:Platform=x64
+    /t:Build /p:Configuration=Release /p:Platform=x64 "/p:PlatformToolset=$platformToolset"
 if ($LASTEXITCODE -ne 0) { throw "Native layer build failed (exit $LASTEXITCODE)." }
 
 & (Join-Path $PSScriptRoot 'Build-OBSPlugin.ps1') `
