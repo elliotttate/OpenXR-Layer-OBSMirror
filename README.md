@@ -47,7 +47,7 @@ Elements Divided.
 Build it from existing Release binaries with:
 
 ```powershell
-pwsh -File .\scripts\Build-VDXRPackage.ps1 -Version 1.0.2
+pwsh -File .\scripts\Build-VDXRPackage.ps1 -Version 1.0.3
 ```
 
 See [docs/VDXR-COMPATIBILITY.md](docs/VDXR-COMPATIBILITY.md) for the capture

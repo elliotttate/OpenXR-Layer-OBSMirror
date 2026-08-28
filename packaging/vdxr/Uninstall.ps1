@@ -1,8 +1,11 @@
 [CmdletBinding(SupportsShouldProcess)]
-param()
+param(
+    [switch]$RemoveSharedPlugin
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$scriptCmdlet = $PSCmdlet
 
 function Test-IsAdministrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -10,14 +13,51 @@ function Test-IsAdministrator {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-if (-not (Test-IsAdministrator)) {
-    Write-Host 'Administrator approval is required to remove the shared OBS plugin.' -ForegroundColor Yellow
-    $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $PSCommandPath))
-    $elevated = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -Verb RunAs -Wait -PassThru
-    exit $elevated.ExitCode
+function Remove-EmptyDirectory {
+    param([Parameter(Mandatory)] [string]$Path)
+    if ((Test-Path -LiteralPath $Path -PathType Container) -and
+        -not (Get-ChildItem -LiteralPath $Path -Force | Select-Object -First 1) -and
+        $scriptCmdlet.ShouldProcess($Path, 'Remove empty plugin directory')) {
+        Remove-Item -LiteralPath $Path -Force
+    }
 }
 
-if (Get-Process -Name obs64 -ErrorAction SilentlyContinue) {
+function Remove-SharedOBSPluginFiles {
+    param([Parameter(Mandatory)] [string]$PluginDirectory)
+
+    # openvr_api.dll is shipped only by the full OBS Mirror package. Its
+    # presence means the shared win-openxr.dll and data are jointly owned, so
+    # the slim VDXR uninstaller must leave the complete full install intact.
+    $fullInstallMarker = Join-Path $PluginDirectory 'bin\64bit\openvr_api.dll'
+    if (Test-Path -LiteralPath $fullInstallMarker -PathType Leaf) {
+        Write-Warning 'Full OpenXR/SteamVR OBS Mirror installation detected; leaving its shared plugin files installed.'
+        return
+    }
+
+    $ownedFiles = @(
+        (Join-Path $PluginDirectory 'bin\64bit\win-openxr.dll'),
+        (Join-Path $PluginDirectory 'data\locale\en-US.ini'),
+        (Join-Path $PluginDirectory 'data\win_openxrmirror-presets.ini')
+    )
+    foreach ($file in $ownedFiles) {
+        if ((Test-Path -LiteralPath $file -PathType Leaf) -and
+            $scriptCmdlet.ShouldProcess($file, 'Remove VDXR package file')) {
+            Remove-Item -LiteralPath $file -Force
+        }
+    }
+
+    foreach ($directory in @(
+        (Join-Path $PluginDirectory 'bin\64bit'),
+        (Join-Path $PluginDirectory 'bin'),
+        (Join-Path $PluginDirectory 'data\locale'),
+        (Join-Path $PluginDirectory 'data'),
+        $PluginDirectory
+    )) {
+        Remove-EmptyDirectory -Path $directory
+    }
+}
+
+if (-not $WhatIfPreference -and (Get-Process -Name obs64 -ErrorAction SilentlyContinue)) {
     throw 'OBS is running. Close it before uninstalling the source plugin.'
 }
 
@@ -33,23 +73,54 @@ if (-not $layerDirectory.Equals($expectedLayer, [StringComparison]::OrdinalIgnor
     throw 'Resolved install paths did not match the expected product directories.'
 }
 
+if ($RemoveSharedPlugin) {
+    if (-not $WhatIfPreference -and -not (Test-IsAdministrator)) {
+        throw 'Removing the shared OBS plugin requires administrator privileges.'
+    }
+    Remove-SharedOBSPluginFiles -PluginDirectory $sharedPluginDirectory
+    return
+}
+
+$installedManifest = Join-Path $layerDirectory 'XR_APILAYER_NOVENDOR_OBSMirror.json'
 $registryPath = 'HKCU:\Software\Khronos\OpenXR\1\ApiLayers\Implicit'
 if (Test-Path -LiteralPath $registryPath) {
     $properties = (Get-ItemProperty -LiteralPath $registryPath).PSObject.Properties
     foreach ($property in $properties) {
         if (-not $property.Name.StartsWith('PS') -and
-            $property.Name.StartsWith($layerDirectory, [StringComparison]::OrdinalIgnoreCase)) {
-            if ($PSCmdlet.ShouldProcess($property.Name, 'Unregister OpenXR mirror layer')) {
-                Remove-ItemProperty -LiteralPath $registryPath -Name $property.Name -Force
-            }
+            $property.Name.Equals($installedManifest, [StringComparison]::OrdinalIgnoreCase) -and
+            $PSCmdlet.ShouldProcess($property.Name, 'Unregister OpenXR mirror layer')) {
+            Remove-ItemProperty -LiteralPath $registryPath -Name $property.Name -Force
         }
     }
 }
 
-foreach ($directory in @($layerDirectory, $sharedPluginDirectory, $legacyPluginDirectory)) {
-    if ((Test-Path -LiteralPath $directory) -and $PSCmdlet.ShouldProcess($directory, 'Remove mirror files')) {
+foreach ($directory in @($layerDirectory, $legacyPluginDirectory)) {
+    if ((Test-Path -LiteralPath $directory) -and
+        $PSCmdlet.ShouldProcess($directory, 'Remove per-user mirror files')) {
         Remove-Item -LiteralPath $directory -Recurse -Force
     }
 }
 
-Write-Host 'VDXR OBS Mirror was removed.' -ForegroundColor Green
+# WhatIf performs the complete dry run in the original user process and never
+# requests elevation. A real removal delegates only the ProgramData files.
+if ($WhatIfPreference -or (Test-IsAdministrator)) {
+    Remove-SharedOBSPluginFiles -PluginDirectory $sharedPluginDirectory
+} else {
+    $arguments = @(
+        '-NoProfile',
+        '-ExecutionPolicy', 'Bypass',
+        '-File', ('"{0}"' -f $PSCommandPath),
+        '-RemoveSharedPlugin'
+    )
+    Write-Host 'Administrator approval is required to remove the shared OBS plugin.' -ForegroundColor Yellow
+    $elevated = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -Verb RunAs -Wait -PassThru
+    if ($elevated.ExitCode -ne 0) {
+        throw "Shared OBS plugin removal failed or was cancelled (exit $($elevated.ExitCode))."
+    }
+}
+
+if ($WhatIfPreference) {
+    Write-Host 'VDXR OBS Mirror uninstall dry run completed; nothing was removed.' -ForegroundColor Cyan
+} else {
+    Write-Host 'VDXR OBS Mirror was removed.' -ForegroundColor Green
+}

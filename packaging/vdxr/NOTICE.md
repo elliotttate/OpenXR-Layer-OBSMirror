@@ -10,7 +10,7 @@ only to identify tested compatibility.
 The complete source used for this release, including build and packaging
 scripts, is available without charge at:
 
-https://github.com/zenmonkeyvr/VDXR-OBS-Mirror/tree/vdxr-v1.0.2
+https://github.com/zenmonkeyvr/VDXR-OBS-Mirror/tree/vdxr-v1.0.3
 
 The project is forked from:
 

@@ -35,6 +35,10 @@ To check installed versions and package integrity without changing the system:
 powershell -ExecutionPolicy Bypass -File .\Install.ps1 -ValidateOnly
 ```
 
+This compares both native DLLs against the expected SHA-256 digests recorded in
+`BUILD-INFO.json`. Also verify the complete ZIP against the separately
+published, version-specific `*-SHA256.txt` file before extracting it.
+
 ## Lowest-overhead settings
 
 - Capture one eye (right is the default).
@@ -50,7 +54,8 @@ window, and the layer stops publishing frames when it has no consumer.
 ## What the mirror can capture
 
 The source mirrors the selected application's submitted eye image plus OpenXR
-quad layers, including the eye-visibility behavior used by VDXR 1.34.22.
+quad layers, including the eye-visibility behavior used by Virtual Desktop
+Streamer 1.34.22 / VDXR 1.0.10.
 OpenXR does not expose VDXR's private compositor output after `xrEndFrame`, so
 runtime-added elements are not available: the Virtual Desktop performance
 overlay, guardian/boundary, passthrough, lens distortion, spacewarp artifacts,
@@ -77,7 +82,7 @@ powershell -ExecutionPolicy Bypass -File .\Uninstall.ps1
   VR application use the same GPU.
 - The layer log is `%LOCALAPPDATA%\XR_APILAYER_NOVENDOR_OBSMirror.log`.
 - The native binaries are currently unsigned. Windows may show a SmartScreen
-  warning; verify the ZIP against the published `SHA256SUMS.txt`.
+  warning; verify the ZIP against its version-specific `*-SHA256.txt` file.
 
 ## Provenance and support
 
@@ -86,7 +91,7 @@ by Elliot Tate and the OpenXR layer template by Matthieu Bucchianeri. See
 `LICENSE`, `LICENSE-OBS-GPL-2.0.txt`, `NOTICE.md`, `THIRD_PARTY`,
 `SOURCE-CHANGES.diff`, and `VDXR-COMPATIBILITY.md`. The corresponding source
 for this package is published at
-[zenmonkeyvr/VDXR-OBS-Mirror](https://github.com/zenmonkeyvr/VDXR-OBS-Mirror/tree/vdxr-v1.0.2).
+[zenmonkeyvr/VDXR-OBS-Mirror](https://github.com/zenmonkeyvr/VDXR-OBS-Mirror/tree/vdxr-v1.0.3).
 
 When reporting a problem, include the Virtual Desktop Streamer, VDXR, and OBS
 versions; GPU model; application name; OBS log; and OpenXR layer log. Do not

@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$OBSInstallPath = 'C:\Program Files\obs-studio',
-    [switch]$ValidateOnly
+    [switch]$ValidateOnly,
+    [switch]$InstallSharedPlugin
 )
 
 Set-StrictMode -Version Latest
@@ -13,16 +14,18 @@ function Test-IsAdministrator {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-if (-not $ValidateOnly -and -not (Test-IsAdministrator)) {
-    $arguments = @(
-        '-NoProfile',
-        '-ExecutionPolicy', 'Bypass',
-        '-File', ('"{0}"' -f $PSCommandPath),
-        '-OBSInstallPath', ('"{0}"' -f $OBSInstallPath)
+function Install-SharedOBSPlugin {
+    param(
+        [Parameter(Mandatory)] [string]$PluginSource,
+        [Parameter(Mandatory)] [string]$PluginDataSource
     )
-    Write-Host 'Administrator approval is required to install the OBS plugin.' -ForegroundColor Yellow
-    $elevated = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -Verb RunAs -Wait -PassThru
-    exit $elevated.ExitCode
+
+    $pluginDirectory = Join-Path $env:ProgramData 'obs-studio\plugins\win-openxr'
+    $pluginBin = Join-Path $pluginDirectory 'bin\64bit'
+    $pluginData = Join-Path $pluginDirectory 'data'
+    New-Item -ItemType Directory -Force -Path $pluginBin, $pluginData | Out-Null
+    Copy-Item -LiteralPath $PluginSource -Destination (Join-Path $pluginBin 'win-openxr.dll') -Force
+    Copy-Item -Path (Join-Path $PluginDataSource '*') -Destination $pluginData -Recurse -Force
 }
 
 if (-not $ValidateOnly -and (Get-Process -Name obs64 -ErrorAction SilentlyContinue)) {
@@ -51,20 +54,33 @@ $layerSource = Join-Path $PSScriptRoot 'bin\XR_APILAYER_NOVENDOR_OBSMirror.dll'
 $manifestSource = Join-Path $PSScriptRoot 'bin\XR_APILAYER_NOVENDOR_OBSMirror.json'
 $pluginSource = Join-Path $PSScriptRoot 'obs-plugin\bin\64bit\win-openxr.dll'
 $pluginDataSource = Join-Path $PSScriptRoot 'obs-plugin\data'
-foreach ($required in @($layerSource, $manifestSource, $pluginSource, $pluginDataSource)) {
+$buildInfoSource = Join-Path $PSScriptRoot 'BUILD-INFO.json'
+foreach ($required in @($layerSource, $manifestSource, $pluginSource, $pluginDataSource, $buildInfoSource)) {
     if (-not (Test-Path -LiteralPath $required)) {
         throw "Package file is missing: $required"
     }
 }
 
-# Parse the manifest now so a damaged package fails before any files are changed.
 $manifest = Get-Content -Raw -LiteralPath $manifestSource | ConvertFrom-Json
 if ($manifest.api_layer.name -ne 'XR_APILAYER_NOVENDOR_OBSMirror') {
     throw 'The OpenXR layer manifest is invalid.'
 }
 
-$layerHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $layerSource).Hash
-$pluginHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $pluginSource).Hash
+$buildInfo = Get-Content -Raw -LiteralPath $buildInfoSource | ConvertFrom-Json
+$layerHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $layerSource).Hash.ToUpperInvariant()
+$pluginHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $pluginSource).Hash.ToUpperInvariant()
+$expectedLayerHash = ([string]$buildInfo.openxr_layer_sha256).ToUpperInvariant()
+$expectedPluginHash = ([string]$buildInfo.obs_plugin_sha256).ToUpperInvariant()
+if ($expectedLayerHash -notmatch '^[0-9A-F]{64}$' -or $expectedPluginHash -notmatch '^[0-9A-F]{64}$') {
+    throw 'BUILD-INFO.json does not contain valid SHA-256 digests.'
+}
+if ($layerHash -ne $expectedLayerHash) {
+    throw "OpenXR layer checksum mismatch. Expected $expectedLayerHash; found $layerHash."
+}
+if ($pluginHash -ne $expectedPluginHash) {
+    throw "OBS plugin checksum mismatch. Expected $expectedPluginHash; found $pluginHash."
+}
+
 if ($ValidateOnly) {
     [pscustomobject]@{
         Status = 'Package validation passed'
@@ -76,12 +92,38 @@ if ($ValidateOnly) {
     return
 }
 
-$layerDirectory = Join-Path $env:LOCALAPPDATA 'OpenXR-OBSMirror'
-$pluginDirectory = Join-Path $env:ProgramData 'obs-studio\plugins\win-openxr'
-$pluginBin = Join-Path $pluginDirectory 'bin\64bit'
-$pluginData = Join-Path $pluginDirectory 'data'
-New-Item -ItemType Directory -Force -Path $layerDirectory, $pluginBin, $pluginData | Out-Null
+# This internal mode is the only work performed by the elevated process. The
+# OpenXR layer is deliberately registered later by the original user process,
+# so alternate administrator credentials cannot redirect HKCU/LOCALAPPDATA.
+if ($InstallSharedPlugin) {
+    if (-not (Test-IsAdministrator)) {
+        throw 'Installing the shared OBS plugin requires administrator privileges.'
+    }
+    Install-SharedOBSPlugin -PluginSource $pluginSource -PluginDataSource $pluginDataSource
+    return
+}
 
+# Complete every shared plugin copy before activating the per-user layer. This
+# prevents a copy failure from leaving an active layer with no OBS consumer.
+if (Test-IsAdministrator) {
+    Install-SharedOBSPlugin -PluginSource $pluginSource -PluginDataSource $pluginDataSource
+} else {
+    $arguments = @(
+        '-NoProfile',
+        '-ExecutionPolicy', 'Bypass',
+        '-File', ('"{0}"' -f $PSCommandPath),
+        '-OBSInstallPath', ('"{0}"' -f $OBSInstallPath),
+        '-InstallSharedPlugin'
+    )
+    Write-Host 'Administrator approval is required to install the shared OBS plugin.' -ForegroundColor Yellow
+    $elevated = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -Verb RunAs -Wait -PassThru
+    if ($elevated.ExitCode -ne 0) {
+        throw "Shared OBS plugin installation failed or was cancelled (exit $($elevated.ExitCode))."
+    }
+}
+
+$layerDirectory = Join-Path $env:LOCALAPPDATA 'OpenXR-OBSMirror'
+New-Item -ItemType Directory -Force -Path $layerDirectory | Out-Null
 $hash = $layerHash.ToLowerInvariant()
 $versionedName = "XR_APILAYER_NOVENDOR_OBSMirror.$($hash.Substring(0, 12)).dll"
 $versionedLayer = Join-Path $layerDirectory $versionedName
@@ -98,9 +140,6 @@ $registryPath = 'HKCU:\Software\Khronos\OpenXR\1\ApiLayers\Implicit'
 New-Item -Path $registryPath -Force | Out-Null
 New-ItemProperty -Path $registryPath -Name $installedManifest -PropertyType DWord -Value 0 -Force | Out-Null
 
-Copy-Item -LiteralPath $pluginSource -Destination (Join-Path $pluginBin 'win-openxr.dll') -Force
-Copy-Item -Path (Join-Path $pluginDataSource '*') -Destination $pluginData -Recurse -Force
-
 # OBS 32.2.0 does not discover this older per-user plugin location. Remove only
 # this product's exact legacy folder so Plugin Manager does not retain a stale
 # "Missing Plugins" entry after upgrading from 1.0.0.
@@ -113,7 +152,7 @@ if (Test-Path -LiteralPath $legacyPluginDirectory) {
     VirtualDesktop = if ($vdVersion) { $vdVersion.ToString() } else { 'not detected' }
     OBS = $obsVersion.ToString()
     Layer = $versionedLayer
-    OBSPlugin = Join-Path $pluginBin 'win-openxr.dll'
+    OBSPlugin = Join-Path $env:ProgramData 'obs-studio\plugins\win-openxr\bin\64bit\win-openxr.dll'
     LayerSHA256 = $layerHash
     PluginSHA256 = $pluginHash
 }

@@ -44,17 +44,28 @@ $vswhere = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe
 if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) {
     throw "Visual Studio locator not found: $vswhere"
 }
-$vsPath = & $vswhere -latest -version '[17.0,19.0)' -products * `
-    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-if (-not $vsPath) { throw 'Visual Studio 2022 or 2026 C++ build tools were not found.' }
-
-$vsVersion = & $vswhere -latest -version '[17.0,19.0)' -products * `
-    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationVersion
-$vsMajor = [int]([Version]$vsVersion).Major
+$vsJson = & $vswhere -latest -version '[17.0,19.0)' -products * `
+    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -format json
+if ($LASTEXITCODE -ne 0 -or -not $vsJson) {
+    throw 'Visual Studio 2022 or 2026 C++ build tools were not found.'
+}
+$vsInstall = @(($vsJson -join "`n") | ConvertFrom-Json) | Select-Object -First 1
+if (-not $vsInstall -or -not $vsInstall.installationPath -or -not $vsInstall.installationVersion) {
+    throw 'Visual Studio discovery returned incomplete installation metadata.'
+}
+$vsPath = [string]$vsInstall.installationPath
+$vsMajor = ([Version]$vsInstall.installationVersion).Major
 $cmakeGenerator = if ($vsMajor -ge 18) { 'Visual Studio 18 2026' } else { 'Visual Studio 17 2022' }
 $cmake = Join-Path $vsPath 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe'
 if (-not (Test-Path -LiteralPath $cmake -PathType Leaf)) {
     $cmake = (Get-Command cmake -ErrorAction Stop).Source
+}
+$cmakeHelp = & $cmake --help 2>&1
+if ($LASTEXITCODE -ne 0) {
+    throw "CMake could not be executed: $cmake"
+}
+if (($cmakeHelp -join "`n") -notmatch [regex]::Escape($cmakeGenerator)) {
+    throw "CMake at $cmake does not support the required '$cmakeGenerator' generator. Install the CMake component for the selected Visual Studio instance or upgrade CMake."
 }
 
 $toolsVersionFile = Join-Path $vsPath 'VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt'

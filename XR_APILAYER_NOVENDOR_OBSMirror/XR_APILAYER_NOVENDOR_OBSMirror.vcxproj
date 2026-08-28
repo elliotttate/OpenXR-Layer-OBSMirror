@@ -2,6 +2,7 @@
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <DisableFastUpToDateCheck>True</DisableFastUpToDateCheck>
+    <PythonExe Condition="'$(PythonExe)' == ''">python</PythonExe>
   </PropertyGroup>
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -132,7 +133,7 @@ copy $(SolutionDir)\scripts\Uninstall-Layer.ps1 $(OutDir)
       </Message>
     </PreLinkEvent>
     <PreBuildEvent>
-      <Command>python $(ProjectDir)\framework\dispatch_generator.py</Command>
+      <Command>&quot;$(PythonExe)&quot; &quot;$(ProjectDir)\framework\dispatch_generator.py&quot;</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Generating layer dispatcher...</Message>
@@ -175,7 +176,7 @@ copy $(SolutionDir)\scripts\Uninstall-Layer.ps1 $(OutDir)
       </Message>
     </PreLinkEvent>
     <PreBuildEvent>
-      <Command>python $(ProjectDir)\framework\dispatch_generator.py</Command>
+      <Command>&quot;$(PythonExe)&quot; &quot;$(ProjectDir)\framework\dispatch_generator.py&quot;</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Generating layer dispatcher...</Message>
@@ -222,7 +223,7 @@ copy $(SolutionDir)\scripts\Uninstall-Layer.ps1 $(OutDir)
       </Message>
     </PreLinkEvent>
     <PreBuildEvent>
-      <Command>python $(ProjectDir)\framework\dispatch_generator.py</Command>
+      <Command>&quot;$(PythonExe)&quot; &quot;$(ProjectDir)\framework\dispatch_generator.py&quot;</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Generating layer dispatcher...</Message>
@@ -271,7 +272,7 @@ copy $(SolutionDir)\scripts\Uninstall-Layer.ps1 $(OutDir)
       </Message>
     </PreLinkEvent>
     <PreBuildEvent>
-      <Command>python $(ProjectDir)\framework\dispatch_generator.py</Command>
+      <Command>&quot;$(PythonExe)&quot; &quot;$(ProjectDir)\framework\dispatch_generator.py&quot;</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Generating layer dispatcher...</Message>

@@ -1037,8 +1037,9 @@ namespace {
                         } else if (hdr->type == XR_TYPE_COMPOSITION_LAYER_QUAD && includeQuadLayers) {
                             const XrCompositionLayerQuad* quadLayer =
                                 reinterpret_cast<const XrCompositionLayerQuad*>(hdr);
-                            // VDXR 1.34.22 started honoring the core OpenXR
-                            // eye-visibility field for quad composition layers.
+                            // Virtual Desktop Streamer 1.34.22 / VDXR 1.0.10
+                            // honors the core OpenXR eye-visibility field for
+                            // quad composition layers.
                             // Match the eye selected in OBS instead of leaking a
                             // left-only HUD into the right-eye recording (or vice
                             // versa). Stereo capture keeps any quad visible to at

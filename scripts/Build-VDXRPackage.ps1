@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = '1.0.2',
+    [string]$Version = '1.0.3',
     [string]$TargetOBS = '32.2.0',
     [string]$TargetVirtualDesktop = '1.34.22.0',
     [string]$TargetVDXR = '1.0.10',
@@ -19,7 +19,7 @@ $outputRoot = Join-Path $repoRoot 'artifacts\vdxr'
 $packageName = "VDXR-OBS-Mirror-$Version-win64"
 $stage = Join-Path $outputRoot $packageName
 $zipPath = Join-Path $outputRoot "$packageName.zip"
-$checksumPath = Join-Path $outputRoot 'SHA256SUMS.txt'
+$checksumPath = Join-Path $outputRoot "$packageName-SHA256.txt"
 
 $resolvedOutput = [IO.Path]::GetFullPath($outputRoot).TrimEnd('\') + '\'
 foreach ($target in @($stage, $zipPath, $checksumPath)) {
