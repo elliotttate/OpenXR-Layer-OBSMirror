@@ -81,6 +81,25 @@ if ($RemoveSharedPlugin) {
     return
 }
 
+# Remove the shared files first for a real uninstall. If UAC is cancelled or
+# the elevated removal fails, the current user's layer remains fully usable.
+# WhatIf stays in-process and previews both shared and per-user operations.
+if ($WhatIfPreference -or (Test-IsAdministrator)) {
+    Remove-SharedOBSPluginFiles -PluginDirectory $sharedPluginDirectory
+} else {
+    $arguments = @(
+        '-NoProfile',
+        '-ExecutionPolicy', 'Bypass',
+        '-File', ('"{0}"' -f $PSCommandPath),
+        '-RemoveSharedPlugin'
+    )
+    Write-Host 'Administrator approval is required to remove the shared OBS plugin.' -ForegroundColor Yellow
+    $elevated = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -Verb RunAs -Wait -PassThru
+    if ($elevated.ExitCode -ne 0) {
+        throw "Shared OBS plugin removal failed or was cancelled (exit $($elevated.ExitCode))."
+    }
+}
+
 $installedManifest = Join-Path $layerDirectory 'XR_APILAYER_NOVENDOR_OBSMirror.json'
 $registryPath = 'HKCU:\Software\Khronos\OpenXR\1\ApiLayers\Implicit'
 if (Test-Path -LiteralPath $registryPath) {
@@ -98,24 +117,6 @@ foreach ($directory in @($layerDirectory, $legacyPluginDirectory)) {
     if ((Test-Path -LiteralPath $directory) -and
         $PSCmdlet.ShouldProcess($directory, 'Remove per-user mirror files')) {
         Remove-Item -LiteralPath $directory -Recurse -Force
-    }
-}
-
-# WhatIf performs the complete dry run in the original user process and never
-# requests elevation. A real removal delegates only the ProgramData files.
-if ($WhatIfPreference -or (Test-IsAdministrator)) {
-    Remove-SharedOBSPluginFiles -PluginDirectory $sharedPluginDirectory
-} else {
-    $arguments = @(
-        '-NoProfile',
-        '-ExecutionPolicy', 'Bypass',
-        '-File', ('"{0}"' -f $PSCommandPath),
-        '-RemoveSharedPlugin'
-    )
-    Write-Host 'Administrator approval is required to remove the shared OBS plugin.' -ForegroundColor Yellow
-    $elevated = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -Verb RunAs -Wait -PassThru
-    if ($elevated.ExitCode -ne 0) {
-        throw "Shared OBS plugin removal failed or was cancelled (exit $($elevated.ExitCode))."
     }
 }
 

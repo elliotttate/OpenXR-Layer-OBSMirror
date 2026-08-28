@@ -23,7 +23,8 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $safeRepo = $repoRoot.Replace('\', '/')
 $branch = (& git -c "safe.directory=$safeRepo" -C $repoRoot branch --show-current).Trim()
 if (-not $branch) { throw 'The local repository has no current branch.' }
-$repositoryPattern = '(?i)github\.com[:/]' + [regex]::Escape($Repository) + '(?:\.git)?/?$'
+$repositoryPattern = '(?i)^(?:(?:[a-z][a-z0-9+.-]*://(?:[^/@\s]+@)?github\.com(?::\d+)?/)|(?:[^/@\s]+@)?github\.com[:/])' +
+    [regex]::Escape($Repository) + '(?:\.git)?/?$'
 $tag = "vdxr-v$Version"
 $archive = Join-Path $repoRoot "artifacts\vdxr\VDXR-OBS-Mirror-$Version-win64.zip"
 $checksums = Join-Path $repoRoot "artifacts\vdxr\VDXR-OBS-Mirror-$Version-win64-SHA256.txt"
@@ -48,8 +49,11 @@ if ($CreateRepository) {
 
 if (-not $Remote) {
     foreach ($candidate in (& git -c "safe.directory=$safeRepo" -C $repoRoot remote)) {
-        $candidateUrl = (& git -c "safe.directory=$safeRepo" -C $repoRoot remote get-url $candidate).Trim()
-        if ($candidateUrl -match $repositoryPattern) {
+        $candidateRawUrls = @(& git -c "safe.directory=$safeRepo" -C $repoRoot remote get-url --push --all $candidate 2>$null)
+        $candidateExitCode = $LASTEXITCODE
+        $candidateUrls = @($candidateRawUrls | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+        $invalidCandidateUrls = @($candidateUrls | Where-Object { $_ -notmatch $repositoryPattern })
+        if ($candidateExitCode -eq 0 -and $candidateUrls.Count -gt 0 -and $invalidCandidateUrls.Count -eq 0) {
             $Remote = $candidate
             break
         }
@@ -58,12 +62,15 @@ if (-not $Remote) {
 if (-not $Remote) {
     throw "No Git remote matches $Repository. Add the remote or pass -Remote explicitly."
 }
-$remoteUrl = (& git -c "safe.directory=$safeRepo" -C $repoRoot remote get-url $Remote 2>$null).Trim()
-if ($LASTEXITCODE -ne 0 -or -not $remoteUrl) {
+$remoteRawUrls = @(& git -c "safe.directory=$safeRepo" -C $repoRoot remote get-url --push --all $Remote 2>$null)
+$remoteExitCode = $LASTEXITCODE
+$remoteUrls = @($remoteRawUrls | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+if ($remoteExitCode -ne 0 -or $remoteUrls.Count -eq 0) {
     throw "Git remote '$Remote' does not exist."
 }
-if ($remoteUrl -notmatch $repositoryPattern) {
-    throw "Git remote '$Remote' points to '$remoteUrl', not '$Repository'."
+$invalidRemoteUrls = @($remoteUrls | Where-Object { $_ -notmatch $repositoryPattern })
+if ($invalidRemoteUrls.Count -gt 0) {
+    throw "Git remote '$Remote' has a push URL that does not point to '$Repository': $($invalidRemoteUrls -join ', ')"
 }
 if ($PSCmdlet.ShouldProcess("$Repository/$branch", 'Push source branch')) {
     & git -c "safe.directory=$safeRepo" -C $repoRoot push -u $Remote $branch
