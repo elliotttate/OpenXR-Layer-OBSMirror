@@ -41,7 +41,7 @@ if ($CreateRepository) {
     if ($PSCmdlet.ShouldProcess($Repository, "Create $visibility GitHub repository")) {
         & $gh.Source repo create $Repository $visibility --source $repoRoot --remote $Remote
         if ($LASTEXITCODE -ne 0) { throw 'GitHub repository creation failed.' }
-    } elseif ($WhatIfPreference) {
+    } else {
         return
     }
 }

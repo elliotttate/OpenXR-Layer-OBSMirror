@@ -55,16 +55,26 @@ if (-not (Test-Path -LiteralPath $msbuild -PathType Leaf)) {
 }
 $vsVersion = [Version]$vsInstall.installationVersion
 $platformToolset = if ($vsVersion.Major -ge 18) { 'v145' } else { 'v143' }
-$pythonCommand = @(Get-Command python -CommandType Application -ErrorAction SilentlyContinue) |
-    Select-Object -First 1
-if (-not $pythonCommand) {
-    $pythonCommand = @(Get-Command py -CommandType Application -ErrorAction SilentlyContinue) |
+$pythonExe = $null
+foreach ($pythonName in @('python', 'py')) {
+    $pythonCommand = @(Get-Command $pythonName -CommandType Application -ErrorAction SilentlyContinue) |
         Select-Object -First 1
+    if (-not $pythonCommand) { continue }
+
+    try {
+        & $pythonCommand.Source -c 'import sys; sys.exit(0 if sys.version_info.major == 3 else 1)' *> $null
+        if ($LASTEXITCODE -eq 0) {
+            $pythonExe = $pythonCommand.Source
+            break
+        }
+    } catch {
+        # Continue searching when an app-execution alias or broken interpreter
+        # cannot run without user interaction.
+    }
 }
-if (-not $pythonCommand) {
-    throw 'Python 3 was not found. Install Python or add python/py to PATH before building the native layer.'
+if (-not $pythonExe) {
+    throw 'A runnable Python 3 interpreter was not found. Install Python 3 or add python/py to PATH before building the native layer.'
 }
-$pythonExe = $pythonCommand.Source
 
 & $msbuild (Join-Path $repoRoot 'OpenXR-Layer-OBSMirror.sln') /m `
     /t:Build /p:Configuration=Release /p:Platform=x64 `

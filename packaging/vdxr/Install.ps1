@@ -108,11 +108,14 @@ if ($InstallSharedPlugin) {
 if (Test-IsAdministrator) {
     Install-SharedOBSPlugin -PluginSource $pluginSource -PluginDataSource $pluginDataSource
 } else {
+    # Start-Process joins ArgumentList into a Windows command line. Double any
+    # trailing backslashes so they do not escape the closing quote.
+    $quotedOBSInstallPath = '"{0}"' -f ($OBSInstallPath -replace '(\\+)$', '$1$1')
     $arguments = @(
         '-NoProfile',
         '-ExecutionPolicy', 'Bypass',
         '-File', ('"{0}"' -f $PSCommandPath),
-        '-OBSInstallPath', ('"{0}"' -f $OBSInstallPath),
+        '-OBSInstallPath', $quotedOBSInstallPath,
         '-InstallSharedPlugin'
     )
     Write-Host 'Administrator approval is required to install the shared OBS plugin.' -ForegroundColor Yellow
