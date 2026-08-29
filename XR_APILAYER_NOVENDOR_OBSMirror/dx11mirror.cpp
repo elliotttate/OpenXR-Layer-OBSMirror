@@ -390,16 +390,27 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
         blendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
         blendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-        blendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-        blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+        // The projection copy is the mirror's opaque background. Composition
+        // quads must not replace its alpha with the quad texture's alpha or a
+        // mostly-transparent overlay makes the OBS source disappear.
+        blendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ZERO;
+        blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
         blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
         blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
         CHECK_DX(_d3d11MirrorDevice->CreateBlendState(&blendDesc, _quadBlendState.ReleaseAndGetAddressOf()));
 
+        // OpenXR composition-layer colors are premultiplied unless the layer
+        // explicitly sets XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT.
+        // Keep a second color blend state so premultiplied overlays such as
+        // ZenOverlay are not multiplied by alpha a second time.
+        blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
+        CHECK_DX(_d3d11MirrorDevice->CreateBlendState(
+            &blendDesc, _quadPremultipliedBlendState.ReleaseAndGetAddressOf()));
+
         if (!_quadVShader || !_quadPShader || !_quadArrayPShader || !_quadShaderLayout || !_quadVertexBuffer ||
             !_quadIndexBuffer || !_quadConstantBuffer || !_quadConstantBlendBuffer || !_quadSampleState ||
-            !_quadBlendState) {
+            !_quadBlendState || !_quadPremultipliedBlendState) {
             Log("init: D3D resource creation failed, mirror disabled\n");
             return;
         }
@@ -885,7 +896,7 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         _d3d11MirrorContext->Unmap(_quadConstantBlendBuffer.Get(), 0);
     }
 
-    void D3D11Mirror::bindQuadPipeline(const SourceData& srcData) {
+    void D3D11Mirror::bindQuadPipeline(const SourceData& srcData, const bool premultipliedAlpha) {
         _d3d11MirrorContext->PSSetConstantBuffers(1, 1, _quadConstantBlendBuffer.GetAddressOf());
         // The shader must match the view dimension or sampling returns zeros.
         _d3d11MirrorContext->PSSetShader(srcData._isArray ? _quadArrayPShader.Get() : _quadPShader.Get(), nullptr, 0);
@@ -895,7 +906,10 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         _d3d11MirrorContext->PSSetShaderResources(0, 1, views);
 
         float blend_factor[4] = {1.f, 1.f, 1.f, 1.f};
-        _d3d11MirrorContext->OMSetBlendState(_quadBlendState.Get(), blend_factor, 0xffffffff);
+        ID3D11BlendState* blendState = premultipliedAlpha
+            ? _quadPremultipliedBlendState.Get()
+            : _quadBlendState.Get();
+        _d3d11MirrorContext->OMSetBlendState(blendState, blend_factor, 0xffffffff);
     }
 
     void D3D11Mirror::setTargetRect(const XrRect2Di& rect) {
@@ -940,8 +954,14 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         if (it == _sourceData.end() || !it->second._texture)
             return;
 
-        checkCopyTex(view->subImage.imageRect.extent.width, view->subImage.imageRect.extent.height, format);
-
+        // The compositor surface belongs to the projection image and must
+        // keep the projection's output format. A composition quad is allowed
+        // to use a different swapchain format (ZenOverlay commonly uses
+        // B8G8R8A8_SRGB while the game uses R8G8B8A8_SRGB). Rebuilding the
+        // shared OBS ring with the quad's format here makes it alternate
+        // formats twice per frame, continuously disconnecting the consumer.
+        // The quad texture is sampled through its SRV and can be blended into
+        // the existing projection-format render target without a rebuild.
         if (_compositorTexture == nullptr || _mirrorTextures.size() == 0)
             return;
 
@@ -959,7 +979,12 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
                             0.0f,
                             static_cast<float>(quad->subImage.imageArrayIndex),
                             0.0f);
-        bindQuadPipeline(it->second);
+        const bool usesSourceAlpha =
+            (quad->layerFlags & XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT) != 0;
+        const bool premultipliedAlpha =
+            usesSourceAlpha &&
+            (quad->layerFlags & XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT) == 0;
+        bindQuadPipeline(it->second, premultipliedAlpha);
 
         XrRect2Di rect = {{0, 0}, {static_cast<int32_t>(_comp_desc.Width), static_cast<int32_t>(_comp_desc.Height)}};
         setTargetRect(rect);
