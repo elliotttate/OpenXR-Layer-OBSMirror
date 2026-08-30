@@ -168,7 +168,7 @@ namespace Mirror
                                  float texIndex,
                                  float alphaOverride);
 
-        void bindQuadPipeline(const SourceData& srcData);
+        void bindQuadPipeline(const SourceData& srcData, bool premultipliedAlpha = false);
 
         void setTargetRect(const XrRect2Di& rect);
 
@@ -203,6 +203,7 @@ namespace Mirror
         ComPtr<ID3D11Buffer> _quadIndexBuffer = nullptr;
         ComPtr<ID3D11SamplerState> _quadSampleState = nullptr;
         ComPtr<ID3D11BlendState> _quadBlendState = nullptr;
+        ComPtr<ID3D11BlendState> _quadPremultipliedBlendState = nullptr;
 
         ComPtr<ID3D11Texture2D> _compositorTexture = nullptr;
         D3D11_TEXTURE2D_DESC _comp_desc{};
