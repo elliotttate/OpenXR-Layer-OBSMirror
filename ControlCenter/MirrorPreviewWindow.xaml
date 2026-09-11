@@ -17,12 +17,12 @@
 
         <Grid>
             <StackPanel Spacing="3">
-                <TextBlock Text="LIVE MIRROR PREVIEW" Foreground="#FF58D7DF"
+                <TextBlock x:Uid="Ui_LargePreview_Eyebrow" Text="LIVE MIRROR PREVIEW" Foreground="#FF58D7DF"
                            FontSize="12" FontWeight="SemiBold" CharacterSpacing="110" />
-                <TextBlock x:Name="LargePreviewStatusText" Text="Waiting for a VR app"
+                <TextBlock x:Name="LargePreviewStatusText" x:Uid="Ui_LargePreview_Status" Text="Waiting for a VR app"
                            FontSize="24" FontWeight="SemiBold" />
                 <TextBlock x:Name="LargePreviewDetailText"
-                           Text="The preview will connect automatically when a frame is published."
+                           x:Uid="Ui_LargePreview_Detail" Text="The preview will connect automatically when a frame is published."
                            Foreground="#FFAAB2C3" FontSize="12" />
             </StackPanel>
         </Grid>
@@ -34,17 +34,17 @@
                 <StackPanel x:Name="LargePreviewPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center"
                             Spacing="10" MaxWidth="440" Margin="24">
                     <SymbolIcon Symbol="Video" Width="38" Height="38" Foreground="#FFAAB2C3" />
-                    <TextBlock x:Name="LargePreviewPlaceholderTitle" Text="No mirror image yet"
+                    <TextBlock x:Name="LargePreviewPlaceholderTitle" x:Uid="Ui_LargePreview_PlaceholderTitle" Text="No mirror image yet"
                                FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" />
                     <TextBlock x:Name="LargePreviewPlaceholderDetail"
-                               Text="Start an OpenXR or OpenVR app; the preview connects automatically."
+                               x:Uid="Ui_LargePreview_PlaceholderDetail" Text="Start an OpenXR or OpenVR app; the preview connects automatically."
                                Foreground="#FFAAB2C3" TextAlignment="Center" TextWrapping="Wrap" />
                 </StackPanel>
             </Grid>
         </Border>
 
         <TextBlock Grid.Row="2"
-                   Text="This view uses the same live preview stream as the Dashboard. OBS does not need to be open."
+                   x:Uid="Ui_LargePreview_Footer" Text="This view uses the same live preview stream as the Dashboard. OBS does not need to be open."
                    Foreground="#FFAAB2C3" FontSize="11" />
     </Grid>
 </Window>

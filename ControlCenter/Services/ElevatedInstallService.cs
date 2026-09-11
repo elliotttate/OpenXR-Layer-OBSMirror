@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.Json;
+using OBSMirror.ControlCenter.Localization;
 
 namespace OBSMirror.ControlCenter.Services;
 
@@ -105,7 +106,11 @@ internal static class ElevatedInstallService
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
         {
-            throw new InvalidOperationException("Installation was canceled before administrator permission was granted.", ex);
+            throw new InvalidOperationException(
+                Loc.S(
+                    "Code_Svc_ElevationCanceled",
+                    "Installation was canceled before administrator permission was granted."),
+                ex);
         }
         finally
         {

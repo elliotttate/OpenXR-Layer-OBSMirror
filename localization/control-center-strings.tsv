@@ -1,0 +1,140 @@
+key	target	prop	english	zh-CN
+Ui_TitleBar_Eyebrow	MainWindow.xaml	Text	CONTROL CENTER	控制中心
+Ui_Sidebar_Eyebrow	MainWindow.xaml	Text	CAPTURE TOOLS	采集工具
+Ui_Nav_Dashboard	MainWindow.xaml	Text	Dashboard	仪表盘
+Ui_Nav_Overscan	MainWindow.xaml	Text	Overscan	过扫描
+Ui_Nav_Smoothing	MainWindow.xaml	Text	Camera smoothing	相机平滑
+Ui_Nav_QuadLayers	MainWindow.xaml	Text	UI layers	UI 层
+Ui_Nav_Installation	MainWindow.xaml	Text	Installation	安装
+Ui_Nav_Diagnostics	MainWindow.xaml	Text	Diagnostics	诊断
+Ui_VrRestart_Title	MainWindow.xaml	Text	RESTART VR APP	重启 VR 应用
+Ui_VrRestart_Reason	MainWindow.xaml	Text	Restart the running VR app to apply the change.	重启正在运行的 VR 应用以应用此更改。
+Ui_Dashboard_Eyebrow	MainWindow.xaml	Text	SYSTEM OVERVIEW	系统总览
+Ui_Dashboard_Title	MainWindow.xaml	Text	Ready for the next capture.	已就绪，可开始下一次采集。
+Ui_Dashboard_Subtitle	MainWindow.xaml	Text	Live status for the OpenXR layer, OpenXR/OpenVR OBS sources, runtime, and recording overscan.	OpenXR 层、OpenXR/OpenVR OBS 源、运行时以及录制过扫描的实时状态。
+Ui_Action_Refresh	MainWindow.xaml	Text	Refresh	刷新
+Ui_Card_Layer_Eyebrow	MainWindow.xaml	Text	OPENXR LAYER	OPENXR 层
+Ui_Status_Checking	MainWindow.xaml	Text*	Checking…	检查中…
+Ui_Card_Plugin_Eyebrow	MainWindow.xaml	Text	OBS SOURCE	OBS 源
+Ui_Card_Runtime_Eyebrow	MainWindow.xaml	Text	OPENXR RUNTIME	OPENXR 运行时
+Ui_Card_Overscan_Eyebrow	MainWindow.xaml	Text	OVERSCAN	过扫描
+Ui_QuickActions_Eyebrow	MainWindow.xaml	Text	QUICK ACTIONS	快捷操作
+Ui_QuickActions_Title	MainWindow.xaml	Text	Capture workflow	采集流程
+Ui_QuickActions_Layer	MainWindow.xaml	Text	Layer	层
+Ui_Action_OpenObs	MainWindow.xaml	Text	Open OBS	打开 OBS
+Ui_Action_OpenObsButton	MainWindow.xaml	Content	Open OBS	打开 OBS
+Ui_Action_UseHeadsetRuntime	MainWindow.xaml	Text	Use headset runtime	使用头显运行时
+Ui_Action_OpenLayerLog	MainWindow.xaml	Text	Open layer log	打开层日志
+Ui_RuntimeMode_Checking	MainWindow.xaml	Title	Checking runtime selection	正在检查运行时选择
+Ui_RuntimeMode_Checking	MainWindow.xaml	Message	Reading the effective and system OpenXR runtime settings.	正在读取当前生效的与系统级的 OpenXR 运行时设置。
+Ui_Conflict_Title	MainWindow.xaml	Title	An old OBS source copy is taking over	存在旧版 OBS 源正在抢占
+Ui_Conflict_Action	MainWindow.xaml	Content	Remove the old copy	移除旧版副本
+Ui_NonOpenXr_Checking	MainWindow.xaml	Title	Checking the running VR application	正在检查运行中的 VR 应用
+Ui_Preview_Eyebrow	MainWindow.xaml	Text	LIVE MIRROR PREVIEW	实时镜像预览
+Ui_Preview_StatusWaiting	MainWindow.xaml	Text	Waiting for a VR app	等待 VR 应用
+Ui_Preview_DetailIdle	MainWindow.xaml	Text	Start an OpenXR or OpenVR app; the preview connects automatically.	启动 OpenXR 或 OpenVR 应用后，预览会自动连接。
+Ui_Preview_RefreshTooltip	MainWindow.xaml	ToolTipService.ToolTip	Refresh preview now	立即刷新预览
+Ui_Preview_OpenLarger	MainWindow.xaml	Text	Open larger	放大查看
+Ui_Preview_PlaceholderTitle	MainWindow.xaml	Text	No mirror image yet	暂无镜像画面
+Ui_Preview_PlaceholderDetail	MainWindow.xaml	Text	The preview connects automatically to OpenXR or OpenVR capture.	预览会自动连接到 OpenXR 或 OpenVR 采集。
+Ui_Overscan_Eyebrow	MainWindow.xaml	Text	RECORDING OVERSCAN	录制过扫描
+Ui_Overscan_Title	MainWindow.xaml	Text	Give the recording more room.	给录制画面留出更多余量。
+Ui_Overscan_Subtitle	MainWindow.xaml	Text	Ask the OpenXR application for a wider FOV and a larger render target while the headset receives the original central crop.	向 OpenXR 应用申请更大的视场角（FOV）与渲染目标，而头显仍然获得原始的中央裁切画面。
+Ui_Overscan_Enable	MainWindow.xaml	Text	Enable recording overscan	启用录制过扫描
+Ui_Overscan_EnableHint	MainWindow.xaml	Text	The setting is applied the next time the VR application creates OpenXR.	该设置会在 VR 应用下次创建 OpenXR 时生效。
+Ui_Overscan_Horizontal	MainWindow.xaml	Text	Horizontal expansion	水平扩展
+Ui_Overscan_HorizontalHint	MainWindow.xaml	Text	Adds room to the left and right edges of the recording.	为录制画面的左右两侧增加余量。
+Ui_Overscan_Vertical	MainWindow.xaml	Text	Vertical expansion	垂直扩展
+Ui_Overscan_VerticalHint	MainWindow.xaml	Text	Adds room above and below the headset crop.	在头显裁切区域的上方与下方增加余量。
+Ui_Overscan_ShapeEyebrow	MainWindow.xaml	Text	RECORDING SHAPE	录制画面比例
+Ui_Overscan_ShapeHint	MainWindow.xaml	Text	Headsets render each eye almost square, so a recording is square until the horizontal expansion outruns the vertical one.	头显每只眼睛的渲染画面接近正方形，因此在水平扩展超过垂直扩展之前，录制画面都是正方形。
+Ui_Overscan_ShapeNative	MainWindow.xaml	Content	Headset native	头显原生
+Ui_Overscan_ShapeWidest	MainWindow.xaml	Content	Widest possible	尽可能宽
+Ui_Overscan_PresetsEyebrow	MainWindow.xaml	Text	EXTRA ROOM ON EVERY EDGE	各边额外余量
+Ui_Overscan_PresetBalanced	MainWindow.xaml	Content	Balanced  115 × 108	均衡  115 × 108
+Ui_Overscan_PresetWide	MainWindow.xaml	Content	Wide  120 × 110	宽幅  120 × 110
+Ui_Overscan_PresetExtraWide	MainWindow.xaml	Content	Extra wide  130 × 115	超宽  130 × 115
+Ui_Overscan_PixelCostEyebrow	MainWindow.xaml	Text	ESTIMATED PIXEL COST	预计像素开销
+Ui_Overscan_FrameEyebrow	MainWindow.xaml	Text	RECORDING FRAME	录制帧尺寸
+Ui_Overscan_Restart	MainWindow.xaml	Title	Restart the VR app	重启 VR 应用
+Ui_Overscan_Restart	MainWindow.xaml	Message	Changing these values cannot resize an existing OpenXR swapchain.	修改这些数值无法改变已存在的 OpenXR 交换链大小。
+Ui_Overscan_Footer	MainWindow.xaml	Text	Changes save as you make them. Restart the VR application to apply them.	改动会即时保存，重启 VR 应用后生效。
+Ui_Smoothing_Eyebrow	MainWindow.xaml	Text	RECORDING CAMERA	录制相机
+Ui_Smoothing_Title	MainWindow.xaml	Text	Smooth motion without changing the headset.	在不改动头显画面的前提下平滑运动。
+Ui_Smoothing_Subtitle	MainWindow.xaml	Text	A filtered virtual camera is applied only to the OBS mirror. The headset continues to receive the original pose and image.	经过滤波的虚拟相机只作用于 OBS 镜像；头显仍然接收原始的位姿与画面。
+Ui_Smoothing_Managed	MainWindow.xaml	Text	Control smoothing from this app	由本应用控制平滑
+Ui_Smoothing_ManagedHint	MainWindow.xaml	Text	Turn this off to use the values saved directly on the OBS source.	关闭后改用直接保存在 OBS 源上的数值。
+Ui_Smoothing_Strength	MainWindow.xaml	Text	Smoothing strength	平滑强度
+Ui_Smoothing_StrengthHint	MainWindow.xaml	Text	Higher values feel steadier and more floaty; zero disables the filtered camera.	数值越高画面越稳但漂浮感越强；设为 0 可关闭滤波相机。
+Ui_Smoothing_Crop	MainWindow.xaml	Text	Pan margin crop	平移边距裁切
+Ui_Smoothing_CropHint	MainWindow.xaml	Text	Reserves edge room for the smoothed camera to pan without exposing black borders.	为平滑相机预留边缘余量，使其平移时不会露出黑边。
+Ui_Smoothing_PresetsEyebrow	MainWindow.xaml	Text	PRESETS	预设
+Ui_Smoothing_PresetSubtle	MainWindow.xaml	Content	Subtle  20 / 5%	轻微  20 / 5%
+Ui_Smoothing_PresetBalanced	MainWindow.xaml	Content	Balanced  40 / 8%	均衡  40 / 8%
+Ui_Smoothing_PresetSteady	MainWindow.xaml	Content	Steady  65 / 12%	稳定  65 / 12%
+Ui_Smoothing_ResponseEyebrow	MainWindow.xaml	Text	FILTER RESPONSE	滤波响应
+Ui_Smoothing_ResponseHint	MainWindow.xaml	Text	estimated filter time constant	估算的滤波时间常数
+Ui_Smoothing_VisibleEyebrow	MainWindow.xaml	Text	VISIBLE IMAGE	可见画面
+Ui_Smoothing_VisibleHint	MainWindow.xaml	Text	of each axis remains after the safety crop	为安全裁切后各轴保留的比例
+Ui_Smoothing_Availability	MainWindow.xaml	Title#1	Applies live	实时生效
+Ui_Smoothing_Availability	MainWindow.xaml	Message	The installed OBS source polls these settings four times per second. Saved values are used on the next session too.	已安装的 OBS 源每秒轮询这些设置 4 次；保存的数值也会在下次会话中继续使用。
+Ui_QuadLayers_Eyebrow	MainWindow.xaml	Text	RECORDING UI	录制 UI
+Ui_QuadLayers_Title	MainWindow.xaml	Text	Choose whether UI layers appear in the recording.	选择 UI 层是否出现在录制画面中。
+Ui_QuadLayers_Subtitle	MainWindow.xaml	Text	OpenXR composition quad layers can be included in or removed from the OBS mirror without changing what appears in the headset.	可以在不影响头显画面的前提下，把 OpenXR 合成四边形层包含进 OBS 镜像或从中移除。
+Ui_QuadLayers_Toggle	MainWindow.xaml	Text	OpenXR quad-layer UI	OpenXR 四边形层 UI
+Ui_QuadLayers_ToggleHint	MainWindow.xaml	Text	Controls UI submitted separately from the main projection image.	控制与主投影画面分开提交的 UI。
+Ui_QuadLayers_ToggleState	MainWindow.xaml	OnContent	Shown	显示
+Ui_QuadLayers_ToggleState	MainWindow.xaml	OffContent	Hidden	隐藏
+Ui_QuadLayers_ObsEyebrow	MainWindow.xaml	Text	OBS RECORDING	OBS 录制
+Ui_QuadLayers_ObsHint	MainWindow.xaml	Text	The filter is applied while the layer builds the mirror image.	该过滤在层构建镜像画面时生效。
+Ui_QuadLayers_HeadsetEyebrow	MainWindow.xaml	Text	HEADSET	头显
+Ui_QuadLayers_HeadsetValue	MainWindow.xaml	Text	Always unchanged	始终不受影响
+Ui_QuadLayers_HeadsetHint	MainWindow.xaml	Text	Every layer is still submitted to the active OpenXR runtime.	所有层仍然会提交给当前生效的 OpenXR 运行时。
+Ui_QuadLayers_Availability	MainWindow.xaml	Title#2	Applies live	实时生效
+Ui_QuadLayers_Availability	MainWindow.xaml	Message	The updated OpenXR layer polls this setting while recording. Restart the VR application once after installing the update.	更新后的 OpenXR 层会在录制时轮询该设置；安装更新后请重启一次 VR 应用。
+Ui_QuadLayers_ScopeEyebrow	MainWindow.xaml	Text	WHAT THIS CAN SEPARATE	可分离的范围
+Ui_QuadLayers_ScopeHint	MainWindow.xaml	Text	This affects XR_COMPOSITION_LAYER_QUAD content only. UI drawn directly into the projection eye image, including world-space or post-processed UI, is part of that image and cannot be hidden independently.	该选项只影响 XR_COMPOSITION_LAYER_QUAD 内容。直接绘制进投影眼图里的 UI（包括世界空间或后处理 UI）属于该图像的一部分，无法单独隐藏。
+Ui_QuadLayers_Hide	MainWindow.xaml	Content	Hide from recording	从录制中隐藏
+Ui_QuadLayers_Show	MainWindow.xaml	Content	Show in recording	在录制中显示
+Ui_QuadLayers_Apply	MainWindow.xaml	Content	Apply UI setting	应用 UI 设置
+Ui_Install_Eyebrow	MainWindow.xaml	Text	INSTALLATION	安装
+Ui_Install_Title	MainWindow.xaml	Text	Layer and OBS integration.	层与 OBS 集成。
+Ui_Install_Subtitle	MainWindow.xaml	Text	Install the built layer, register its manifest for the current user, and stage the matching OBS source.	安装已构建的层、为当前用户注册其清单，并部署匹配的 OBS 源。
+Ui_Install_LayerEyebrow	MainWindow.xaml	Text	OPENXR API LAYER	OPENXR API 层
+Ui_Install_EnableCurrentUser	MainWindow.xaml	Text	Enable for the current user	为当前用户启用
+Ui_Install_EnableCurrentUserHint	MainWindow.xaml	Text	Turn this off to stop OpenXR applications from loading the layer. Installed files and the OBS source remain in place.	关闭后 OpenXR 应用将不再加载该层；已安装的文件与 OBS 源都会保留。
+Ui_Install_RegistrationState	MainWindow.xaml	OnContent	Enabled	已启用
+Ui_Install_RegistrationState	MainWindow.xaml	OffContent	Disabled	已禁用
+Ui_Install_PluginEyebrow	MainWindow.xaml	Text	OBS PLUGIN	OBS 插件
+Ui_Install_PluginHint	MainWindow.xaml	Text	Installs both OpenXR Mirror Capture and OpenVR / SteamVR Mirror Capture sources.	会同时安装 OpenXR 镜像采集与 OpenVR / SteamVR 镜像采集两个源。
+Ui_Install_BothEyebrow	MainWindow.xaml	Text	INSTALL OR UPDATE BOTH COMPONENTS	安装或更新两个组件
+Ui_Install_BothTitle	MainWindow.xaml	Text	Use the release artifacts already built in this repository.	使用本仓库中已构建好的发布产物。
+Ui_Install_BothHint	MainWindow.xaml	Text	If OBS is open and already has this exact plugin, the installer safely updates only the layer. Close OBS first when the plugin binary has changed; Windows may then ask for administrator permission.	如果 OBS 正在运行且已装有完全相同的插件，安装程序只会安全地更新层。插件二进制发生变化时请先关闭 OBS，此时 Windows 可能会请求管理员权限。
+Ui_Install_OpenFolder	MainWindow.xaml	Content	Open install folder	打开安装目录
+Ui_Install_InstallUpdate	MainWindow.xaml	Content	Install / update	安装 / 更新
+Ui_Install_RuntimeNote	MainWindow.xaml	Title	Normal headset runtime is the default	默认使用头显的正常运行时
+Ui_Install_RuntimeNote	MainWindow.xaml	Message	The manager does not select a simulator when it starts one. Use the simulator only from the testing section below, then restore the headset runtime when testing is finished.	管理器启动模拟器时不会自动选中它。请只在下方测试区域使用模拟器，测试完成后恢复头显运行时。
+Ui_Install_SimulatorHeader	MainWindow.xaml	Header	Simulator testing	模拟器测试
+Ui_Install_SimulatorTitle	MainWindow.xaml	Text	Open the optional simulator tool	打开可选的模拟器工具
+Ui_Install_SimulatorHint	MainWindow.xaml	Text	Opening it here keeps runtime selection explicit and does not pass along a stale simulator environment override.	从这里打开可以保证运行时选择是明确的，也不会带上过期的模拟器环境变量覆盖。
+Ui_Install_OpenSimulator	MainWindow.xaml	Content	Open simulator (testing)	打开模拟器（测试）
+Ui_Diagnostics_Eyebrow	MainWindow.xaml	Text	DIAGNOSTICS	诊断
+Ui_Diagnostics_Title	MainWindow.xaml	Text	See what the runtime sees.	查看运行时实际看到的内容。
+Ui_Diagnostics_Refresh	MainWindow.xaml	Text	Refresh status	刷新状态
+Ui_Diagnostics_RuntimeEyebrow	MainWindow.xaml	Text	ACTIVE RUNTIME	当前运行时
+Ui_Diagnostics_HashesEyebrow	MainWindow.xaml	Text	INSTALLED HASHES	已安装文件的哈希值
+Ui_Diagnostics_LogLayer	MainWindow.xaml	Content	OpenXR layer log	OpenXR 层日志
+Ui_Diagnostics_LogObs	MainWindow.xaml	Content	OBS log	OBS 日志
+Ui_Diagnostics_LogPreview	MainWindow.xaml	Content	Preview diagnostics	预览诊断
+Ui_Diagnostics_RefreshLog	MainWindow.xaml	Content	Refresh log	刷新日志
+Ui_Diagnostics_ShareLogsTooltip	MainWindow.xaml	ToolTipService.ToolTip	Uploads the diagnostics report, layer log and OBS log to filebin.net and copies the share link to the clipboard. The link expires after about a week.	将诊断报告、层日志与 OBS 日志上传到 filebin.net，并把分享链接复制到剪贴板。链接约一周后失效。
+Ui_Diagnostics_ShareLogs	MainWindow.xaml	Text	Upload & share logs	上传并分享日志
+Ui_Diagnostics_OpenExplorer	MainWindow.xaml	Content	Open in Explorer	在资源管理器中打开
+Ui_LargePreview_Eyebrow	MirrorPreviewWindow.xaml	Text	LIVE MIRROR PREVIEW	实时镜像预览
+Ui_LargePreview_Status	MirrorPreviewWindow.xaml	Text	Waiting for a VR app	等待 VR 应用
+Ui_LargePreview_Detail	MirrorPreviewWindow.xaml	Text	The preview will connect automatically when a frame is published.	有画面输出后，预览会自动连接。
+Ui_LargePreview_PlaceholderTitle	MirrorPreviewWindow.xaml	Text	No mirror image yet	暂无镜像画面
+Ui_LargePreview_PlaceholderDetail	MirrorPreviewWindow.xaml	Text	Start an OpenXR or OpenVR app; the preview connects automatically.	启动 OpenXR 或 OpenVR 应用后，预览会自动连接。
+Ui_LargePreview_Footer	MirrorPreviewWindow.xaml	Text	This view uses the same live preview stream as the Dashboard. OBS does not need to be open.	此视图与仪表盘使用同一条实时预览流，无需打开 OBS。
+Ui_Window_MainTitle	MainWindow.xaml.cs	code	OBSMirror Control Center	OBSMirror 控制中心
+Ui_Window_PreviewTitle	MirrorPreviewWindow.xaml.cs	code	OBSMirror — Live Preview	OBSMirror — 实时预览

@@ -1,0 +1,951 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Ui_TitleBar_Eyebrow.Text" xml:space="preserve">
+    <value>CONTROL CENTER</value>
+  </data>
+  <data name="Ui_Sidebar_Eyebrow.Text" xml:space="preserve">
+    <value>CAPTURE TOOLS</value>
+  </data>
+  <data name="Ui_Nav_Dashboard.Text" xml:space="preserve">
+    <value>Dashboard</value>
+  </data>
+  <data name="Ui_Nav_Overscan.Text" xml:space="preserve">
+    <value>Overscan</value>
+  </data>
+  <data name="Ui_Nav_Smoothing.Text" xml:space="preserve">
+    <value>Camera smoothing</value>
+  </data>
+  <data name="Ui_Nav_QuadLayers.Text" xml:space="preserve">
+    <value>UI layers</value>
+  </data>
+  <data name="Ui_Nav_Installation.Text" xml:space="preserve">
+    <value>Installation</value>
+  </data>
+  <data name="Ui_Nav_Diagnostics.Text" xml:space="preserve">
+    <value>Diagnostics</value>
+  </data>
+  <data name="Ui_VrRestart_Title.Text" xml:space="preserve">
+    <value>RESTART VR APP</value>
+  </data>
+  <data name="Ui_VrRestart_Reason.Text" xml:space="preserve">
+    <value>Restart the running VR app to apply the change.</value>
+  </data>
+  <data name="Ui_Dashboard_Eyebrow.Text" xml:space="preserve">
+    <value>SYSTEM OVERVIEW</value>
+  </data>
+  <data name="Ui_Dashboard_Title.Text" xml:space="preserve">
+    <value>Ready for the next capture.</value>
+  </data>
+  <data name="Ui_Dashboard_Subtitle.Text" xml:space="preserve">
+    <value>Live status for the OpenXR layer, OpenXR/OpenVR OBS sources, runtime, and recording overscan.</value>
+  </data>
+  <data name="Ui_Action_Refresh.Text" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="Ui_Card_Layer_Eyebrow.Text" xml:space="preserve">
+    <value>OPENXR LAYER</value>
+  </data>
+  <data name="Ui_Status_Checking.Text" xml:space="preserve">
+    <value>Checking…</value>
+  </data>
+  <data name="Ui_Card_Plugin_Eyebrow.Text" xml:space="preserve">
+    <value>OBS SOURCE</value>
+  </data>
+  <data name="Ui_Card_Runtime_Eyebrow.Text" xml:space="preserve">
+    <value>OPENXR RUNTIME</value>
+  </data>
+  <data name="Ui_Card_Overscan_Eyebrow.Text" xml:space="preserve">
+    <value>OVERSCAN</value>
+  </data>
+  <data name="Ui_QuickActions_Eyebrow.Text" xml:space="preserve">
+    <value>QUICK ACTIONS</value>
+  </data>
+  <data name="Ui_QuickActions_Title.Text" xml:space="preserve">
+    <value>Capture workflow</value>
+  </data>
+  <data name="Ui_QuickActions_Layer.Text" xml:space="preserve">
+    <value>Layer</value>
+  </data>
+  <data name="Ui_Action_OpenObs.Text" xml:space="preserve">
+    <value>Open OBS</value>
+  </data>
+  <data name="Ui_Action_OpenObsButton.Content" xml:space="preserve">
+    <value>Open OBS</value>
+  </data>
+  <data name="Ui_Action_UseHeadsetRuntime.Text" xml:space="preserve">
+    <value>Use headset runtime</value>
+  </data>
+  <data name="Ui_Action_OpenLayerLog.Text" xml:space="preserve">
+    <value>Open layer log</value>
+  </data>
+  <data name="Ui_RuntimeMode_Checking.Title" xml:space="preserve">
+    <value>Checking runtime selection</value>
+  </data>
+  <data name="Ui_RuntimeMode_Checking.Message" xml:space="preserve">
+    <value>Reading the effective and system OpenXR runtime settings.</value>
+  </data>
+  <data name="Ui_Conflict_Title.Title" xml:space="preserve">
+    <value>An old OBS source copy is taking over</value>
+  </data>
+  <data name="Ui_Conflict_Action.Content" xml:space="preserve">
+    <value>Remove the old copy</value>
+  </data>
+  <data name="Ui_NonOpenXr_Checking.Title" xml:space="preserve">
+    <value>Checking the running VR application</value>
+  </data>
+  <data name="Ui_Preview_Eyebrow.Text" xml:space="preserve">
+    <value>LIVE MIRROR PREVIEW</value>
+  </data>
+  <data name="Ui_Preview_StatusWaiting.Text" xml:space="preserve">
+    <value>Waiting for a VR app</value>
+  </data>
+  <data name="Ui_Preview_DetailIdle.Text" xml:space="preserve">
+    <value>Start an OpenXR or OpenVR app; the preview connects automatically.</value>
+  </data>
+  <data name="Ui_Preview_RefreshTooltip.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Refresh preview now</value>
+  </data>
+  <data name="Ui_Preview_OpenLarger.Text" xml:space="preserve">
+    <value>Open larger</value>
+  </data>
+  <data name="Ui_Preview_PlaceholderTitle.Text" xml:space="preserve">
+    <value>No mirror image yet</value>
+  </data>
+  <data name="Ui_Preview_PlaceholderDetail.Text" xml:space="preserve">
+    <value>The preview connects automatically to OpenXR or OpenVR capture.</value>
+  </data>
+  <data name="Ui_Overscan_Eyebrow.Text" xml:space="preserve">
+    <value>RECORDING OVERSCAN</value>
+  </data>
+  <data name="Ui_Overscan_Title.Text" xml:space="preserve">
+    <value>Give the recording more room.</value>
+  </data>
+  <data name="Ui_Overscan_Subtitle.Text" xml:space="preserve">
+    <value>Ask the OpenXR application for a wider FOV and a larger render target while the headset receives the original central crop.</value>
+  </data>
+  <data name="Ui_Overscan_Enable.Text" xml:space="preserve">
+    <value>Enable recording overscan</value>
+  </data>
+  <data name="Ui_Overscan_EnableHint.Text" xml:space="preserve">
+    <value>The setting is applied the next time the VR application creates OpenXR.</value>
+  </data>
+  <data name="Ui_Overscan_Horizontal.Text" xml:space="preserve">
+    <value>Horizontal expansion</value>
+  </data>
+  <data name="Ui_Overscan_HorizontalHint.Text" xml:space="preserve">
+    <value>Adds room to the left and right edges of the recording.</value>
+  </data>
+  <data name="Ui_Overscan_Vertical.Text" xml:space="preserve">
+    <value>Vertical expansion</value>
+  </data>
+  <data name="Ui_Overscan_VerticalHint.Text" xml:space="preserve">
+    <value>Adds room above and below the headset crop.</value>
+  </data>
+  <data name="Ui_Overscan_ShapeEyebrow.Text" xml:space="preserve">
+    <value>RECORDING SHAPE</value>
+  </data>
+  <data name="Ui_Overscan_ShapeHint.Text" xml:space="preserve">
+    <value>Headsets render each eye almost square, so a recording is square until the horizontal expansion outruns the vertical one.</value>
+  </data>
+  <data name="Ui_Overscan_ShapeNative.Content" xml:space="preserve">
+    <value>Headset native</value>
+  </data>
+  <data name="Ui_Overscan_ShapeWidest.Content" xml:space="preserve">
+    <value>Widest possible</value>
+  </data>
+  <data name="Ui_Overscan_PresetsEyebrow.Text" xml:space="preserve">
+    <value>EXTRA ROOM ON EVERY EDGE</value>
+  </data>
+  <data name="Ui_Overscan_PresetBalanced.Content" xml:space="preserve">
+    <value>Balanced  115 × 108</value>
+  </data>
+  <data name="Ui_Overscan_PresetWide.Content" xml:space="preserve">
+    <value>Wide  120 × 110</value>
+  </data>
+  <data name="Ui_Overscan_PresetExtraWide.Content" xml:space="preserve">
+    <value>Extra wide  130 × 115</value>
+  </data>
+  <data name="Ui_Overscan_PixelCostEyebrow.Text" xml:space="preserve">
+    <value>ESTIMATED PIXEL COST</value>
+  </data>
+  <data name="Ui_Overscan_FrameEyebrow.Text" xml:space="preserve">
+    <value>RECORDING FRAME</value>
+  </data>
+  <data name="Ui_Overscan_Restart.Title" xml:space="preserve">
+    <value>Restart the VR app</value>
+  </data>
+  <data name="Ui_Overscan_Restart.Message" xml:space="preserve">
+    <value>Changing these values cannot resize an existing OpenXR swapchain.</value>
+  </data>
+  <data name="Ui_Overscan_Footer.Text" xml:space="preserve">
+    <value>Changes save as you make them. Restart the VR application to apply them.</value>
+  </data>
+  <data name="Ui_Smoothing_Eyebrow.Text" xml:space="preserve">
+    <value>RECORDING CAMERA</value>
+  </data>
+  <data name="Ui_Smoothing_Title.Text" xml:space="preserve">
+    <value>Smooth motion without changing the headset.</value>
+  </data>
+  <data name="Ui_Smoothing_Subtitle.Text" xml:space="preserve">
+    <value>A filtered virtual camera is applied only to the OBS mirror. The headset continues to receive the original pose and image.</value>
+  </data>
+  <data name="Ui_Smoothing_Managed.Text" xml:space="preserve">
+    <value>Control smoothing from this app</value>
+  </data>
+  <data name="Ui_Smoothing_ManagedHint.Text" xml:space="preserve">
+    <value>Turn this off to use the values saved directly on the OBS source.</value>
+  </data>
+  <data name="Ui_Smoothing_Strength.Text" xml:space="preserve">
+    <value>Smoothing strength</value>
+  </data>
+  <data name="Ui_Smoothing_StrengthHint.Text" xml:space="preserve">
+    <value>Higher values feel steadier and more floaty; zero disables the filtered camera.</value>
+  </data>
+  <data name="Ui_Smoothing_Crop.Text" xml:space="preserve">
+    <value>Pan margin crop</value>
+  </data>
+  <data name="Ui_Smoothing_CropHint.Text" xml:space="preserve">
+    <value>Reserves edge room for the smoothed camera to pan without exposing black borders.</value>
+  </data>
+  <data name="Ui_Smoothing_PresetsEyebrow.Text" xml:space="preserve">
+    <value>PRESETS</value>
+  </data>
+  <data name="Ui_Smoothing_PresetSubtle.Content" xml:space="preserve">
+    <value>Subtle  20 / 5%</value>
+  </data>
+  <data name="Ui_Smoothing_PresetBalanced.Content" xml:space="preserve">
+    <value>Balanced  40 / 8%</value>
+  </data>
+  <data name="Ui_Smoothing_PresetSteady.Content" xml:space="preserve">
+    <value>Steady  65 / 12%</value>
+  </data>
+  <data name="Ui_Smoothing_ResponseEyebrow.Text" xml:space="preserve">
+    <value>FILTER RESPONSE</value>
+  </data>
+  <data name="Ui_Smoothing_ResponseHint.Text" xml:space="preserve">
+    <value>estimated filter time constant</value>
+  </data>
+  <data name="Ui_Smoothing_VisibleEyebrow.Text" xml:space="preserve">
+    <value>VISIBLE IMAGE</value>
+  </data>
+  <data name="Ui_Smoothing_VisibleHint.Text" xml:space="preserve">
+    <value>of each axis remains after the safety crop</value>
+  </data>
+  <data name="Ui_Smoothing_Availability.Title" xml:space="preserve">
+    <value>Applies live</value>
+  </data>
+  <data name="Ui_Smoothing_Availability.Message" xml:space="preserve">
+    <value>The installed OBS source polls these settings four times per second. Saved values are used on the next session too.</value>
+  </data>
+  <data name="Ui_QuadLayers_Eyebrow.Text" xml:space="preserve">
+    <value>RECORDING UI</value>
+  </data>
+  <data name="Ui_QuadLayers_Title.Text" xml:space="preserve">
+    <value>Choose whether UI layers appear in the recording.</value>
+  </data>
+  <data name="Ui_QuadLayers_Subtitle.Text" xml:space="preserve">
+    <value>OpenXR composition quad layers can be included in or removed from the OBS mirror without changing what appears in the headset.</value>
+  </data>
+  <data name="Ui_QuadLayers_Toggle.Text" xml:space="preserve">
+    <value>OpenXR quad-layer UI</value>
+  </data>
+  <data name="Ui_QuadLayers_ToggleHint.Text" xml:space="preserve">
+    <value>Controls UI submitted separately from the main projection image.</value>
+  </data>
+  <data name="Ui_QuadLayers_ToggleState.OnContent" xml:space="preserve">
+    <value>Shown</value>
+  </data>
+  <data name="Ui_QuadLayers_ToggleState.OffContent" xml:space="preserve">
+    <value>Hidden</value>
+  </data>
+  <data name="Ui_QuadLayers_ObsEyebrow.Text" xml:space="preserve">
+    <value>OBS RECORDING</value>
+  </data>
+  <data name="Ui_QuadLayers_ObsHint.Text" xml:space="preserve">
+    <value>The filter is applied while the layer builds the mirror image.</value>
+  </data>
+  <data name="Ui_QuadLayers_HeadsetEyebrow.Text" xml:space="preserve">
+    <value>HEADSET</value>
+  </data>
+  <data name="Ui_QuadLayers_HeadsetValue.Text" xml:space="preserve">
+    <value>Always unchanged</value>
+  </data>
+  <data name="Ui_QuadLayers_HeadsetHint.Text" xml:space="preserve">
+    <value>Every layer is still submitted to the active OpenXR runtime.</value>
+  </data>
+  <data name="Ui_QuadLayers_Availability.Title" xml:space="preserve">
+    <value>Applies live</value>
+  </data>
+  <data name="Ui_QuadLayers_Availability.Message" xml:space="preserve">
+    <value>The updated OpenXR layer polls this setting while recording. Restart the VR application once after installing the update.</value>
+  </data>
+  <data name="Ui_QuadLayers_ScopeEyebrow.Text" xml:space="preserve">
+    <value>WHAT THIS CAN SEPARATE</value>
+  </data>
+  <data name="Ui_QuadLayers_ScopeHint.Text" xml:space="preserve">
+    <value>This affects XR_COMPOSITION_LAYER_QUAD content only. UI drawn directly into the projection eye image, including world-space or post-processed UI, is part of that image and cannot be hidden independently.</value>
+  </data>
+  <data name="Ui_QuadLayers_Hide.Content" xml:space="preserve">
+    <value>Hide from recording</value>
+  </data>
+  <data name="Ui_QuadLayers_Show.Content" xml:space="preserve">
+    <value>Show in recording</value>
+  </data>
+  <data name="Ui_QuadLayers_Apply.Content" xml:space="preserve">
+    <value>Apply UI setting</value>
+  </data>
+  <data name="Ui_Install_Eyebrow.Text" xml:space="preserve">
+    <value>INSTALLATION</value>
+  </data>
+  <data name="Ui_Install_Title.Text" xml:space="preserve">
+    <value>Layer and OBS integration.</value>
+  </data>
+  <data name="Ui_Install_Subtitle.Text" xml:space="preserve">
+    <value>Install the built layer, register its manifest for the current user, and stage the matching OBS source.</value>
+  </data>
+  <data name="Ui_Install_LayerEyebrow.Text" xml:space="preserve">
+    <value>OPENXR API LAYER</value>
+  </data>
+  <data name="Ui_Install_EnableCurrentUser.Text" xml:space="preserve">
+    <value>Enable for the current user</value>
+  </data>
+  <data name="Ui_Install_EnableCurrentUserHint.Text" xml:space="preserve">
+    <value>Turn this off to stop OpenXR applications from loading the layer. Installed files and the OBS source remain in place.</value>
+  </data>
+  <data name="Ui_Install_RegistrationState.OnContent" xml:space="preserve">
+    <value>Enabled</value>
+  </data>
+  <data name="Ui_Install_RegistrationState.OffContent" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
+  <data name="Ui_Install_PluginEyebrow.Text" xml:space="preserve">
+    <value>OBS PLUGIN</value>
+  </data>
+  <data name="Ui_Install_PluginHint.Text" xml:space="preserve">
+    <value>Installs both OpenXR Mirror Capture and OpenVR / SteamVR Mirror Capture sources.</value>
+  </data>
+  <data name="Ui_Install_BothEyebrow.Text" xml:space="preserve">
+    <value>INSTALL OR UPDATE BOTH COMPONENTS</value>
+  </data>
+  <data name="Ui_Install_BothTitle.Text" xml:space="preserve">
+    <value>Use the release artifacts already built in this repository.</value>
+  </data>
+  <data name="Ui_Install_BothHint.Text" xml:space="preserve">
+    <value>If OBS is open and already has this exact plugin, the installer safely updates only the layer. Close OBS first when the plugin binary has changed; Windows may then ask for administrator permission.</value>
+  </data>
+  <data name="Ui_Install_OpenFolder.Content" xml:space="preserve">
+    <value>Open install folder</value>
+  </data>
+  <data name="Ui_Install_InstallUpdate.Content" xml:space="preserve">
+    <value>Install / update</value>
+  </data>
+  <data name="Ui_Install_RuntimeNote.Title" xml:space="preserve">
+    <value>Normal headset runtime is the default</value>
+  </data>
+  <data name="Ui_Install_RuntimeNote.Message" xml:space="preserve">
+    <value>The manager does not select a simulator when it starts one. Use the simulator only from the testing section below, then restore the headset runtime when testing is finished.</value>
+  </data>
+  <data name="Ui_Install_SimulatorHeader.Header" xml:space="preserve">
+    <value>Simulator testing</value>
+  </data>
+  <data name="Ui_Install_SimulatorTitle.Text" xml:space="preserve">
+    <value>Open the optional simulator tool</value>
+  </data>
+  <data name="Ui_Install_SimulatorHint.Text" xml:space="preserve">
+    <value>Opening it here keeps runtime selection explicit and does not pass along a stale simulator environment override.</value>
+  </data>
+  <data name="Ui_Install_OpenSimulator.Content" xml:space="preserve">
+    <value>Open simulator (testing)</value>
+  </data>
+  <data name="Ui_Diagnostics_Eyebrow.Text" xml:space="preserve">
+    <value>DIAGNOSTICS</value>
+  </data>
+  <data name="Ui_Diagnostics_Title.Text" xml:space="preserve">
+    <value>See what the runtime sees.</value>
+  </data>
+  <data name="Ui_Diagnostics_Refresh.Text" xml:space="preserve">
+    <value>Refresh status</value>
+  </data>
+  <data name="Ui_Diagnostics_RuntimeEyebrow.Text" xml:space="preserve">
+    <value>ACTIVE RUNTIME</value>
+  </data>
+  <data name="Ui_Diagnostics_HashesEyebrow.Text" xml:space="preserve">
+    <value>INSTALLED HASHES</value>
+  </data>
+  <data name="Ui_Diagnostics_LogLayer.Content" xml:space="preserve">
+    <value>OpenXR layer log</value>
+  </data>
+  <data name="Ui_Diagnostics_LogObs.Content" xml:space="preserve">
+    <value>OBS log</value>
+  </data>
+  <data name="Ui_Diagnostics_LogPreview.Content" xml:space="preserve">
+    <value>Preview diagnostics</value>
+  </data>
+  <data name="Ui_Diagnostics_RefreshLog.Content" xml:space="preserve">
+    <value>Refresh log</value>
+  </data>
+  <data name="Ui_Diagnostics_ShareLogsTooltip.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Uploads the diagnostics report, layer log and OBS log to filebin.net and copies the share link to the clipboard. The link expires after about a week.</value>
+  </data>
+  <data name="Ui_Diagnostics_ShareLogs.Text" xml:space="preserve">
+    <value>Upload &amp; share logs</value>
+  </data>
+  <data name="Ui_Diagnostics_OpenExplorer.Content" xml:space="preserve">
+    <value>Open in Explorer</value>
+  </data>
+  <data name="Ui_LargePreview_Eyebrow.Text" xml:space="preserve">
+    <value>LIVE MIRROR PREVIEW</value>
+  </data>
+  <data name="Ui_LargePreview_Status.Text" xml:space="preserve">
+    <value>Waiting for a VR app</value>
+  </data>
+  <data name="Ui_LargePreview_Detail.Text" xml:space="preserve">
+    <value>The preview will connect automatically when a frame is published.</value>
+  </data>
+  <data name="Ui_LargePreview_PlaceholderTitle.Text" xml:space="preserve">
+    <value>No mirror image yet</value>
+  </data>
+  <data name="Ui_LargePreview_PlaceholderDetail.Text" xml:space="preserve">
+    <value>Start an OpenXR or OpenVR app; the preview connects automatically.</value>
+  </data>
+  <data name="Ui_LargePreview_Footer.Text" xml:space="preserve">
+    <value>This view uses the same live preview stream as the Dashboard. OBS does not need to be open.</value>
+  </data>
+  <data name="Ui_Window_MainTitle" xml:space="preserve">
+    <value>OBSMirror Control Center</value>
+  </data>
+  <data name="Ui_Window_PreviewTitle" xml:space="preserve">
+    <value>OBSMirror — Live Preview</value>
+  </data>
+  <data name="Code_Main_RuntimeNotConfigured" xml:space="preserve">
+    <value>Not configured</value>
+  </data>
+  <data name="Code_Main_RuntimeNoneConfigured" xml:space="preserve">
+    <value>No runtime configured</value>
+  </data>
+  <data name="Code_Main_RuntimeSystemHeadset" xml:space="preserve">
+    <value>System headset runtime</value>
+  </data>
+  <data name="Code_Main_RuntimeProcessOverride" xml:space="preserve">
+    <value>Process environment override</value>
+  </data>
+  <data name="Code_Main_UpdateAvailableTitle" xml:space="preserve">
+    <value>Update available — {0}</value>
+  </data>
+  <data name="Code_Main_UpdateAvailableYes" xml:space="preserve">
+    <value>Yes, update</value>
+  </data>
+  <data name="Code_Main_Later" xml:space="preserve">
+    <value>Later</value>
+  </data>
+  <data name="Code_Main_UpdateAvailableBody" xml:space="preserve">
+    <value>Version {0} is available (you have {1}).</value>
+  </data>
+  <data name="Code_Main_UpdateAvailableAuto" xml:space="preserve">
+    <value>It downloads, installs, and reopens the app automatically.</value>
+  </data>
+  <data name="Code_Main_DownloadingUpdate" xml:space="preserve">
+    <value>Downloading update {0}</value>
+  </data>
+  <data name="Code_Main_InstallingUpdate" xml:space="preserve">
+    <value>Installing update</value>
+  </data>
+  <data name="Code_Main_UpdateInstallNote" xml:space="preserve">
+    <value>The app closes now and reopens automatically when the update finishes.</value>
+  </data>
+  <data name="Code_Main_UpdateFailed" xml:space="preserve">
+    <value>Update failed</value>
+  </data>
+  <data name="Code_Main_UpdateFailedBody" xml:space="preserve">
+    <value>{0} You can retry from the dialog on next launch or download it from GitHub Releases.</value>
+  </data>
+  <data name="Code_Main_CouldNotRefreshStatus" xml:space="preserve">
+    <value>Could not refresh status</value>
+  </data>
+  <data name="Code_Main_Updating" xml:space="preserve">
+    <value>Updating…</value>
+  </data>
+  <data name="Code_Main_RetryFromInstallationPage" xml:space="preserve">
+    <value>Retry from the Installation page</value>
+  </data>
+  <data name="Code_Main_InstallingNewLayerAutomatically" xml:space="preserve">
+    <value>Installing the new layer build automatically</value>
+  </data>
+  <data name="Code_Main_ReleaseFilesNotInstalled" xml:space="preserve">
+    <value>Release files are not installed</value>
+  </data>
+  <data name="Code_Main_LayerInstalled" xml:space="preserve">
+    <value>Installed • {0}</value>
+  </data>
+  <data name="Code_Main_NotInstalled" xml:space="preserve">
+    <value>Not installed</value>
+  </data>
+  <data name="Code_Main_Current" xml:space="preserve">
+    <value>Current</value>
+  </data>
+  <data name="Code_Main_CloseObsToUpdate" xml:space="preserve">
+    <value>Close OBS to update</value>
+  </data>
+  <data name="Code_Main_PluginUpdateWaitsForObs" xml:space="preserve">
+    <value>OBS is running — the update installs when it closes</value>
+  </data>
+  <data name="Code_Main_ObsRunning" xml:space="preserve">
+    <value>OBS is running</value>
+  </data>
+  <data name="Code_Main_ObsNotRunning" xml:space="preserve">
+    <value>OBS is not running</value>
+  </data>
+  <data name="Code_Main_ConflictingPluginMessage" xml:space="preserve">
+    <value>OBS is loading a second, older copy of the capture source from {0}. OBS uses whichever copy registers first, so the source can stay blank even though everything here reports as current. Removing the old copy leaves the installed source in place.</value>
+  </data>
+  <data name="Code_Main_SteamVrCaptureAvailable" xml:space="preserve">
+    <value>SteamVR capture is available</value>
+  </data>
+  <data name="Code_Main_SteamVrCaptureMessage" xml:space="preserve">
+    <value>The automatic OBS source will use SteamVR&apos;s native compositor mirror. OpenXR layer controls do not apply to this capture.</value>
+  </data>
+  <data name="Code_Main_VrApiNotCapturable" xml:space="preserve">
+    <value>This VR API is not capturable yet</value>
+  </data>
+  <data name="Code_Main_VrApiNotCapturableMessage" xml:space="preserve">
+    <value>{0} is running VR through the {1} path, not OpenXR. Switch the application to OpenXR or OpenVR/SteamVR, then start it again.</value>
+  </data>
+  <data name="Code_Main_SimulatorSelected" xml:space="preserve">
+    <value>Simulator selected</value>
+  </data>
+  <data name="Code_Main_RestoreRuntimeForHeadset" xml:space="preserve">
+    <value>Restore {0} for a headset</value>
+  </data>
+  <data name="Code_Main_SelectHeadsetRuntime" xml:space="preserve">
+    <value>Select your headset runtime in its desktop software</value>
+  </data>
+  <data name="Code_Main_SimulatorOverrideActive" xml:space="preserve">
+    <value>Simulator override is active</value>
+  </data>
+  <data name="Code_Main_SimulatorIsSystemRuntime" xml:space="preserve">
+    <value>Simulator is the system OpenXR runtime</value>
+  </data>
+  <data name="Code_Main_SimulatorOverrideMessage" xml:space="preserve">
+    <value>OpenXR applications will bypass the normal headset runtime. Use headset runtime restores {0} and clears the per-user override.</value>
+  </data>
+  <data name="Code_Main_SimulatorNotSelectedByApp" xml:space="preserve">
+    <value>The app did not select this runtime. Choose &apos;Set as active OpenXR runtime&apos; in your headset or SteamVR software before starting an OpenXR application.</value>
+  </data>
+  <data name="Code_Main_NoRuntimeConfigured" xml:space="preserve">
+    <value>No OpenXR runtime is configured</value>
+  </data>
+  <data name="Code_Main_NoRuntimeConfiguredMessage" xml:space="preserve">
+    <value>Set your headset software as the active OpenXR runtime, then refresh this page.</value>
+  </data>
+  <data name="Code_Main_HeadsetRuntimeSelected" xml:space="preserve">
+    <value>Headset runtime selected</value>
+  </data>
+  <data name="Code_Main_HeadsetRuntimeSelectedMessage" xml:space="preserve">
+    <value>OpenXR applications will use {0}. Simulator testing is optional and isolated under Installation.</value>
+  </data>
+  <data name="Code_Main_HeadsetNativeFov" xml:space="preserve">
+    <value>Headset-native FOV</value>
+  </data>
+  <data name="Code_Main_InstallObsSource" xml:space="preserve">
+    <value>Install the OBS source</value>
+  </data>
+  <data name="Code_Main_ObsSourceSaveNowNotEffective" xml:space="preserve">
+    <value>The values can be saved now, but the OBS source must be installed before they can take effect.</value>
+  </data>
+  <data name="Code_Main_SourceUpdateRequired" xml:space="preserve">
+    <value>Source update required</value>
+  </data>
+  <data name="Code_Main_ObsSourceUpdateNote" xml:space="preserve">
+    <value>The values can be saved now. Install the available source update and restart OBS to enable live control.</value>
+  </data>
+  <data name="Code_Main_InstallOpenXrLayer" xml:space="preserve">
+    <value>Install the OpenXR layer</value>
+  </data>
+  <data name="Code_Main_LayerSaveNowNotEffective" xml:space="preserve">
+    <value>The preference can be saved now, but the updated layer must be installed before it can filter the recording.</value>
+  </data>
+  <data name="Code_Main_LayerUpdateRequired" xml:space="preserve">
+    <value>Layer update required</value>
+  </data>
+  <data name="Code_Main_LayerUpdateNote" xml:space="preserve">
+    <value>Save the preference now, then install the available layer update and restart the VR application once.</value>
+  </data>
+  <data name="Code_Main_LayerInstalledDisabled" xml:space="preserve">
+    <value>Installed, disabled</value>
+  </data>
+  <data name="Code_Main_LayerInstalledEnabled" xml:space="preserve">
+    <value>Installed and enabled</value>
+  </data>
+  <data name="Code_Main_InstalledUpdatePending" xml:space="preserve">
+    <value>Installed, update pending (automatic)</value>
+  </data>
+  <data name="Code_Main_PluginInstalledCurrent" xml:space="preserve">
+    <value>Installed and current</value>
+  </data>
+  <data name="Code_Main_PluginUpdateWaitingForObs" xml:space="preserve">
+    <value>Installed, update waiting for OBS to close</value>
+  </data>
+  <data name="Code_Main_SystemDefault" xml:space="preserve">
+    <value>System default: {0} — {1}</value>
+  </data>
+  <data name="Code_Main_DiagnosticLayerHash" xml:space="preserve">
+    <value>Layer   {0}</value>
+  </data>
+  <data name="Code_Main_DiagnosticPluginHash" xml:space="preserve">
+    <value>Plugin  {0}</value>
+  </data>
+  <data name="Code_Main_CouldNotSaveOverscan" xml:space="preserve">
+    <value>Could not save overscan</value>
+  </data>
+  <data name="Code_Main_ReasonOverscanChange" xml:space="preserve">
+    <value>the overscan change</value>
+  </data>
+  <data name="Code_Main_ScaleSummary" xml:space="preserve">
+    <value>{0:0.00}× horizontal  •  {1:0.00}× vertical</value>
+  </data>
+  <data name="Code_Main_FrameShapeKnown" xml:space="preserve">
+    <value>{0:0.00} : 1 per eye, from the runtime&apos;s {1} × {2} ({3:0.00} : 1). The application&apos;s own render scale multiplies both axes, so the shape holds.</value>
+  </data>
+  <data name="Code_Main_FrameShapeUnknown" xml:space="preserve">
+    <value>relative to the runtime&apos;s recommended per-eye size. Run a VR application once and this will show the recording&apos;s real pixel size and shape.</value>
+  </data>
+  <data name="Code_Main_WidestShapeTitle" xml:space="preserve">
+    <value>As wide as this build allows</value>
+  </data>
+  <data name="Code_Main_WidestShapeLimited" xml:space="preserve">
+    <value>A {0:0.00} : 1 frame needs more than {1}% horizontal expansion from this headset&apos;s {2:0.00} : 1 per-eye render. The sliders are set to the widest reachable shape, {3:0.00} : 1.</value>
+  </data>
+  <data name="Code_Main_RunningVrApp" xml:space="preserve">
+    <value>the running VR app</value>
+  </data>
+  <data name="Code_Main_RestartToApply" xml:space="preserve">
+    <value>Restart {0} to apply {1}.</value>
+  </data>
+  <data name="Code_Main_RestartToApplyMultiple" xml:space="preserve">
+    <value>Restart {0} to apply these changes: {1}.</value>
+  </data>
+  <data name="Code_Main_CouldNotSaveCameraSmoothing" xml:space="preserve">
+    <value>Could not save camera smoothing</value>
+  </data>
+  <data name="Code_Main_Off" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="Code_Main_ProjectionQuadLayerUi" xml:space="preserve">
+    <value>Projection + quad-layer UI</value>
+  </data>
+  <data name="Code_Main_ProjectionOnly" xml:space="preserve">
+    <value>Projection only</value>
+  </data>
+  <data name="Code_Main_QuadLayerUiShown" xml:space="preserve">
+    <value>Quad-layer UI shown</value>
+  </data>
+  <data name="Code_Main_QuadLayerUiHidden" xml:space="preserve">
+    <value>Quad-layer UI hidden</value>
+  </data>
+  <data name="Code_Main_QuadLayerUiSavedNote" xml:space="preserve">
+    <value>The OBS mirror picks up this recording-only setting live when the updated layer is active. The headset remains unchanged.</value>
+  </data>
+  <data name="Code_Main_CouldNotSaveUiLayerSetting" xml:space="preserve">
+    <value>Could not save the UI-layer setting</value>
+  </data>
+  <data name="Code_Main_NewerComponentsInstalled" xml:space="preserve">
+    <value>Newer components are installed</value>
+  </data>
+  <data name="Code_Main_NewerComponentsMessage" xml:space="preserve">
+    <value>The installed layer and OBS source come from {0}, which is newer than this Control Center ({1}). They were left alone; update the app to match.</value>
+  </data>
+  <data name="Code_Main_ReasonLayerUpdate" xml:space="preserve">
+    <value>the OpenXR layer update</value>
+  </data>
+  <data name="Code_Main_RestartVrForNewLayer" xml:space="preserve">
+    <value>Restart the running VR application to load the new layer build.</value>
+  </data>
+  <data name="Code_Main_ObsSourceUpdateOnClose" xml:space="preserve">
+    <value>The OBS source update installs automatically once OBS is closed.</value>
+  </data>
+  <data name="Code_Main_RestartObsForSource" xml:space="preserve">
+    <value>Restart OBS to load the updated source.</value>
+  </data>
+  <data name="Code_Main_ObsSourceUpdateWaiting" xml:space="preserve">
+    <value>OBS source update waiting</value>
+  </data>
+  <data name="Code_Main_UpdatedAutomatically" xml:space="preserve">
+    <value>Updated automatically</value>
+  </data>
+  <data name="Code_Main_NewBuildDetected" xml:space="preserve">
+    <value>A new build was detected.</value>
+  </data>
+  <data name="Code_Main_AutomaticUpdateFailed" xml:space="preserve">
+    <value>Automatic update failed</value>
+  </data>
+  <data name="Code_Main_AutomaticUpdateFailedBody" xml:space="preserve">
+    <value>{0} Use Installation &gt; Install / update to retry.</value>
+  </data>
+  <data name="Code_Main_ActionInstallingObsmirror" xml:space="preserve">
+    <value>Installing OBSMirror</value>
+  </data>
+  <data name="Code_Main_InstallationComplete" xml:space="preserve">
+    <value>Installation complete</value>
+  </data>
+  <data name="Code_Main_ActionEnablingLayer" xml:space="preserve">
+    <value>Enabling the OpenXR layer</value>
+  </data>
+  <data name="Code_Main_ActionDisablingLayer" xml:space="preserve">
+    <value>Disabling the OpenXR layer</value>
+  </data>
+  <data name="Code_Main_ReasonLayerRegistrationChange" xml:space="preserve">
+    <value>the OpenXR layer registration change</value>
+  </data>
+  <data name="Code_Main_LayerEnabled" xml:space="preserve">
+    <value>OpenXR layer enabled</value>
+  </data>
+  <data name="Code_Main_RestartVrToLoadLayer" xml:space="preserve">
+    <value>Restart the running VR application to load the layer.</value>
+  </data>
+  <data name="Code_Main_LayerDisabled" xml:space="preserve">
+    <value>OpenXR layer disabled</value>
+  </data>
+  <data name="Code_Main_FilesLeftInPlace" xml:space="preserve">
+    <value>Installed files and the OBS source were left in place.</value>
+  </data>
+  <data name="Code_Main_RestartVrToUnloadLayer" xml:space="preserve">
+    <value>Restart the running VR application to unload the layer.</value>
+  </data>
+  <data name="Code_Main_ActionRemovingOldSource" xml:space="preserve">
+    <value>Removing the old OBS source copy</value>
+  </data>
+  <data name="Code_Main_OldSourceCopyRemoved" xml:space="preserve">
+    <value>Old OBS source copy removed</value>
+  </data>
+  <data name="Code_Main_OldSourceCopyRemovedBody" xml:space="preserve">
+    <value>{0} Start OBS again; the installed source will now be the one that loads.</value>
+  </data>
+  <data name="Code_Main_ObsAlreadyRunning" xml:space="preserve">
+    <value>OBS is already running</value>
+  </data>
+  <data name="Code_Main_ObsAlreadyRunningBody" xml:space="preserve">
+    <value>The saved OpenXR Mirror Capture source is ready in the current OBS session.</value>
+  </data>
+  <data name="Code_Main_ObsLaunched" xml:space="preserve">
+    <value>OBS launched</value>
+  </data>
+  <data name="Code_Main_ObsLaunchedBody" xml:space="preserve">
+    <value>Refresh status after OBS finishes loading.</value>
+  </data>
+  <data name="Code_Main_CouldNotLaunchObs" xml:space="preserve">
+    <value>Could not launch OBS</value>
+  </data>
+  <data name="Code_Main_LocateObsStudio" xml:space="preserve">
+    <value>Locate OBS Studio</value>
+  </data>
+  <data name="Code_Main_BrowseForObs64" xml:space="preserve">
+    <value>Browse for obs64.exe</value>
+  </data>
+  <data name="Code_Main_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Code_Main_ObsExeHint" xml:space="preserve">
+    <value>obs64.exe is usually in the OBS install folder under bin\64bit.</value>
+  </data>
+  <data name="Code_Main_SavedObsLocation" xml:space="preserve">
+    <value>Saved this location for future launches: {0}</value>
+  </data>
+  <data name="Code_Main_SelectHeadsetRuntimeFirst" xml:space="preserve">
+    <value>Select a headset runtime first</value>
+  </data>
+  <data name="Code_Main_SystemRuntimeIsSimulator" xml:space="preserve">
+    <value>The system runtime itself is currently the simulator, so there is no headset runtime for this button to restore. Open your headset or SteamVR desktop software and choose &apos;Set as active OpenXR runtime&apos;.</value>
+  </data>
+  <data name="Code_Main_TheSystemOpenXrRuntime" xml:space="preserve">
+    <value>the system OpenXR runtime</value>
+  </data>
+  <data name="Code_Main_ReasonRuntimeChange" xml:space="preserve">
+    <value>the OpenXR runtime change</value>
+  </data>
+  <data name="Code_Main_HeadsetRuntimeRestored" xml:space="preserve">
+    <value>Headset runtime restored</value>
+  </data>
+  <data name="Code_Main_HeadsetRuntimeRestoredBody" xml:space="preserve">
+    <value>Per-user simulator overrides were cleared. New OpenXR applications will use {0} ({1}).</value>
+  </data>
+  <data name="Code_Main_RestartVrToSwitchRuntimes" xml:space="preserve">
+    <value>Restart the running VR application to switch runtimes.</value>
+  </data>
+  <data name="Code_Main_CouldNotRestoreRuntime" xml:space="preserve">
+    <value>Could not restore the headset runtime</value>
+  </data>
+  <data name="Code_Main_SimulatorAlreadyRunning" xml:space="preserve">
+    <value>Simulator testing tool is already running</value>
+  </data>
+  <data name="Code_Main_SimulatorAlreadyRunningBody" xml:space="preserve">
+    <value>The manager has not changed your active OpenXR runtime.</value>
+  </data>
+  <data name="Code_Main_SimulatorLaunched" xml:space="preserve">
+    <value>Simulator testing tool launched</value>
+  </data>
+  <data name="Code_Main_SimulatorLaunchedBody" xml:space="preserve">
+    <value>It opened without inheriting a simulator runtime override. Runtime selection remains an explicit testing action.</value>
+  </data>
+  <data name="Code_Main_CouldNotLaunchSimulator" xml:space="preserve">
+    <value>Could not launch the simulator testing tool</value>
+  </data>
+  <data name="Code_Main_ActionLogSharing" xml:space="preserve">
+    <value>Log sharing</value>
+  </data>
+  <data name="Code_Main_ShareSummary" xml:space="preserve">
+    <value>{0} ({1} file(s); the link expires after about a week)</value>
+  </data>
+  <data name="Code_Main_NotUploaded" xml:space="preserve">
+    <value>Not uploaded: {0}</value>
+  </data>
+  <data name="Code_Main_LogsUploadedLinkCopied" xml:space="preserve">
+    <value>Logs uploaded - share link copied to the clipboard</value>
+  </data>
+  <data name="Code_Main_LogsUploaded" xml:space="preserve">
+    <value>Logs uploaded</value>
+  </data>
+  <data name="Code_Main_ActionFailed" xml:space="preserve">
+    <value>{0} failed</value>
+  </data>
+  <data name="Code_Main_HashUnavailable" xml:space="preserve">
+    <value>hash unavailable</value>
+  </data>
+  <data name="Code_Main_HashNotInstalled" xml:space="preserve">
+    <value>not installed</value>
+  </data>
+  <data name="Code_Main_CompletedSuccessfully" xml:space="preserve">
+    <value>Completed successfully.</value>
+  </data>
+  <data name="Code_Svc_PreviewStopped" xml:space="preserve">
+    <value>Preview stopped</value>
+  </data>
+  <data name="Code_Svc_PreviewStoppedReopenDetail" xml:space="preserve">
+    <value>Reopen the app to start the mirror preview again.</value>
+  </data>
+  <data name="Code_Svc_WaitingForOpenXrApp" xml:space="preserve">
+    <value>Waiting for an OpenXR app</value>
+  </data>
+  <data name="Code_Svc_WaitingFirstMirrorFrame" xml:space="preserve">
+    <value>Waiting for the first mirror frame</value>
+  </data>
+  <data name="Code_Svc_WaitingFirstMirrorFrameDetail" xml:space="preserve">
+    <value>The layer is connected, but only {0}/{1} shared texture handles are published (generation {2}). Start or resume the VR app to publish an image. {3}</value>
+  </data>
+  <data name="Code_Svc_MirrorUnavailable" xml:space="preserve">
+    <value>Mirror image is not available</value>
+  </data>
+  <data name="Code_Svc_PreviewFormatUnsupported" xml:space="preserve">
+    <value>Preview format is not supported</value>
+  </data>
+  <data name="Code_Svc_PreviewFormatNotSupportedDetail" xml:space="preserve">
+    <value>The mirror is using {0} at {1} × {2}. OBS capture is unaffected.</value>
+  </data>
+  <data name="Code_Svc_LiveMirror" xml:space="preserve">
+    <value>Live mirror</value>
+  </data>
+  <data name="Code_Svc_BlackFramesDetected" xml:space="preserve">
+    <value>Black frames detected</value>
+  </data>
+  <data name="Code_Svc_MirrorFrameStale" xml:space="preserve">
+    <value>Mirror frame is stale</value>
+  </data>
+  <data name="Code_Svc_PreviewPaused" xml:space="preserve">
+    <value>Preview paused</value>
+  </data>
+  <data name="Code_Svc_CpuFallbackSuffix" xml:space="preserve">
+    <value>  •  CPU fallback</value>
+  </data>
+  <data name="Code_Svc_SeePreviewDiagnosticsSuffix" xml:space="preserve">
+    <value>  •  See Preview diagnostics</value>
+  </data>
+  <data name="Code_Svc_LiveFrameDetail" xml:space="preserve">
+    <value>Source {0} × {1}  •  Preview {2} × {3}</value>
+  </data>
+  <data name="Code_Svc_StartVrAppDetail" xml:space="preserve">
+    <value>Start a VR app after enabling the OpenXR layer. The preview will connect automatically.</value>
+  </data>
+  <data name="Code_Svc_SteamVrPreviewStopped" xml:space="preserve">
+    <value>SteamVR preview stopped</value>
+  </data>
+  <data name="Code_Svc_SteamVrPreviewStoppedDetail" xml:space="preserve">
+    <value>Reopen the app to restart the preview.</value>
+  </data>
+  <data name="Code_Svc_WaitingForSteamVrMirror" xml:space="preserve">
+    <value>Waiting for a SteamVR mirror</value>
+  </data>
+  <data name="Code_Svc_LiveSteamVrMirror" xml:space="preserve">
+    <value>Live SteamVR mirror</value>
+  </data>
+  <data name="Code_Svc_SteamVrFrameDetail" xml:space="preserve">
+    <value>Right eye  •  Source {0} × {1}  •  Preview {2} × {3}  •  {4}</value>
+  </data>
+  <data name="Code_Svc_SteamVrPreviewPaused" xml:space="preserve">
+    <value>SteamVR preview paused</value>
+  </data>
+  <data name="Code_Svc_StartSteamVrDetail" xml:space="preserve">
+    <value>Start SteamVR and an OpenVR application; the preview will connect automatically.</value>
+  </data>
+  <data name="Code_Svc_ChecksumEntryMissing" xml:space="preserve">
+    <value>The release checksum manifest has no entry for {0}.</value>
+  </data>
+  <data name="Code_Svc_ChecksumMismatch" xml:space="preserve">
+    <value>The downloaded installer did not match the release checksum and was deleted. Try again later.</value>
+  </data>
+  <data name="Code_Svc_ElevationCanceled" xml:space="preserve">
+    <value>Installation was canceled before administrator permission was granted.</value>
+  </data>
+  <data name="Code_Svc_CloseObsBeforePluginUpdate" xml:space="preserve">
+    <value>OBS is running. Close it before updating the OBS plugin.</value>
+  </data>
+  <data name="Code_Svc_LayerInstalledEnabled" xml:space="preserve">
+    <value>Installed and enabled layer {0}.</value>
+  </data>
+  <data name="Code_Svc_ObsPluginCurrent" xml:space="preserve">
+    <value>OBS plugin already current.</value>
+  </data>
+  <data name="Code_Svc_CloseObsPluginChanged" xml:space="preserve">
+    <value>OBS is running and the plugin binary has changed. Stop recording and close OBS before updating the plugin.</value>
+  </data>
+  <data name="Code_Svc_ObsPluginUpdated" xml:space="preserve">
+    <value>Updated the OBS plugin.</value>
+  </data>
+  <data name="Code_Svc_LayerRegisteredForUser" xml:space="preserve">
+    <value>Registered OpenXR OBS Mirror for the current user: {0}</value>
+  </data>
+  <data name="Code_Svc_NoLayerRegistryKey" xml:space="preserve">
+    <value>No current-user OpenXR implicit-layer registry key exists.</value>
+  </data>
+  <data name="Code_Svc_LayerRegistrationsRemoved" xml:space="preserve">
+    <value>Removed {0} OpenXR OBS Mirror registration(s) for the current user.</value>
+  </data>
+  <data name="Code_Svc_NoConflictingPlugin" xml:space="preserve">
+    <value>No conflicting OBS plugin copy was found.</value>
+  </data>
+  <data name="Code_Svc_CloseObsBeforePluginRemoval" xml:space="preserve">
+    <value>Close OBS before removing the old plugin copy; OBS is holding the file.</value>
+  </data>
+  <data name="Code_Svc_ConflictingPluginRemoved" xml:space="preserve">
+    <value>Removed the conflicting plugin copy at {0}.</value>
+  </data>
+  <data name="Code_Svc_SelectObs64Executable" xml:space="preserve">
+    <value>Select obs64.exe (the 64-bit OBS Studio executable).</value>
+  </data>
+  <data name="Code_Svc_ObsNotFound" xml:space="preserve">
+    <value>OBS Studio (obs64.exe) could not be found automatically. This is normal for a custom or portable install - browse to obs64.exe once and it will be remembered.</value>
+  </data>
+  <data name="Code_Svc_NoCaptureSessionLogged" xml:space="preserve">
+    <value>No OpenXR capture session has been logged yet.</value>
+  </data>
+</root>

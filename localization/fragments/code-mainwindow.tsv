@@ -1,0 +1,130 @@
+key	target	prop	english	zh-CN
+Code_Main_UpdateAvailableTitle	MainWindow.xaml.cs	code	Update available — {0}	有可用更新 — {0}
+Code_Main_UpdateAvailableYes	MainWindow.xaml.cs	code	Yes, update	是，更新
+Code_Main_Later	MainWindow.xaml.cs	code	Later	稍后
+Code_Main_UpdateAvailableBody	MainWindow.xaml.cs	code	Version {0} is available (you have {1}).	版本 {0} 已发布（当前版本为 {1}）。
+Code_Main_UpdateAvailableAuto	MainWindow.xaml.cs	code	It downloads, installs, and reopens the app automatically.	更新会自动下载、安装并重新打开应用。
+Code_Main_DownloadingUpdate	MainWindow.xaml.cs	code	Downloading update {0}	正在下载更新 {0}
+Code_Main_InstallingUpdate	MainWindow.xaml.cs	code	Installing update	正在安装更新
+Code_Main_UpdateInstallNote	MainWindow.xaml.cs	code	The app closes now and reopens automatically when the update finishes.	应用现在会关闭，更新完成后会自动重新打开。
+Code_Main_UpdateFailed	MainWindow.xaml.cs	code	Update failed	更新失败
+Code_Main_UpdateFailedBody	MainWindow.xaml.cs	code	{0} You can retry from the dialog on next launch or download it from GitHub Releases.	{0} 可以在下次启动时的对话框中重试，也可从 GitHub Releases 下载。
+Code_Main_CouldNotRefreshStatus	MainWindow.xaml.cs	code	Could not refresh status	无法刷新状态
+Code_Main_Updating	MainWindow.xaml.cs	code	Updating…	正在更新…
+Code_Main_RetryFromInstallationPage	MainWindow.xaml.cs	code	Retry from the Installation page	请在“安装”页面重试
+Code_Main_InstallingNewLayerAutomatically	MainWindow.xaml.cs	code	Installing the new layer build automatically	正在自动安装新的层构建
+Code_Main_ReleaseFilesNotInstalled	MainWindow.xaml.cs	code	Release files are not installed	发布文件尚未安装
+Code_Main_LayerInstalled	MainWindow.xaml.cs	code	Installed • {0}	已安装 • {0}
+Code_Main_NotInstalled	MainWindow.xaml.cs	code	Not installed	未安装
+Code_Main_Current	MainWindow.xaml.cs	code	Current	已是最新
+Code_Main_CloseObsToUpdate	MainWindow.xaml.cs	code	Close OBS to update	关闭 OBS 后更新
+Code_Main_PluginUpdateWaitsForObs	MainWindow.xaml.cs	code	OBS is running — the update installs when it closes	OBS 正在运行 — 更新会在其关闭后安装
+Code_Main_ObsRunning	MainWindow.xaml.cs	code	OBS is running	OBS 正在运行
+Code_Main_ObsNotRunning	MainWindow.xaml.cs	code	OBS is not running	OBS 未运行
+Code_Main_ConflictingPluginMessage	MainWindow.xaml.cs	code	OBS is loading a second, older copy of the capture source from {0}. OBS uses whichever copy registers first, so the source can stay blank even though everything here reports as current. Removing the old copy leaves the installed source in place.	OBS 正在从 {0} 加载第二份、更旧的采集源副本。OBS 会使用最先注册的那份副本，因此即使本页所有信息都显示为最新，该源仍可能一直黑屏。移除旧副本后，已安装的源会保留在原位。
+Code_Main_SteamVrCaptureAvailable	MainWindow.xaml.cs	code	SteamVR capture is available	可使用 SteamVR 采集
+Code_Main_SteamVrCaptureMessage	MainWindow.xaml.cs	code	The automatic OBS source will use SteamVR's native compositor mirror. OpenXR layer controls do not apply to this capture.	自动 OBS 源将使用 SteamVR 原生合成器镜像。OpenXR 层控制不适用于此采集。
+Code_Main_VrApiNotCapturable	MainWindow.xaml.cs	code	This VR API is not capturable yet	暂不支持采集此 VR API
+Code_Main_VrApiNotCapturableMessage	MainWindow.xaml.cs	code	{0} is running VR through the {1} path, not OpenXR. Switch the application to OpenXR or OpenVR/SteamVR, then start it again.	{0} 正通过 {1} 路径运行 VR，而非 OpenXR。请将该应用切换为 OpenXR 或 OpenVR/SteamVR，然后重新启动。
+Code_Main_SimulatorSelected	MainWindow.xaml.cs	code	Simulator selected	已选择模拟器
+Code_Main_RestoreRuntimeForHeadset	MainWindow.xaml.cs	code	Restore {0} for a headset	请恢复 {0} 以使用头显
+Code_Main_SelectHeadsetRuntime	MainWindow.xaml.cs	code	Select your headset runtime in its desktop software	请在头显配套的桌面软件中选择其运行时
+Code_Main_SimulatorOverrideActive	MainWindow.xaml.cs	code	Simulator override is active	模拟器覆盖已生效
+Code_Main_SimulatorIsSystemRuntime	MainWindow.xaml.cs	code	Simulator is the system OpenXR runtime	模拟器当前是系统 OpenXR 运行时
+Code_Main_SimulatorOverrideMessage	MainWindow.xaml.cs	code	OpenXR applications will bypass the normal headset runtime. Use headset runtime restores {0} and clears the per-user override.	OpenXR 应用将绕过正常的头显运行时。点击“使用头显运行时”会恢复 {0} 并清除每用户覆盖。
+Code_Main_SimulatorNotSelectedByApp	MainWindow.xaml.cs	code	The app did not select this runtime. Choose 'Set as active OpenXR runtime' in your headset or SteamVR software before starting an OpenXR application.	本应用未选择此运行时。请在启动 OpenXR 应用前，在头显或 SteamVR 软件中选择“设为活动的 OpenXR 运行时”。
+Code_Main_NoRuntimeConfigured	MainWindow.xaml.cs	code	No OpenXR runtime is configured	未配置 OpenXR 运行时
+Code_Main_NoRuntimeConfiguredMessage	MainWindow.xaml.cs	code	Set your headset software as the active OpenXR runtime, then refresh this page.	请将头显软件设为活动的 OpenXR 运行时，然后刷新此页面。
+Code_Main_HeadsetRuntimeSelected	MainWindow.xaml.cs	code	Headset runtime selected	已选择头显运行时
+Code_Main_HeadsetRuntimeSelectedMessage	MainWindow.xaml.cs	code	OpenXR applications will use {0}. Simulator testing is optional and isolated under Installation.	OpenXR 应用将使用 {0}。模拟器测试是可选的，且仅在“安装”页面中提供。
+Code_Main_HeadsetNativeFov	MainWindow.xaml.cs	code	Headset-native FOV	头显原生 FOV
+Code_Main_InstallObsSource	MainWindow.xaml.cs	code	Install the OBS source	请安装 OBS 源
+Code_Main_ObsSourceSaveNowNotEffective	MainWindow.xaml.cs	code	The values can be saved now, but the OBS source must be installed before they can take effect.	现在可以保存这些数值，但必须先安装 OBS 源才能生效。
+Code_Main_SourceUpdateRequired	MainWindow.xaml.cs	code	Source update required	需要更新源
+Code_Main_ObsSourceUpdateNote	MainWindow.xaml.cs	code	The values can be saved now. Install the available source update and restart OBS to enable live control.	现在可以保存这些数值。安装可用的源更新并重启 OBS 后即可实时控制。
+Code_Main_InstallOpenXrLayer	MainWindow.xaml.cs	code	Install the OpenXR layer	请安装 OpenXR 层
+Code_Main_LayerSaveNowNotEffective	MainWindow.xaml.cs	code	The preference can be saved now, but the updated layer must be installed before it can filter the recording.	现在可以保存该偏好设置，但必须先安装更新后的层，才能过滤录制画面。
+Code_Main_LayerUpdateRequired	MainWindow.xaml.cs	code	Layer update required	需要更新层
+Code_Main_LayerUpdateNote	MainWindow.xaml.cs	code	Save the preference now, then install the available layer update and restart the VR application once.	现在即可保存该偏好设置，然后安装可用的层更新并重启一次 VR 应用。
+Code_Main_LayerInstalledDisabled	MainWindow.xaml.cs	code	Installed, disabled	已安装，已禁用
+Code_Main_LayerInstalledEnabled	MainWindow.xaml.cs	code	Installed and enabled	已安装并启用
+Code_Main_InstalledUpdatePending	MainWindow.xaml.cs	code	Installed, update pending (automatic)	已安装，等待更新（自动）
+Code_Main_PluginInstalledCurrent	MainWindow.xaml.cs	code	Installed and current	已安装且为最新
+Code_Main_PluginUpdateWaitingForObs	MainWindow.xaml.cs	code	Installed, update waiting for OBS to close	已安装，等待 OBS 关闭后更新
+Code_Main_SystemDefault	MainWindow.xaml.cs	code	System default: {0} — {1}	系统默认：{0} — {1}
+Code_Main_DiagnosticLayerHash	MainWindow.xaml.cs	code	Layer   {0}	层   {0}
+Code_Main_DiagnosticPluginHash	MainWindow.xaml.cs	code	Plugin  {0}	插件  {0}
+Code_Main_CouldNotSaveOverscan	MainWindow.xaml.cs	code	Could not save overscan	无法保存过扫描设置
+Code_Main_ReasonOverscanChange	MainWindow.xaml.cs	code	the overscan change	过扫描改动
+Code_Main_ScaleSummary	MainWindow.xaml.cs	code	{0:0.00}× horizontal  •  {1:0.00}× vertical	{0:0.00}× 水平  •  {1:0.00}× 垂直
+Code_Main_FrameShapeKnown	MainWindow.xaml.cs	code	{0:0.00} : 1 per eye, from the runtime's {1} × {2} ({3:0.00} : 1). The application's own render scale multiplies both axes, so the shape holds.	单眼 {0:0.00} : 1，来自运行时推荐的 {1} × {2}（{3:0.00} : 1）。应用自身的渲染缩放会同时作用于两个轴，因此画幅比例保持不变。
+Code_Main_FrameShapeUnknown	MainWindow.xaml.cs	code	relative to the runtime's recommended per-eye size. Run a VR application once and this will show the recording's real pixel size and shape.	相对于运行时推荐的单眼尺寸。运行一次 VR 应用后，这里会显示录制画面的实际像素尺寸与画幅比例。
+Code_Main_WidestShapeTitle	MainWindow.xaml.cs	code	As wide as this build allows	已达此版本允许的最宽画幅
+Code_Main_WidestShapeLimited	MainWindow.xaml.cs	code	A {0:0.00} : 1 frame needs more than {1}% horizontal expansion from this headset's {2:0.00} : 1 per-eye render. The sliders are set to the widest reachable shape, {3:0.00} : 1.	要得到 {0:0.00} : 1 的画幅，需要在这款头显 {2:0.00} : 1 的单眼渲染基础上增加超过 {1}% 的水平扩展。滑块已设置为可达到的最宽画幅 {3:0.00} : 1。
+Code_Main_RunningVrApp	MainWindow.xaml.cs	code	the running VR app	正在运行的 VR 应用
+Code_Main_RestartToApply	MainWindow.xaml.cs	code	Restart {0} to apply {1}.	重启 {0} 以应用{1}。
+Code_Main_RestartToApplyMultiple	MainWindow.xaml.cs	code	Restart {0} to apply these changes: {1}.	重启 {0} 以应用以下更改：{1}。
+Code_Main_CouldNotSaveCameraSmoothing	MainWindow.xaml.cs	code	Could not save camera smoothing	无法保存相机平滑设置
+Code_Main_Off	MainWindow.xaml.cs	code	Off	关闭
+Code_Main_ProjectionQuadLayerUi	MainWindow.xaml.cs	code	Projection + quad-layer UI	投影 + 四边形层 UI
+Code_Main_ProjectionOnly	MainWindow.xaml.cs	code	Projection only	仅投影
+Code_Main_QuadLayerUiShown	MainWindow.xaml.cs	code	Quad-layer UI shown	已显示四边形层 UI
+Code_Main_QuadLayerUiHidden	MainWindow.xaml.cs	code	Quad-layer UI hidden	已隐藏四边形层 UI
+Code_Main_QuadLayerUiSavedNote	MainWindow.xaml.cs	code	The OBS mirror picks up this recording-only setting live when the updated layer is active. The headset remains unchanged.	更新后的层生效时，OBS 镜像会实时采用这一仅影响录制的设置；头显画面保持不变。
+Code_Main_CouldNotSaveUiLayerSetting	MainWindow.xaml.cs	code	Could not save the UI-layer setting	无法保存 UI 层设置
+Code_Main_NewerComponentsInstalled	MainWindow.xaml.cs	code	Newer components are installed	已安装更新的组件
+Code_Main_NewerComponentsMessage	MainWindow.xaml.cs	code	The installed layer and OBS source come from {0}, which is newer than this Control Center ({1}). They were left alone; update the app to match.	已安装的层与 OBS 源来自 {0}，比当前控制中心（{1}）更新。它们未被改动；请更新本应用以保持一致。
+Code_Main_ReasonLayerUpdate	MainWindow.xaml.cs	code	the OpenXR layer update	OpenXR 层更新
+Code_Main_RestartVrForNewLayer	MainWindow.xaml.cs	code	Restart the running VR application to load the new layer build.	重启正在运行的 VR 应用以加载新的层构建。
+Code_Main_ObsSourceUpdateOnClose	MainWindow.xaml.cs	code	The OBS source update installs automatically once OBS is closed.	OBS 关闭后会自动安装 OBS 源更新。
+Code_Main_RestartObsForSource	MainWindow.xaml.cs	code	Restart OBS to load the updated source.	重启 OBS 以加载更新后的源。
+Code_Main_ObsSourceUpdateWaiting	MainWindow.xaml.cs	code	OBS source update waiting	OBS 源更新等待中
+Code_Main_UpdatedAutomatically	MainWindow.xaml.cs	code	Updated automatically	已自动更新
+Code_Main_NewBuildDetected	MainWindow.xaml.cs	code	A new build was detected.	检测到新的构建。
+Code_Main_AutomaticUpdateFailed	MainWindow.xaml.cs	code	Automatic update failed	自动更新失败
+Code_Main_AutomaticUpdateFailedBody	MainWindow.xaml.cs	code	{0} Use Installation > Install / update to retry.	{0} 请使用“安装 > 安装 / 更新”重试。
+Code_Main_ActionInstallingObsmirror	MainWindow.xaml.cs	code	Installing OBSMirror	OBSMirror 安装
+Code_Main_InstallationComplete	MainWindow.xaml.cs	code	Installation complete	安装完成
+Code_Main_ActionEnablingLayer	MainWindow.xaml.cs	code	Enabling the OpenXR layer	OpenXR 层启用
+Code_Main_ActionDisablingLayer	MainWindow.xaml.cs	code	Disabling the OpenXR layer	OpenXR 层禁用
+Code_Main_ReasonLayerRegistrationChange	MainWindow.xaml.cs	code	the OpenXR layer registration change	OpenXR 层注册变更
+Code_Main_LayerEnabled	MainWindow.xaml.cs	code	OpenXR layer enabled	OpenXR 层已启用
+Code_Main_RestartVrToLoadLayer	MainWindow.xaml.cs	code	Restart the running VR application to load the layer.	重启正在运行的 VR 应用以加载该层。
+Code_Main_LayerDisabled	MainWindow.xaml.cs	code	OpenXR layer disabled	OpenXR 层已禁用
+Code_Main_FilesLeftInPlace	MainWindow.xaml.cs	code	Installed files and the OBS source were left in place.	已安装的文件与 OBS 源均保持原样。
+Code_Main_RestartVrToUnloadLayer	MainWindow.xaml.cs	code	Restart the running VR application to unload the layer.	重启正在运行的 VR 应用以卸载该层。
+Code_Main_ActionRemovingOldSource	MainWindow.xaml.cs	code	Removing the old OBS source copy	移除旧版 OBS 源副本
+Code_Main_OldSourceCopyRemoved	MainWindow.xaml.cs	code	Old OBS source copy removed	已移除旧版 OBS 源副本
+Code_Main_OldSourceCopyRemovedBody	MainWindow.xaml.cs	code	{0} Start OBS again; the installed source will now be the one that loads.	{0} 请重新启动 OBS，此后加载的将是已安装的源。
+Code_Main_ObsAlreadyRunning	MainWindow.xaml.cs	code	OBS is already running	OBS 已在运行
+Code_Main_ObsAlreadyRunningBody	MainWindow.xaml.cs	code	The saved OpenXR Mirror Capture source is ready in the current OBS session.	已保存的 OpenXR 镜像采集源已在当前 OBS 会话中就绪。
+Code_Main_ObsLaunched	MainWindow.xaml.cs	code	OBS launched	OBS 已启动
+Code_Main_ObsLaunchedBody	MainWindow.xaml.cs	code	Refresh status after OBS finishes loading.	OBS 加载完成后请刷新状态。
+Code_Main_CouldNotLaunchObs	MainWindow.xaml.cs	code	Could not launch OBS	无法启动 OBS
+Code_Main_LocateObsStudio	MainWindow.xaml.cs	code	Locate OBS Studio	定位 OBS Studio
+Code_Main_BrowseForObs64	MainWindow.xaml.cs	code	Browse for obs64.exe	浏览以查找 obs64.exe
+Code_Main_Cancel	MainWindow.xaml.cs	code	Cancel	取消
+Code_Main_ObsExeHint	MainWindow.xaml.cs	code	obs64.exe is usually in the OBS install folder under bin\64bit.	obs64.exe 通常位于 OBS 安装目录的 bin\64bit 文件夹中。
+Code_Main_SavedObsLocation	MainWindow.xaml.cs	code	Saved this location for future launches: {0}	已保存此位置，供以后启动使用：{0}
+Code_Main_SelectHeadsetRuntimeFirst	MainWindow.xaml.cs	code	Select a headset runtime first	请先选择头显运行时
+Code_Main_SystemRuntimeIsSimulator	MainWindow.xaml.cs	code	The system runtime itself is currently the simulator, so there is no headset runtime for this button to restore. Open your headset or SteamVR desktop software and choose 'Set as active OpenXR runtime'.	当前系统运行时本身就是模拟器，因此此按钮没有可恢复的头显运行时。请打开头显或 SteamVR 桌面软件，并选择“设为活动的 OpenXR 运行时”。
+Code_Main_TheSystemOpenXrRuntime	MainWindow.xaml.cs	code	the system OpenXR runtime	系统 OpenXR 运行时
+Code_Main_ReasonRuntimeChange	MainWindow.xaml.cs	code	the OpenXR runtime change	OpenXR 运行时变更
+Code_Main_HeadsetRuntimeRestored	MainWindow.xaml.cs	code	Headset runtime restored	头显运行时已恢复
+Code_Main_HeadsetRuntimeRestoredBody	MainWindow.xaml.cs	code	Per-user simulator overrides were cleared. New OpenXR applications will use {0} ({1}).	已清除每用户的模拟器覆盖。新的 OpenXR 应用将使用 {0}（{1}）。
+Code_Main_RestartVrToSwitchRuntimes	MainWindow.xaml.cs	code	Restart the running VR application to switch runtimes.	重启正在运行的 VR 应用以切换运行时。
+Code_Main_CouldNotRestoreRuntime	MainWindow.xaml.cs	code	Could not restore the headset runtime	无法恢复头显运行时
+Code_Main_SimulatorAlreadyRunning	MainWindow.xaml.cs	code	Simulator testing tool is already running	模拟器测试工具已在运行
+Code_Main_SimulatorAlreadyRunningBody	MainWindow.xaml.cs	code	The manager has not changed your active OpenXR runtime.	管理器未更改当前活动的 OpenXR 运行时。
+Code_Main_SimulatorLaunched	MainWindow.xaml.cs	code	Simulator testing tool launched	模拟器测试工具已启动
+Code_Main_SimulatorLaunchedBody	MainWindow.xaml.cs	code	It opened without inheriting a simulator runtime override. Runtime selection remains an explicit testing action.	启动时未继承模拟器运行时覆盖。运行时选择仍需通过测试操作显式指定。
+Code_Main_CouldNotLaunchSimulator	MainWindow.xaml.cs	code	Could not launch the simulator testing tool	无法启动模拟器测试工具
+Code_Main_ActionLogSharing	MainWindow.xaml.cs	code	Log sharing	日志分享
+Code_Main_ShareSummary	MainWindow.xaml.cs	code	{0} ({1} file(s); the link expires after about a week)	{0}（{1} 个文件；链接约一周后失效）
+Code_Main_NotUploaded	MainWindow.xaml.cs	code	Not uploaded: {0}	未上传：{0}
+Code_Main_LogsUploadedLinkCopied	MainWindow.xaml.cs	code	Logs uploaded - share link copied to the clipboard	日志已上传 — 分享链接已复制到剪贴板
+Code_Main_LogsUploaded	MainWindow.xaml.cs	code	Logs uploaded	日志已上传
+Code_Main_ActionFailed	MainWindow.xaml.cs	code	{0} failed	{0}失败
+Code_Main_HashUnavailable	MainWindow.xaml.cs	code	hash unavailable	哈希不可用
+Code_Main_HashNotInstalled	MainWindow.xaml.cs	code	not installed	未安装
+Code_Main_CompletedSuccessfully	MainWindow.xaml.cs	code	Completed successfully.	已成功完成。

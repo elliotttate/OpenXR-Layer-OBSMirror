@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Win32;
+using OBSMirror.ControlCenter.Localization;
 using OBSMirror.ControlCenter.Models;
 
 namespace OBSMirror.ControlCenter.Services;
@@ -170,7 +171,8 @@ public sealed class OBSMirrorService
     {
         var obsRunning = IsProcessRunning("obs64");
         if (obsRunning && !allowRunningObs)
-            throw new InvalidOperationException("OBS is running. Close it before updating the OBS plugin.");
+            throw new InvalidOperationException(
+                Loc.S("Code_Svc_CloseObsBeforePluginUpdate", "OBS is running. Close it before updating the OBS plugin."));
 
         var layerResult = InstallLayerOnly();
         var pluginResult = InstallPluginOnly();
@@ -193,7 +195,10 @@ public sealed class OBSMirrorService
         CopyFileUnlessCurrent(UninstallScriptPath, Path.Combine(InstallDirectory, Path.GetFileName(UninstallScriptPath)));
 
         RegisterLayer(InstalledManifestPath);
-        return $"Installed and enabled layer {layerHash[..12].ToLowerInvariant()}.";
+        return Loc.F(
+            "Code_Svc_LayerInstalledEnabled",
+            "Installed and enabled layer {0}.",
+            layerHash[..12].ToLowerInvariant());
     }
 
     private string InstallPluginOnly()
@@ -208,12 +213,14 @@ public sealed class OBSMirrorService
                             File.Exists(OpenVrApiPath) &&
                             string.Equals(ComputeFileHash(OpenVrApiPath), openVrApiSourceHash, StringComparison.OrdinalIgnoreCase);
         if (pluginCurrent)
-            return "OBS plugin already current.";
+            return Loc.S("Code_Svc_ObsPluginCurrent", "OBS plugin already current.");
 
         if (IsProcessRunning("obs64"))
         {
             throw new InvalidOperationException(
-                "OBS is running and the plugin binary has changed. Stop recording and close OBS before updating the plugin.");
+                Loc.S(
+                    "Code_Svc_CloseObsPluginChanged",
+                    "OBS is running and the plugin binary has changed. Stop recording and close OBS before updating the plugin."));
         }
 
         var pluginBinDirectory = Path.GetDirectoryName(PluginPath)
@@ -228,7 +235,7 @@ public sealed class OBSMirrorService
         if (!Directory.Exists(pluginDataSource))
             throw new DirectoryNotFoundException($"The OBS plugin data directory was not found: {pluginDataSource}");
         CopyDirectoryContents(pluginDataSource, Path.Combine(pluginRoot, "data"));
-        return "Updated the OBS plugin.";
+        return Loc.S("Code_Svc_ObsPluginUpdated", "Updated the OBS plugin.");
     }
 
     private string RegisterLayer(string manifestPath)
@@ -249,14 +256,19 @@ public sealed class OBSMirrorService
             }
         }
         key.SetValue(manifestFullPath, 0, RegistryValueKind.DWord);
-        return $"Registered OpenXR OBS Mirror for the current user: {manifestFullPath}";
+        return Loc.F(
+            "Code_Svc_LayerRegisteredForUser",
+            "Registered OpenXR OBS Mirror for the current user: {0}",
+            manifestFullPath);
     }
 
     private string UnregisterLayer()
     {
         using var key = Registry.CurrentUser.OpenSubKey(LayerRegistryKey, writable: true);
         if (key is null)
-            return "No current-user OpenXR implicit-layer registry key exists.";
+            return Loc.S(
+                "Code_Svc_NoLayerRegistryKey",
+                "No current-user OpenXR implicit-layer registry key exists.");
 
         var removed = 0;
         foreach (var valueName in key.GetValueNames())
@@ -266,7 +278,10 @@ public sealed class OBSMirrorService
             key.DeleteValue(valueName, throwOnMissingValue: false);
             removed++;
         }
-        return $"Removed {removed} OpenXR OBS Mirror registration(s) for the current user.";
+        return Loc.F(
+            "Code_Svc_LayerRegistrationsRemoved",
+            "Removed {0} OpenXR OBS Mirror registration(s) for the current user.",
+            removed);
     }
 
     private void WriteInstalledManifest(string versionedLayerName)
@@ -507,9 +522,12 @@ public sealed class OBSMirrorService
     {
         var conflicting = FindConflictingPluginPath();
         if (conflicting is null)
-            return "No conflicting OBS plugin copy was found.";
+            return Loc.S("Code_Svc_NoConflictingPlugin", "No conflicting OBS plugin copy was found.");
         if (IsProcessRunning("obs64"))
-            throw new InvalidOperationException("Close OBS before removing the old plugin copy; OBS is holding the file.");
+            throw new InvalidOperationException(
+                Loc.S(
+                    "Code_Svc_CloseObsBeforePluginRemoval",
+                    "Close OBS before removing the old plugin copy; OBS is holding the file."));
 
         File.Delete(conflicting);
 
@@ -521,7 +539,7 @@ public sealed class OBSMirrorService
             if (Directory.Exists(dataDirectory))
                 Directory.Delete(dataDirectory, recursive: true);
         }
-        return $"Removed the conflicting plugin copy at {conflicting}.";
+        return Loc.F("Code_Svc_ConflictingPluginRemoved", "Removed the conflicting plugin copy at {0}.", conflicting);
     }
 
     /// <summary>
@@ -531,7 +549,10 @@ public sealed class OBSMirrorService
     {
         EnsureFile(path, "OBS executable");
         if (!Path.GetFileName(path).Equals("obs64.exe", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Select obs64.exe (the 64-bit OBS Studio executable).");
+            throw new InvalidOperationException(
+                Loc.S(
+                    "Code_Svc_SelectObs64Executable",
+                    "Select obs64.exe (the 64-bit OBS Studio executable)."));
 
         using var key = Registry.CurrentUser.CreateSubKey(ConfigKey, writable: true)
             ?? throw new InvalidOperationException("Could not open the per-user OBSMirror settings key.");
@@ -542,8 +563,10 @@ public sealed class OBSMirrorService
     {
         var obsPath = ResolveObsExecutablePath()
             ?? throw new ObsNotFoundException(
-                "OBS Studio (obs64.exe) could not be found automatically. This is normal for a custom or " +
-                "portable install - browse to obs64.exe once and it will be remembered.");
+                Loc.S(
+                    "Code_Svc_ObsNotFound",
+                    "OBS Studio (obs64.exe) could not be found automatically. This is normal for a custom or " +
+                    "portable install - browse to obs64.exe once and it will be remembered."));
         var startInfo = new ProcessStartInfo(obsPath)
         {
             WorkingDirectory = Path.GetDirectoryName(obsPath)!,
@@ -949,7 +972,7 @@ public sealed class OBSMirrorService
     private string FindLastCaptureSummary()
     {
         if (!File.Exists(LayerLogPath))
-            return "No OpenXR capture session has been logged yet.";
+            return Loc.S("Code_Svc_NoCaptureSessionLogged", "No OpenXR capture session has been logged yet.");
 
         try
         {

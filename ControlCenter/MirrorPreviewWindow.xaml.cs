@@ -3,6 +3,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using OBSMirror.ControlCenter.Localization;
 using OBSMirror.ControlCenter.Services;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
@@ -18,6 +19,7 @@ public sealed partial class MirrorPreviewWindow : Window
     public MirrorPreviewWindow()
     {
         InitializeComponent();
+        Title = Loc.S("Ui_Window_PreviewTitle", "OBSMirror — Live Preview");
         SystemBackdrop = new MicaBackdrop();
 
         var hwnd = WindowNative.GetWindowHandle(this);

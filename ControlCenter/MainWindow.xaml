@@ -26,7 +26,7 @@
                     <FontIcon Glyph="&#xE7B5;" FontSize="14" Foreground="#FF071113" />
                 </Border>
                 <TextBlock Text="OBSMirror" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
-                <TextBlock Text="CONTROL CENTER" Style="{StaticResource EyebrowStyle}" VerticalAlignment="Center" />
+                <TextBlock x:Uid="Ui_TitleBar_Eyebrow" Text="CONTROL CENTER" Style="{StaticResource EyebrowStyle}" VerticalAlignment="Center" />
             </StackPanel>
         </Grid>
 
@@ -44,34 +44,34 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <StackPanel Spacing="4" Margin="10,0,10,20">
-                        <TextBlock Text="CAPTURE TOOLS" Style="{StaticResource EyebrowStyle}" />
+                        <TextBlock x:Uid="Ui_Sidebar_Eyebrow" Text="CAPTURE TOOLS" Style="{StaticResource EyebrowStyle}" />
                         <TextBlock Text="OpenXR + OpenVR + OBS" FontSize="18" FontWeight="SemiBold" />
                     </StackPanel>
                     <StackPanel Grid.Row="1">
                         <Button x:Name="DashboardNavButton" Tag="dashboard" Click="SidebarNav_Click" Style="{StaticResource SidebarButtonStyle}" Background="#263A8E96" Foreground="White">
-                            <StackPanel Orientation="Horizontal" Spacing="12"><SymbolIcon Symbol="Home" /><TextBlock Text="Dashboard" FontWeight="SemiBold" /></StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="12"><SymbolIcon Symbol="Home" /><TextBlock x:Uid="Ui_Nav_Dashboard" Text="Dashboard" FontWeight="SemiBold" /></StackPanel>
                         </Button>
                         <Button x:Name="OverscanNavButton" Tag="overscan" Click="SidebarNav_Click" Style="{StaticResource SidebarButtonStyle}">
-                            <StackPanel Orientation="Horizontal" Spacing="12"><SymbolIcon Symbol="View" /><TextBlock Text="Overscan" FontWeight="SemiBold" /></StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="12"><SymbolIcon Symbol="View" /><TextBlock x:Uid="Ui_Nav_Overscan" Text="Overscan" FontWeight="SemiBold" /></StackPanel>
                         </Button>
                         <Button x:Name="SmoothingNavButton" Tag="smoothing" Click="SidebarNav_Click" Style="{StaticResource SidebarButtonStyle}">
-                            <StackPanel Orientation="Horizontal" Spacing="12"><SymbolIcon Symbol="Video" /><TextBlock Text="Camera smoothing" FontWeight="SemiBold" /></StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="12"><SymbolIcon Symbol="Video" /><TextBlock x:Uid="Ui_Nav_Smoothing" Text="Camera smoothing" FontWeight="SemiBold" /></StackPanel>
                         </Button>
                         <Button x:Name="QuadLayersNavButton" Tag="quadlayers" Click="SidebarNav_Click" Style="{StaticResource SidebarButtonStyle}">
-                            <StackPanel Orientation="Horizontal" Spacing="12"><SymbolIcon Symbol="Page" /><TextBlock Text="UI layers" FontWeight="SemiBold" /></StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="12"><SymbolIcon Symbol="Page" /><TextBlock x:Uid="Ui_Nav_QuadLayers" Text="UI layers" FontWeight="SemiBold" /></StackPanel>
                         </Button>
                         <Button x:Name="InstallationNavButton" Tag="installation" Click="SidebarNav_Click" Style="{StaticResource SidebarButtonStyle}">
-                            <StackPanel Orientation="Horizontal" Spacing="12"><SymbolIcon Symbol="Download" /><TextBlock Text="Installation" FontWeight="SemiBold" /></StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="12"><SymbolIcon Symbol="Download" /><TextBlock x:Uid="Ui_Nav_Installation" Text="Installation" FontWeight="SemiBold" /></StackPanel>
                         </Button>
                         <Button x:Name="DiagnosticsNavButton" Tag="diagnostics" Click="SidebarNav_Click" Style="{StaticResource SidebarButtonStyle}">
-                            <StackPanel Orientation="Horizontal" Spacing="12"><SymbolIcon Symbol="Setting" /><TextBlock Text="Diagnostics" FontWeight="SemiBold" /></StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="12"><SymbolIcon Symbol="Setting" /><TextBlock x:Uid="Ui_Nav_Diagnostics" Text="Diagnostics" FontWeight="SemiBold" /></StackPanel>
                         </Button>
                     </StackPanel>
                     <Border x:Name="VrRestartPanel" Grid.Row="2" CornerRadius="12" Padding="13"
                             Background="#80333A4A" Visibility="Collapsed">
                         <StackPanel Spacing="5">
-                            <TextBlock x:Name="VrRestartTitleText" Text="RESTART VR APP" Style="{StaticResource EyebrowStyle}" />
-                            <TextBlock x:Name="VrRestartReasonText" Text="Restart the running VR app to apply the change."
+                            <TextBlock x:Name="VrRestartTitleText" x:Uid="Ui_VrRestart_Title" Text="RESTART VR APP" Style="{StaticResource EyebrowStyle}" />
+                            <TextBlock x:Name="VrRestartReasonText" x:Uid="Ui_VrRestart_Reason" Text="Restart the running VR app to apply the change."
                                        Style="{StaticResource MutedTextStyle}" FontSize="11" TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
@@ -98,14 +98,14 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Spacing="5">
-                                    <TextBlock Text="SYSTEM OVERVIEW" Style="{StaticResource EyebrowStyle}" />
-                                    <TextBlock Text="Ready for the next capture." Style="{StaticResource SectionTitleStyle}" />
-                                    <TextBlock Text="Live status for the OpenXR layer, OpenXR/OpenVR OBS sources, runtime, and recording overscan." Style="{StaticResource MutedTextStyle}" />
+                                    <TextBlock x:Uid="Ui_Dashboard_Eyebrow" Text="SYSTEM OVERVIEW" Style="{StaticResource EyebrowStyle}" />
+                                    <TextBlock x:Uid="Ui_Dashboard_Title" Text="Ready for the next capture." Style="{StaticResource SectionTitleStyle}" />
+                                    <TextBlock x:Uid="Ui_Dashboard_Subtitle" Text="Live status for the OpenXR layer, OpenXR/OpenVR OBS sources, runtime, and recording overscan." Style="{StaticResource MutedTextStyle}" />
                                 </StackPanel>
                                 <Button Grid.Column="1" Click="Refresh_Click" Style="{StaticResource SecondaryButtonStyle}" VerticalAlignment="Bottom">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <SymbolIcon Symbol="Refresh" />
-                                        <TextBlock Text="Refresh" />
+                                        <TextBlock x:Uid="Ui_Action_Refresh" Text="Refresh" />
                                     </StackPanel>
                                 </Button>
                             </Grid>
@@ -124,8 +124,8 @@
                                             <Border x:Name="LayerDot" Width="10" Height="10" CornerRadius="5" HorizontalAlignment="Left" />
                                             <SymbolIcon Symbol="Link" HorizontalAlignment="Right" Foreground="{StaticResource MutedTextBrush}" />
                                         </Grid>
-                                        <TextBlock Text="OPENXR LAYER" Style="{StaticResource EyebrowStyle}" />
-                                        <TextBlock x:Name="LayerStatusText" Text="Checking…" FontSize="18" FontWeight="SemiBold" />
+                                        <TextBlock x:Uid="Ui_Card_Layer_Eyebrow" Text="OPENXR LAYER" Style="{StaticResource EyebrowStyle}" />
+                                        <TextBlock x:Name="LayerStatusText" x:Uid="Ui_Status_Checking" Text="Checking…" FontSize="18" FontWeight="SemiBold" />
                                         <TextBlock x:Name="LayerDetailText" Style="{StaticResource MutedTextStyle}" FontSize="12" />
                                     </StackPanel>
                                 </Border>
@@ -136,8 +136,8 @@
                                             <Border x:Name="PluginDot" Width="10" Height="10" CornerRadius="5" HorizontalAlignment="Left" />
                                             <SymbolIcon Symbol="Video" HorizontalAlignment="Right" Foreground="{StaticResource MutedTextBrush}" />
                                         </Grid>
-                                        <TextBlock Text="OBS SOURCE" Style="{StaticResource EyebrowStyle}" />
-                                        <TextBlock x:Name="PluginStatusText" Text="Checking…" FontSize="18" FontWeight="SemiBold" />
+                                        <TextBlock x:Uid="Ui_Card_Plugin_Eyebrow" Text="OBS SOURCE" Style="{StaticResource EyebrowStyle}" />
+                                        <TextBlock x:Name="PluginStatusText" x:Uid="Ui_Status_Checking" Text="Checking…" FontSize="18" FontWeight="SemiBold" />
                                         <TextBlock x:Name="PluginDetailText" Style="{StaticResource MutedTextStyle}" FontSize="12" />
                                     </StackPanel>
                                 </Border>
@@ -148,8 +148,8 @@
                                             <Border x:Name="RuntimeDot" Width="10" Height="10" CornerRadius="5" HorizontalAlignment="Left" />
                                             <SymbolIcon Symbol="World" HorizontalAlignment="Right" Foreground="{StaticResource MutedTextBrush}" />
                                         </Grid>
-                                        <TextBlock Text="OPENXR RUNTIME" Style="{StaticResource EyebrowStyle}" />
-                                        <TextBlock x:Name="RuntimeStatusText" Text="Checking…" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock x:Uid="Ui_Card_Runtime_Eyebrow" Text="OPENXR RUNTIME" Style="{StaticResource EyebrowStyle}" />
+                                        <TextBlock x:Name="RuntimeStatusText" x:Uid="Ui_Status_Checking" Text="Checking…" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                         <TextBlock x:Name="RuntimeDetailText" Style="{StaticResource MutedTextStyle}" FontSize="12" MaxLines="2" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                 </Border>
@@ -160,8 +160,8 @@
                                             <Border x:Name="OverscanDot" Width="10" Height="10" CornerRadius="5" HorizontalAlignment="Left" />
                                             <SymbolIcon Symbol="FullScreen" HorizontalAlignment="Right" Foreground="{StaticResource MutedTextBrush}" />
                                         </Grid>
-                                        <TextBlock Text="OVERSCAN" Style="{StaticResource EyebrowStyle}" />
-                                        <TextBlock x:Name="OverscanStatusText" Text="Checking…" FontSize="18" FontWeight="SemiBold" />
+                                        <TextBlock x:Uid="Ui_Card_Overscan_Eyebrow" Text="OVERSCAN" Style="{StaticResource EyebrowStyle}" />
+                                        <TextBlock x:Name="OverscanStatusText" x:Uid="Ui_Status_Checking" Text="Checking…" FontSize="18" FontWeight="SemiBold" />
                                         <TextBlock x:Name="OverscanDetailText" Style="{StaticResource MutedTextStyle}" FontSize="12" />
                                     </StackPanel>
                                 </Border>
@@ -175,8 +175,8 @@
 
                                 <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="16">
                                     <StackPanel Spacing="10">
-                                        <TextBlock Text="QUICK ACTIONS" Style="{StaticResource EyebrowStyle}" />
-                                        <TextBlock Text="Capture workflow" FontSize="18" FontWeight="SemiBold" />
+                                        <TextBlock x:Uid="Ui_QuickActions_Eyebrow" Text="QUICK ACTIONS" Style="{StaticResource EyebrowStyle}" />
+                                        <TextBlock x:Uid="Ui_QuickActions_Title" Text="Capture workflow" FontSize="18" FontWeight="SemiBold" />
                                         <Grid ColumnSpacing="8" RowSpacing="8">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
@@ -193,7 +193,7 @@
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="Auto" />
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Text="Layer" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                    <TextBlock x:Uid="Ui_QuickActions_Layer" Text="Layer" FontWeight="SemiBold" VerticalAlignment="Center" />
                                                     <ToggleSwitch x:Name="DashboardLayerRegistrationToggle" Grid.Column="1"
                                                                   HorizontalAlignment="Right" VerticalAlignment="Center"
                                                                   Width="48" MinWidth="0"
@@ -202,25 +202,25 @@
                                                 </Grid>
                                             </Border>
                                             <Button Grid.Row="0" Grid.Column="1" Click="LaunchObs_Click" Style="{StaticResource SecondaryButtonStyle}" HorizontalAlignment="Stretch">
-                                                <StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Video" /><TextBlock Text="Open OBS" /></StackPanel>
+                                                <StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Video" /><TextBlock x:Uid="Ui_Action_OpenObs" Text="Open OBS" /></StackPanel>
                                             </Button>
                                             <Button Grid.Row="1" Grid.Column="0" Click="RestoreHeadsetRuntime_Click" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Stretch">
-                                                <StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="World" /><TextBlock Text="Use headset runtime" /></StackPanel>
+                                                <StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="World" /><TextBlock x:Uid="Ui_Action_UseHeadsetRuntime" Text="Use headset runtime" /></StackPanel>
                                             </Button>
                                             <Button Grid.Row="1" Grid.Column="1" Click="OpenLayerLog_Click" Style="{StaticResource SecondaryButtonStyle}" HorizontalAlignment="Stretch">
-                                                <StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Document" /><TextBlock Text="Open layer log" /></StackPanel>
+                                                <StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Document" /><TextBlock x:Uid="Ui_Action_OpenLayerLog" Text="Open layer log" /></StackPanel>
                                             </Button>
                                         </Grid>
                                         <InfoBar x:Name="RuntimeModeInfoBar" IsOpen="True" IsClosable="False" Severity="Informational"
-                                                 Title="Checking runtime selection" Message="Reading the effective and system OpenXR runtime settings." />
+                                                 x:Uid="Ui_RuntimeMode_Checking" Title="Checking runtime selection" Message="Reading the effective and system OpenXR runtime settings." />
                                         <InfoBar x:Name="ConflictingPluginInfoBar" IsOpen="False" IsClosable="False" Severity="Error"
-                                                 Title="An old OBS source copy is taking over">
+                                                 x:Uid="Ui_Conflict_Title" Title="An old OBS source copy is taking over">
                                             <InfoBar.ActionButton>
-                                                <Button Click="RemoveConflictingPlugin_Click" Content="Remove the old copy" />
+                                                <Button Click="RemoveConflictingPlugin_Click" x:Uid="Ui_Conflict_Action" Content="Remove the old copy" />
                                             </InfoBar.ActionButton>
                                         </InfoBar>
                                         <InfoBar x:Name="NonOpenXrVrInfoBar" IsOpen="False" IsClosable="False" Severity="Informational"
-                                                 Title="Checking the running VR application" />
+                                                 x:Uid="Ui_NonOpenXr_Checking" Title="Checking the running VR application" />
                                     </StackPanel>
                                 </Border>
 
@@ -236,22 +236,22 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Spacing="2" VerticalAlignment="Center">
-                                                <TextBlock Text="LIVE MIRROR PREVIEW" Style="{StaticResource EyebrowStyle}" />
-                                                <TextBlock x:Name="PreviewStatusText" Text="Waiting for a VR app" FontSize="18" FontWeight="SemiBold" />
+                                                <TextBlock x:Uid="Ui_Preview_Eyebrow" Text="LIVE MIRROR PREVIEW" Style="{StaticResource EyebrowStyle}" />
+                                                <TextBlock x:Name="PreviewStatusText" x:Uid="Ui_Preview_StatusWaiting" Text="Waiting for a VR app" FontSize="18" FontWeight="SemiBold" />
                                                 <TextBlock x:Name="PreviewDetailText"
-                                                           Text="Start an OpenXR or OpenVR app; the preview connects automatically."
+                                                           x:Uid="Ui_Preview_DetailIdle" Text="Start an OpenXR or OpenVR app; the preview connects automatically."
                                                            Style="{StaticResource MutedTextStyle}" FontSize="11"
                                                            MaxLines="1" TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                                 <Button Click="RefreshPreview_Click" Style="{StaticResource SecondaryButtonStyle}"
-                                                        Padding="10" ToolTipService.ToolTip="Refresh preview now">
+                                                        Padding="10" x:Uid="Ui_Preview_RefreshTooltip" ToolTipService.ToolTip="Refresh preview now">
                                                     <SymbolIcon Symbol="Refresh" />
                                                 </Button>
                                                 <Button Click="OpenPreviewWindow_Click" Style="{StaticResource SecondaryButtonStyle}" Padding="12,9">
                                                     <StackPanel Orientation="Horizontal" Spacing="7">
                                                         <SymbolIcon Symbol="FullScreen" />
-                                                        <TextBlock Text="Open larger" />
+                                                        <TextBlock x:Uid="Ui_Preview_OpenLarger" Text="Open larger" />
                                                     </StackPanel>
                                                 </Button>
                                             </StackPanel>
@@ -264,10 +264,10 @@
                                                 <StackPanel x:Name="PreviewPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                             Spacing="8" MaxWidth="330" Margin="18">
                                                     <SymbolIcon Symbol="Video" Width="30" Height="30" Foreground="{StaticResource MutedTextBrush}" />
-                                                    <TextBlock x:Name="PreviewPlaceholderTitle" Text="No mirror image yet"
+                                                    <TextBlock x:Name="PreviewPlaceholderTitle" x:Uid="Ui_Preview_PlaceholderTitle" Text="No mirror image yet"
                                                                FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" />
                                                     <TextBlock x:Name="PreviewPlaceholderDetail"
-                                                               Text="The preview connects automatically to OpenXR or OpenVR capture."
+                                                               x:Uid="Ui_Preview_PlaceholderDetail" Text="The preview connects automatically to OpenXR or OpenVR capture."
                                                                Style="{StaticResource MutedTextStyle}" FontSize="11" TextAlignment="Center" TextWrapping="Wrap" />
                                                 </StackPanel>
                                             </Grid>
@@ -281,9 +281,9 @@
                     <ScrollViewer x:Name="OverscanPage" Grid.Row="0" Padding="34,28,34,34" Visibility="Collapsed">
                         <StackPanel Spacing="24" MaxWidth="1050" HorizontalAlignment="Stretch">
                             <StackPanel Spacing="5">
-                                <TextBlock Text="RECORDING OVERSCAN" Style="{StaticResource EyebrowStyle}" />
-                                <TextBlock Text="Give the recording more room." Style="{StaticResource SectionTitleStyle}" />
-                                <TextBlock Text="Ask the OpenXR application for a wider FOV and a larger render target while the headset receives the original central crop." Style="{StaticResource MutedTextStyle}" />
+                                <TextBlock x:Uid="Ui_Overscan_Eyebrow" Text="RECORDING OVERSCAN" Style="{StaticResource EyebrowStyle}" />
+                                <TextBlock x:Uid="Ui_Overscan_Title" Text="Give the recording more room." Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock x:Uid="Ui_Overscan_Subtitle" Text="Ask the OpenXR application for a wider FOV and a larger render target while the headset receives the original central crop." Style="{StaticResource MutedTextStyle}" />
                             </StackPanel>
 
                             <Border Style="{StaticResource CardStyle}">
@@ -295,46 +295,46 @@
                                     <StackPanel Spacing="22">
                                         <Grid>
                                             <StackPanel>
-                                                <TextBlock Text="Enable recording overscan" FontSize="20" FontWeight="SemiBold" />
-                                                <TextBlock Text="The setting is applied the next time the VR application creates OpenXR." Style="{StaticResource MutedTextStyle}" />
+                                                <TextBlock x:Uid="Ui_Overscan_Enable" Text="Enable recording overscan" FontSize="20" FontWeight="SemiBold" />
+                                                <TextBlock x:Uid="Ui_Overscan_EnableHint" Text="The setting is applied the next time the VR application creates OpenXR." Style="{StaticResource MutedTextStyle}" />
                                             </StackPanel>
                                             <ToggleSwitch x:Name="OverscanToggle" HorizontalAlignment="Right" VerticalAlignment="Center" Toggled="OverscanToggle_Toggled" />
                                         </Grid>
 
                                         <StackPanel Spacing="6">
                                             <Grid>
-                                                <TextBlock Text="Horizontal expansion" FontWeight="SemiBold" />
+                                                <TextBlock x:Uid="Ui_Overscan_Horizontal" Text="Horizontal expansion" FontWeight="SemiBold" />
                                                 <TextBlock x:Name="HorizontalValueText" Text="115%" HorizontalAlignment="Right" Foreground="{StaticResource BrandBrush}" FontSize="18" FontWeight="SemiBold" />
                                             </Grid>
                                             <Slider x:Name="HorizontalSlider" ValueChanged="OverscanSlider_ValueChanged" />
-                                            <TextBlock Text="Adds room to the left and right edges of the recording." Style="{StaticResource MutedTextStyle}" FontSize="12" />
+                                            <TextBlock x:Uid="Ui_Overscan_HorizontalHint" Text="Adds room to the left and right edges of the recording." Style="{StaticResource MutedTextStyle}" FontSize="12" />
                                         </StackPanel>
 
                                         <StackPanel Spacing="6">
                                             <Grid>
-                                                <TextBlock Text="Vertical expansion" FontWeight="SemiBold" />
+                                                <TextBlock x:Uid="Ui_Overscan_Vertical" Text="Vertical expansion" FontWeight="SemiBold" />
                                                 <TextBlock x:Name="VerticalValueText" Text="108%" HorizontalAlignment="Right" Foreground="{StaticResource BrandBrush}" FontSize="18" FontWeight="SemiBold" />
                                             </Grid>
                                             <Slider x:Name="VerticalSlider" ValueChanged="OverscanSlider_ValueChanged" />
-                                            <TextBlock Text="Adds room above and below the headset crop." Style="{StaticResource MutedTextStyle}" FontSize="12" />
+                                            <TextBlock x:Uid="Ui_Overscan_VerticalHint" Text="Adds room above and below the headset crop." Style="{StaticResource MutedTextStyle}" FontSize="12" />
                                         </StackPanel>
 
                                         <StackPanel Spacing="9">
-                                            <TextBlock Text="RECORDING SHAPE" Style="{StaticResource EyebrowStyle}" />
-                                            <TextBlock Text="Headsets render each eye almost square, so a recording is square until the horizontal expansion outruns the vertical one." Style="{StaticResource MutedTextStyle}" FontSize="12" TextWrapping="Wrap" />
+                                            <TextBlock x:Uid="Ui_Overscan_ShapeEyebrow" Text="RECORDING SHAPE" Style="{StaticResource EyebrowStyle}" />
+                                            <TextBlock x:Uid="Ui_Overscan_ShapeHint" Text="Headsets render each eye almost square, so a recording is square until the horizontal expansion outruns the vertical one." Style="{StaticResource MutedTextStyle}" FontSize="12" TextWrapping="Wrap" />
                                             <StackPanel Orientation="Horizontal" Spacing="9">
-                                                <Button Tag="native" Click="Shape_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Headset native" />
+                                                <Button Tag="native" Click="Shape_Click" Style="{StaticResource SecondaryButtonStyle}" x:Uid="Ui_Overscan_ShapeNative" Content="Headset native" />
                                                 <Button Tag="1.77778" Click="Shape_Click" Style="{StaticResource SecondaryButtonStyle}" Content="16 : 9" />
-                                                <Button Tag="widest" Click="Shape_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Widest possible" />
+                                                <Button Tag="widest" Click="Shape_Click" Style="{StaticResource SecondaryButtonStyle}" x:Uid="Ui_Overscan_ShapeWidest" Content="Widest possible" />
                                             </StackPanel>
                                         </StackPanel>
 
                                         <StackPanel Spacing="9">
-                                            <TextBlock Text="EXTRA ROOM ON EVERY EDGE" Style="{StaticResource EyebrowStyle}" />
+                                            <TextBlock x:Uid="Ui_Overscan_PresetsEyebrow" Text="EXTRA ROOM ON EVERY EDGE" Style="{StaticResource EyebrowStyle}" />
                                             <StackPanel Orientation="Horizontal" Spacing="9">
-                                                <Button Tag="115,108" Click="Preset_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Balanced  115 × 108" />
-                                                <Button Tag="120,110" Click="Preset_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Wide  120 × 110" />
-                                                <Button Tag="130,115" Click="Preset_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Extra wide  130 × 115" />
+                                                <Button Tag="115,108" Click="Preset_Click" Style="{StaticResource SecondaryButtonStyle}" x:Uid="Ui_Overscan_PresetBalanced" Content="Balanced  115 × 108" />
+                                                <Button Tag="120,110" Click="Preset_Click" Style="{StaticResource SecondaryButtonStyle}" x:Uid="Ui_Overscan_PresetWide" Content="Wide  120 × 110" />
+                                                <Button Tag="130,115" Click="Preset_Click" Style="{StaticResource SecondaryButtonStyle}" x:Uid="Ui_Overscan_PresetExtraWide" Content="Extra wide  130 × 115" />
                                             </StackPanel>
                                         </StackPanel>
                                     </StackPanel>
@@ -342,25 +342,25 @@
                                     <StackPanel Grid.Column="1" Spacing="14">
                                         <Border CornerRadius="14" Padding="18" Background="#80333A4A">
                                             <StackPanel Spacing="7">
-                                                <TextBlock Text="ESTIMATED PIXEL COST" Style="{StaticResource EyebrowStyle}" />
+                                                <TextBlock x:Uid="Ui_Overscan_PixelCostEyebrow" Text="ESTIMATED PIXEL COST" Style="{StaticResource EyebrowStyle}" />
                                                 <TextBlock x:Name="PixelCostText" Text="+24.2%" FontSize="34" FontWeight="SemiBold" Foreground="{StaticResource BrandBrush}" />
                                                 <TextBlock x:Name="ScaleSummaryText" Style="{StaticResource MutedTextStyle}" />
                                             </StackPanel>
                                         </Border>
                                         <Border CornerRadius="14" Padding="18" Background="#80333A4A">
                                             <StackPanel Spacing="7">
-                                                <TextBlock Text="RECORDING FRAME" Style="{StaticResource EyebrowStyle}" />
+                                                <TextBlock x:Uid="Ui_Overscan_FrameEyebrow" Text="RECORDING FRAME" Style="{StaticResource EyebrowStyle}" />
                                                 <TextBlock x:Name="ExpectedTextureText" Text="1.15×  ×  1.08×" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
                                                 <TextBlock x:Name="FrameShapeText" Style="{StaticResource MutedTextStyle}" FontSize="12" TextWrapping="Wrap" />
                                             </StackPanel>
                                         </Border>
-                                        <InfoBar IsOpen="True" IsClosable="False" Severity="Warning" Title="Restart the VR app"
+                                        <InfoBar IsOpen="True" IsClosable="False" Severity="Warning" x:Uid="Ui_Overscan_Restart" Title="Restart the VR app"
                                                  Message="Changing these values cannot resize an existing OpenXR swapchain." />
                                     </StackPanel>
                                 </Grid>
                             </Border>
 
-                            <TextBlock Text="Changes save as you make them. Restart the VR application to apply them." Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Right" />
+                            <TextBlock x:Uid="Ui_Overscan_Footer" Text="Changes save as you make them. Restart the VR application to apply them." Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Right" />
                         </StackPanel>
                     </ScrollViewer>
 
@@ -368,9 +368,9 @@
                     <ScrollViewer x:Name="SmoothingPage" Grid.Row="0" Padding="34,28,34,34" Visibility="Collapsed">
                         <StackPanel Spacing="24" MaxWidth="1050" HorizontalAlignment="Stretch">
                             <StackPanel Spacing="5">
-                                <TextBlock Text="RECORDING CAMERA" Style="{StaticResource EyebrowStyle}" />
-                                <TextBlock Text="Smooth motion without changing the headset." Style="{StaticResource SectionTitleStyle}" />
-                                <TextBlock Text="A filtered virtual camera is applied only to the OBS mirror. The headset continues to receive the original pose and image." Style="{StaticResource MutedTextStyle}" />
+                                <TextBlock x:Uid="Ui_Smoothing_Eyebrow" Text="RECORDING CAMERA" Style="{StaticResource EyebrowStyle}" />
+                                <TextBlock x:Uid="Ui_Smoothing_Title" Text="Smooth motion without changing the headset." Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock x:Uid="Ui_Smoothing_Subtitle" Text="A filtered virtual camera is applied only to the OBS mirror. The headset continues to receive the original pose and image." Style="{StaticResource MutedTextStyle}" />
                             </StackPanel>
 
                             <Border Style="{StaticResource CardStyle}">
@@ -383,36 +383,36 @@
                                     <StackPanel Spacing="22">
                                         <Grid>
                                             <StackPanel>
-                                                <TextBlock Text="Control smoothing from this app" FontSize="20" FontWeight="SemiBold" />
-                                                <TextBlock Text="Turn this off to use the values saved directly on the OBS source." Style="{StaticResource MutedTextStyle}" />
+                                                <TextBlock x:Uid="Ui_Smoothing_Managed" Text="Control smoothing from this app" FontSize="20" FontWeight="SemiBold" />
+                                                <TextBlock x:Uid="Ui_Smoothing_ManagedHint" Text="Turn this off to use the values saved directly on the OBS source." Style="{StaticResource MutedTextStyle}" />
                                             </StackPanel>
                                             <ToggleSwitch x:Name="SmoothingManagedToggle" HorizontalAlignment="Right" VerticalAlignment="Center" Toggled="SmoothingControl_Changed" />
                                         </Grid>
 
                                         <StackPanel Spacing="6">
                                             <Grid>
-                                                <TextBlock Text="Smoothing strength" FontWeight="SemiBold" />
+                                                <TextBlock x:Uid="Ui_Smoothing_Strength" Text="Smoothing strength" FontWeight="SemiBold" />
                                                 <TextBlock x:Name="SmoothingValueText" Text="35" HorizontalAlignment="Right" Foreground="{StaticResource BrandBrush}" FontSize="18" FontWeight="SemiBold" />
                                             </Grid>
                                             <Slider x:Name="SmoothingSlider" ValueChanged="SmoothingSlider_ValueChanged" />
-                                            <TextBlock Text="Higher values feel steadier and more floaty; zero disables the filtered camera." Style="{StaticResource MutedTextStyle}" FontSize="12" />
+                                            <TextBlock x:Uid="Ui_Smoothing_StrengthHint" Text="Higher values feel steadier and more floaty; zero disables the filtered camera." Style="{StaticResource MutedTextStyle}" FontSize="12" />
                                         </StackPanel>
 
                                         <StackPanel Spacing="6">
                                             <Grid>
-                                                <TextBlock Text="Pan margin crop" FontWeight="SemiBold" />
+                                                <TextBlock x:Uid="Ui_Smoothing_Crop" Text="Pan margin crop" FontWeight="SemiBold" />
                                                 <TextBlock x:Name="SmoothingCropValueText" Text="8.0%" HorizontalAlignment="Right" Foreground="{StaticResource BrandBrush}" FontSize="18" FontWeight="SemiBold" />
                                             </Grid>
                                             <Slider x:Name="SmoothingCropSlider" ValueChanged="SmoothingSlider_ValueChanged" />
-                                            <TextBlock Text="Reserves edge room for the smoothed camera to pan without exposing black borders." Style="{StaticResource MutedTextStyle}" FontSize="12" />
+                                            <TextBlock x:Uid="Ui_Smoothing_CropHint" Text="Reserves edge room for the smoothed camera to pan without exposing black borders." Style="{StaticResource MutedTextStyle}" FontSize="12" />
                                         </StackPanel>
 
                                         <StackPanel Spacing="9">
-                                            <TextBlock Text="PRESETS" Style="{StaticResource EyebrowStyle}" />
+                                            <TextBlock x:Uid="Ui_Smoothing_PresetsEyebrow" Text="PRESETS" Style="{StaticResource EyebrowStyle}" />
                                             <StackPanel Orientation="Horizontal" Spacing="9">
-                                                <Button Tag="20,5" Click="SmoothingPreset_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Subtle  20 / 5%" />
-                                                <Button Tag="40,8" Click="SmoothingPreset_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Balanced  40 / 8%" />
-                                                <Button Tag="65,12" Click="SmoothingPreset_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Steady  65 / 12%" />
+                                                <Button Tag="20,5" Click="SmoothingPreset_Click" Style="{StaticResource SecondaryButtonStyle}" x:Uid="Ui_Smoothing_PresetSubtle" Content="Subtle  20 / 5%" />
+                                                <Button Tag="40,8" Click="SmoothingPreset_Click" Style="{StaticResource SecondaryButtonStyle}" x:Uid="Ui_Smoothing_PresetBalanced" Content="Balanced  40 / 8%" />
+                                                <Button Tag="65,12" Click="SmoothingPreset_Click" Style="{StaticResource SecondaryButtonStyle}" x:Uid="Ui_Smoothing_PresetSteady" Content="Steady  65 / 12%" />
                                             </StackPanel>
                                         </StackPanel>
                                     </StackPanel>
@@ -420,19 +420,19 @@
                                     <StackPanel Grid.Column="1" Spacing="14">
                                         <Border CornerRadius="14" Padding="18" Background="#80333A4A">
                                             <StackPanel Spacing="7">
-                                                <TextBlock Text="FILTER RESPONSE" Style="{StaticResource EyebrowStyle}" />
+                                                <TextBlock x:Uid="Ui_Smoothing_ResponseEyebrow" Text="FILTER RESPONSE" Style="{StaticResource EyebrowStyle}" />
                                                 <TextBlock x:Name="SmoothingResponseText" Text="133 ms" FontSize="34" FontWeight="SemiBold" Foreground="{StaticResource BrandBrush}" />
-                                                <TextBlock Text="estimated filter time constant" Style="{StaticResource MutedTextStyle}" FontSize="12" />
+                                                <TextBlock x:Uid="Ui_Smoothing_ResponseHint" Text="estimated filter time constant" Style="{StaticResource MutedTextStyle}" FontSize="12" />
                                             </StackPanel>
                                         </Border>
                                         <Border CornerRadius="14" Padding="18" Background="#80333A4A">
                                             <StackPanel Spacing="7">
-                                                <TextBlock Text="VISIBLE IMAGE" Style="{StaticResource EyebrowStyle}" />
+                                                <TextBlock x:Uid="Ui_Smoothing_VisibleEyebrow" Text="VISIBLE IMAGE" Style="{StaticResource EyebrowStyle}" />
                                                 <TextBlock x:Name="SmoothingVisibleText" Text="92.0%" FontSize="24" FontWeight="SemiBold" />
-                                                <TextBlock Text="of each axis remains after the safety crop" Style="{StaticResource MutedTextStyle}" FontSize="12" />
+                                                <TextBlock x:Uid="Ui_Smoothing_VisibleHint" Text="of each axis remains after the safety crop" Style="{StaticResource MutedTextStyle}" FontSize="12" />
                                             </StackPanel>
                                         </Border>
-                                        <InfoBar x:Name="SmoothingAvailabilityInfoBar" IsOpen="True" IsClosable="False" Severity="Informational" Title="Applies live"
+                                        <InfoBar x:Name="SmoothingAvailabilityInfoBar" IsOpen="True" IsClosable="False" Severity="Informational" x:Uid="Ui_Smoothing_Availability" Title="Applies live"
                                                  Message="The installed OBS source polls these settings four times per second. Saved values are used on the next session too." />
                                     </StackPanel>
                                 </Grid>
@@ -446,9 +446,9 @@
                     <ScrollViewer x:Name="QuadLayersPage" Grid.Row="0" Padding="34,28,34,34" Visibility="Collapsed">
                         <StackPanel Spacing="24" MaxWidth="1050" HorizontalAlignment="Stretch">
                             <StackPanel Spacing="5">
-                                <TextBlock Text="RECORDING UI" Style="{StaticResource EyebrowStyle}" />
-                                <TextBlock Text="Choose whether UI layers appear in the recording." Style="{StaticResource SectionTitleStyle}" />
-                                <TextBlock Text="OpenXR composition quad layers can be included in or removed from the OBS mirror without changing what appears in the headset." Style="{StaticResource MutedTextStyle}" />
+                                <TextBlock x:Uid="Ui_QuadLayers_Eyebrow" Text="RECORDING UI" Style="{StaticResource EyebrowStyle}" />
+                                <TextBlock x:Uid="Ui_QuadLayers_Title" Text="Choose whether UI layers appear in the recording." Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock x:Uid="Ui_QuadLayers_Subtitle" Text="OpenXR composition quad layers can be included in or removed from the OBS mirror without changing what appears in the headset." Style="{StaticResource MutedTextStyle}" />
                             </StackPanel>
 
                             <Border Style="{StaticResource CardStyle}">
@@ -459,11 +459,11 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Spacing="5">
-                                            <TextBlock Text="OpenXR quad-layer UI" FontSize="20" FontWeight="SemiBold" />
-                                            <TextBlock Text="Controls UI submitted separately from the main projection image." Style="{StaticResource MutedTextStyle}" />
+                                            <TextBlock x:Uid="Ui_QuadLayers_Toggle" Text="OpenXR quad-layer UI" FontSize="20" FontWeight="SemiBold" />
+                                            <TextBlock x:Uid="Ui_QuadLayers_ToggleHint" Text="Controls UI submitted separately from the main projection image." Style="{StaticResource MutedTextStyle}" />
                                         </StackPanel>
                                         <ToggleSwitch x:Name="MirrorQuadLayersToggle" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                                      IsOn="True" OnContent="Shown" OffContent="Hidden" Toggled="MirrorQuadLayers_Toggled" />
+                                                      IsOn="True" x:Uid="Ui_QuadLayers_ToggleState" OnContent="Shown" OffContent="Hidden" Toggled="MirrorQuadLayers_Toggled" />
                                     </Grid>
 
                                     <Grid ColumnSpacing="14">
@@ -473,36 +473,36 @@
                                         </Grid.ColumnDefinitions>
                                         <Border Grid.Column="0" CornerRadius="14" Padding="18" Background="#80333A4A">
                                             <StackPanel Spacing="7">
-                                                <TextBlock Text="OBS RECORDING" Style="{StaticResource EyebrowStyle}" />
+                                                <TextBlock x:Uid="Ui_QuadLayers_ObsEyebrow" Text="OBS RECORDING" Style="{StaticResource EyebrowStyle}" />
                                                 <TextBlock x:Name="MirrorQuadLayersSummaryText" Text="Projection + quad-layer UI" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource BrandBrush}" />
-                                                <TextBlock Text="The filter is applied while the layer builds the mirror image." Style="{StaticResource MutedTextStyle}" FontSize="12" />
+                                                <TextBlock x:Uid="Ui_QuadLayers_ObsHint" Text="The filter is applied while the layer builds the mirror image." Style="{StaticResource MutedTextStyle}" FontSize="12" />
                                             </StackPanel>
                                         </Border>
                                         <Border Grid.Column="1" CornerRadius="14" Padding="18" Background="#80333A4A">
                                             <StackPanel Spacing="7">
-                                                <TextBlock Text="HEADSET" Style="{StaticResource EyebrowStyle}" />
-                                                <TextBlock Text="Always unchanged" FontSize="20" FontWeight="SemiBold" />
-                                                <TextBlock Text="Every layer is still submitted to the active OpenXR runtime." Style="{StaticResource MutedTextStyle}" FontSize="12" />
+                                                <TextBlock x:Uid="Ui_QuadLayers_HeadsetEyebrow" Text="HEADSET" Style="{StaticResource EyebrowStyle}" />
+                                                <TextBlock x:Uid="Ui_QuadLayers_HeadsetValue" Text="Always unchanged" FontSize="20" FontWeight="SemiBold" />
+                                                <TextBlock x:Uid="Ui_QuadLayers_HeadsetHint" Text="Every layer is still submitted to the active OpenXR runtime." Style="{StaticResource MutedTextStyle}" FontSize="12" />
                                             </StackPanel>
                                         </Border>
                                     </Grid>
 
                                     <InfoBar x:Name="QuadLayersAvailabilityInfoBar" IsOpen="True" IsClosable="False" Severity="Informational"
-                                             Title="Applies live" Message="The updated OpenXR layer polls this setting while recording. Restart the VR application once after installing the update." />
+                                             x:Uid="Ui_QuadLayers_Availability" Title="Applies live" Message="The updated OpenXR layer polls this setting while recording. Restart the VR application once after installing the update." />
 
                                     <Border CornerRadius="12" Padding="15" Background="#66171B24">
                                         <StackPanel Spacing="5">
-                                            <TextBlock Text="WHAT THIS CAN SEPARATE" Style="{StaticResource EyebrowStyle}" />
-                                            <TextBlock Text="This affects XR_COMPOSITION_LAYER_QUAD content only. UI drawn directly into the projection eye image, including world-space or post-processed UI, is part of that image and cannot be hidden independently." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
+                                            <TextBlock x:Uid="Ui_QuadLayers_ScopeEyebrow" Text="WHAT THIS CAN SEPARATE" Style="{StaticResource EyebrowStyle}" />
+                                            <TextBlock x:Uid="Ui_QuadLayers_ScopeHint" Text="This affects XR_COMPOSITION_LAYER_QUAD content only. UI drawn directly into the projection eye image, including world-space or post-processed UI, is part of that image and cannot be hidden independently." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
                                         </StackPanel>
                                     </Border>
                                 </StackPanel>
                             </Border>
 
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-                                <Button Tag="false" Click="QuadLayerPreset_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Hide from recording" />
-                                <Button Tag="true" Click="QuadLayerPreset_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Show in recording" />
-                                <Button Click="ApplyMirrorQuadLayers_Click" Style="{StaticResource PrimaryButtonStyle}" Content="Apply UI setting" />
+                                <Button Tag="false" Click="QuadLayerPreset_Click" Style="{StaticResource SecondaryButtonStyle}" x:Uid="Ui_QuadLayers_Hide" Content="Hide from recording" />
+                                <Button Tag="true" Click="QuadLayerPreset_Click" Style="{StaticResource SecondaryButtonStyle}" x:Uid="Ui_QuadLayers_Show" Content="Show in recording" />
+                                <Button Click="ApplyMirrorQuadLayers_Click" Style="{StaticResource PrimaryButtonStyle}" x:Uid="Ui_QuadLayers_Apply" Content="Apply UI setting" />
                             </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
@@ -511,9 +511,9 @@
                     <ScrollViewer x:Name="InstallationPage" Grid.Row="0" Padding="34,28,34,34" Visibility="Collapsed">
                         <StackPanel Spacing="24" MaxWidth="1050" HorizontalAlignment="Stretch">
                             <StackPanel Spacing="5">
-                                <TextBlock Text="INSTALLATION" Style="{StaticResource EyebrowStyle}" />
-                                <TextBlock Text="Layer and OBS integration." Style="{StaticResource SectionTitleStyle}" />
-                                <TextBlock Text="Install the built layer, register its manifest for the current user, and stage the matching OBS source." Style="{StaticResource MutedTextStyle}" />
+                                <TextBlock x:Uid="Ui_Install_Eyebrow" Text="INSTALLATION" Style="{StaticResource EyebrowStyle}" />
+                                <TextBlock x:Uid="Ui_Install_Title" Text="Layer and OBS integration." Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock x:Uid="Ui_Install_Subtitle" Text="Install the built layer, register its manifest for the current user, and stage the matching OBS source." Style="{StaticResource MutedTextStyle}" />
                             </StackPanel>
 
                             <Grid ColumnSpacing="14">
@@ -523,8 +523,8 @@
                                 </Grid.ColumnDefinitions>
                                 <Border Grid.Column="0" Style="{StaticResource CardStyle}">
                                     <StackPanel Spacing="14">
-                                        <TextBlock Text="OPENXR API LAYER" Style="{StaticResource EyebrowStyle}" />
-                                        <TextBlock x:Name="InstallLayerStatusText" FontSize="22" FontWeight="SemiBold" Text="Checking…" />
+                                        <TextBlock x:Uid="Ui_Install_LayerEyebrow" Text="OPENXR API LAYER" Style="{StaticResource EyebrowStyle}" />
+                                        <TextBlock x:Name="InstallLayerStatusText" FontSize="22" FontWeight="SemiBold" x:Uid="Ui_Status_Checking" Text="Checking…" />
                                         <TextBlock x:Name="InstallLayerPathText" Style="{StaticResource MutedTextStyle}" FontFamily="Cascadia Mono" FontSize="12" TextWrapping="Wrap" />
                                         <Grid ColumnSpacing="20">
                                             <Grid.ColumnDefinitions>
@@ -532,24 +532,24 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Spacing="3" VerticalAlignment="Center">
-                                                <TextBlock Text="Enable for the current user" FontWeight="SemiBold" />
-                                                <TextBlock Text="Turn this off to stop OpenXR applications from loading the layer. Installed files and the OBS source remain in place."
+                                                <TextBlock x:Uid="Ui_Install_EnableCurrentUser" Text="Enable for the current user" FontWeight="SemiBold" />
+                                                <TextBlock x:Uid="Ui_Install_EnableCurrentUserHint" Text="Turn this off to stop OpenXR applications from loading the layer. Installed files and the OBS source remain in place."
                                                            Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
                                             </StackPanel>
                                             <ToggleSwitch x:Name="InstallationLayerRegistrationToggle" Grid.Column="1"
                                                           HorizontalAlignment="Right" VerticalAlignment="Center"
-                                                          OnContent="Enabled" OffContent="Disabled"
+                                                          x:Uid="Ui_Install_RegistrationState" OnContent="Enabled" OffContent="Disabled"
                                                           Toggled="LayerRegistrationToggle_Toggled" />
                                         </Grid>
                                     </StackPanel>
                                 </Border>
                                 <Border Grid.Column="1" Style="{StaticResource CardStyle}">
                                     <StackPanel Spacing="14">
-                                        <TextBlock Text="OBS PLUGIN" Style="{StaticResource EyebrowStyle}" />
-                                        <TextBlock x:Name="InstallPluginStatusText" FontSize="22" FontWeight="SemiBold" Text="Checking…" />
+                                        <TextBlock x:Uid="Ui_Install_PluginEyebrow" Text="OBS PLUGIN" Style="{StaticResource EyebrowStyle}" />
+                                        <TextBlock x:Name="InstallPluginStatusText" FontSize="22" FontWeight="SemiBold" x:Uid="Ui_Status_Checking" Text="Checking…" />
                                         <TextBlock x:Name="InstallPluginPathText" Style="{StaticResource MutedTextStyle}" FontFamily="Cascadia Mono" FontSize="12" TextWrapping="Wrap" />
-                                        <TextBlock Text="Installs both OpenXR Mirror Capture and OpenVR / SteamVR Mirror Capture sources." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
-                                        <Button Click="LaunchObs_Click" Style="{StaticResource SecondaryButtonStyle}" HorizontalAlignment="Left" Content="Open OBS" />
+                                        <TextBlock x:Uid="Ui_Install_PluginHint" Text="Installs both OpenXR Mirror Capture and OpenVR / SteamVR Mirror Capture sources." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
+                                        <Button Click="LaunchObs_Click" Style="{StaticResource SecondaryButtonStyle}" HorizontalAlignment="Left" x:Uid="Ui_Action_OpenObsButton" Content="Open OBS" />
                                     </StackPanel>
                                 </Border>
                             </Grid>
@@ -561,21 +561,21 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Spacing="7">
-                                        <TextBlock Text="INSTALL OR UPDATE BOTH COMPONENTS" Style="{StaticResource EyebrowStyle}" />
-                                        <TextBlock Text="Use the release artifacts already built in this repository." FontSize="20" FontWeight="SemiBold" />
-                                        <TextBlock Text="If OBS is open and already has this exact plugin, the installer safely updates only the layer. Close OBS first when the plugin binary has changed; Windows may then ask for administrator permission." Style="{StaticResource MutedTextStyle}" />
+                                        <TextBlock x:Uid="Ui_Install_BothEyebrow" Text="INSTALL OR UPDATE BOTH COMPONENTS" Style="{StaticResource EyebrowStyle}" />
+                                        <TextBlock x:Uid="Ui_Install_BothTitle" Text="Use the release artifacts already built in this repository." FontSize="20" FontWeight="SemiBold" />
+                                        <TextBlock x:Uid="Ui_Install_BothHint" Text="If OBS is open and already has this exact plugin, the installer safely updates only the layer. Close OBS first when the plugin binary has changed; Windows may then ask for administrator permission." Style="{StaticResource MutedTextStyle}" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                                        <Button Click="OpenInstallFolder_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Open install folder" />
-                                        <Button Click="InstallUpdate_Click" Style="{StaticResource PrimaryButtonStyle}" Content="Install / update" />
+                                        <Button Click="OpenInstallFolder_Click" Style="{StaticResource SecondaryButtonStyle}" x:Uid="Ui_Install_OpenFolder" Content="Open install folder" />
+                                        <Button Click="InstallUpdate_Click" Style="{StaticResource PrimaryButtonStyle}" x:Uid="Ui_Install_InstallUpdate" Content="Install / update" />
                                     </StackPanel>
                                 </Grid>
                             </Border>
 
-                            <InfoBar IsOpen="True" IsClosable="False" Severity="Informational" Title="Normal headset runtime is the default"
+                            <InfoBar IsOpen="True" IsClosable="False" Severity="Informational" x:Uid="Ui_Install_RuntimeNote" Title="Normal headset runtime is the default"
                                      Message="The manager does not select a simulator when it starts one. Use the simulator only from the testing section below, then restore the headset runtime when testing is finished." />
 
-                            <Expander Header="Simulator testing">
+                            <Expander x:Uid="Ui_Install_SimulatorHeader" Header="Simulator testing">
                                 <Border Style="{StaticResource CardStyle}" Margin="0,8,0,0">
                                     <Grid ColumnSpacing="24">
                                         <Grid.ColumnDefinitions>
@@ -583,11 +583,11 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Spacing="5">
-                                            <TextBlock Text="Open the optional simulator tool" FontWeight="SemiBold" />
-                                            <TextBlock Text="Opening it here keeps runtime selection explicit and does not pass along a stale simulator environment override." Style="{StaticResource MutedTextStyle}" />
+                                            <TextBlock x:Uid="Ui_Install_SimulatorTitle" Text="Open the optional simulator tool" FontWeight="SemiBold" />
+                                            <TextBlock x:Uid="Ui_Install_SimulatorHint" Text="Opening it here keeps runtime selection explicit and does not pass along a stale simulator environment override." Style="{StaticResource MutedTextStyle}" />
                                         </StackPanel>
                                         <Button x:Name="LaunchMetaButton" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                                Click="LaunchMeta_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Open simulator (testing)" />
+                                                Click="LaunchMeta_Click" Style="{StaticResource SecondaryButtonStyle}" x:Uid="Ui_Install_OpenSimulator" Content="Open simulator (testing)" />
                                     </Grid>
                                 </Border>
                             </Expander>
@@ -604,11 +604,11 @@
                         </Grid.RowDefinitions>
                         <Grid Grid.Row="0">
                             <StackPanel Spacing="5">
-                                <TextBlock Text="DIAGNOSTICS" Style="{StaticResource EyebrowStyle}" />
-                                <TextBlock Text="See what the runtime sees." Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock x:Uid="Ui_Diagnostics_Eyebrow" Text="DIAGNOSTICS" Style="{StaticResource EyebrowStyle}" />
+                                <TextBlock x:Uid="Ui_Diagnostics_Title" Text="See what the runtime sees." Style="{StaticResource SectionTitleStyle}" />
                             </StackPanel>
                             <Button HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="Refresh_Click" Style="{StaticResource SecondaryButtonStyle}">
-                                <StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Refresh" /><TextBlock Text="Refresh status" /></StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Refresh" /><TextBlock x:Uid="Ui_Diagnostics_Refresh" Text="Refresh status" /></StackPanel>
                             </Button>
                         </Grid>
 
@@ -619,12 +619,12 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Spacing="8">
-                                    <TextBlock Text="ACTIVE RUNTIME" Style="{StaticResource EyebrowStyle}" />
+                                    <TextBlock x:Uid="Ui_Diagnostics_RuntimeEyebrow" Text="ACTIVE RUNTIME" Style="{StaticResource EyebrowStyle}" />
                                     <TextBlock x:Name="DiagnosticRuntimeNameText" FontSize="20" FontWeight="SemiBold" />
                                     <TextBlock x:Name="DiagnosticRuntimePathText" FontFamily="Cascadia Mono" FontSize="12" Style="{StaticResource MutedTextStyle}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Spacing="8">
-                                    <TextBlock Text="INSTALLED HASHES" Style="{StaticResource EyebrowStyle}" />
+                                    <TextBlock x:Uid="Ui_Diagnostics_HashesEyebrow" Text="INSTALLED HASHES" Style="{StaticResource EyebrowStyle}" />
                                     <TextBlock x:Name="DiagnosticLayerHashText" FontFamily="Cascadia Mono" FontSize="11" Style="{StaticResource MutedTextStyle}" />
                                     <TextBlock x:Name="DiagnosticPluginHashText" FontFamily="Cascadia Mono" FontSize="11" Style="{StaticResource MutedTextStyle}" />
                                 </StackPanel>
@@ -640,17 +640,17 @@
                                 <Grid Margin="0,0,0,12">
                                     <StackPanel Orientation="Horizontal" Spacing="10">
                                         <ComboBox x:Name="LogSelector" Width="170" SelectedIndex="0" SelectionChanged="LogSelector_SelectionChanged">
-                                            <ComboBoxItem Content="OpenXR layer log" Tag="layer" />
-                                            <ComboBoxItem Content="OBS log" Tag="obs" />
-                                            <ComboBoxItem Content="Preview diagnostics" Tag="preview" />
+                                            <ComboBoxItem x:Uid="Ui_Diagnostics_LogLayer" Content="OpenXR layer log" Tag="layer" />
+                                            <ComboBoxItem x:Uid="Ui_Diagnostics_LogObs" Content="OBS log" Tag="obs" />
+                                            <ComboBoxItem x:Uid="Ui_Diagnostics_LogPreview" Content="Preview diagnostics" Tag="preview" />
                                         </ComboBox>
-                                        <Button Click="RefreshLogs_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Refresh log" />
+                                        <Button Click="RefreshLogs_Click" Style="{StaticResource SecondaryButtonStyle}" x:Uid="Ui_Diagnostics_RefreshLog" Content="Refresh log" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
-                                        <Button x:Name="ShareLogsButton" Click="ShareLogs_Click" Style="{StaticResource SecondaryButtonStyle}" ToolTipService.ToolTip="Uploads the diagnostics report, layer log and OBS log to filebin.net and copies the share link to the clipboard. The link expires after about a week.">
-                                            <StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Upload" /><TextBlock Text="Upload &amp; share logs" /></StackPanel>
+                                        <Button x:Name="ShareLogsButton" Click="ShareLogs_Click" Style="{StaticResource SecondaryButtonStyle}" x:Uid="Ui_Diagnostics_ShareLogsTooltip" ToolTipService.ToolTip="Uploads the diagnostics report, layer log and OBS log to filebin.net and copies the share link to the clipboard. The link expires after about a week.">
+                                            <StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Upload" /><TextBlock x:Uid="Ui_Diagnostics_ShareLogs" Text="Upload &amp; share logs" /></StackPanel>
                                         </Button>
-                                        <Button Click="OpenSelectedLog_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Open in Explorer" />
+                                        <Button Click="OpenSelectedLog_Click" Style="{StaticResource SecondaryButtonStyle}" x:Uid="Ui_Diagnostics_OpenExplorer" Content="Open in Explorer" />
                                     </StackPanel>
                                 </Grid>
                                 <TextBox x:Name="LogTextBox" Grid.Row="1" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"

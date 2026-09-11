@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
 using System.Text;
+using OBSMirror.ControlCenter.Localization;
 using Vortice.D3DCompiler;
 using Vortice.Direct3D;
 using Vortice.Direct3D11;
@@ -152,10 +153,13 @@ public sealed class MirrorPreviewService : IDisposable
         lock (_gate)
         {
             if (_disposed)
-                return DiagnosticWaiting(
+                return LocalizedWaiting(
                     "stopped",
                     "Preview stopped",
-                    "Reopen the app to start the mirror preview again.");
+                    "Reopen the app to start the mirror preview again.",
+                    localizedDetail: Loc.S(
+                        "Code_Svc_PreviewStoppedReopenDetail",
+                        "Reopen the app to start the mirror preview again."));
 
             if (!EnsureSurface(out var mappingError))
             {
@@ -163,7 +167,7 @@ public sealed class MirrorPreviewService : IDisposable
                 if (OpenVrPreviewService.IsRuntimeRunning())
                     return openVrResult;
 
-                return DiagnosticWaiting(
+                return LocalizedWaiting(
                     mappingError.Contains("Start a VR app", StringComparison.OrdinalIgnoreCase)
                         ? "no-shared-surface"
                         : "shared-surface-error",
@@ -188,19 +192,29 @@ public sealed class MirrorPreviewService : IDisposable
                 if (generation == 0 || handles.Any(handle => handle == 0))
                 {
                     ResetGraphics();
-                    return DiagnosticWaiting(
+                    const string waitingDetail =
+                        "The layer is connected, but only {0}/{1} shared texture handles are published " +
+                        "(generation {2}). Start or resume the VR app to publish an image. {3}";
+                    var published = handles.Count(handle => handle != 0);
+                    return LocalizedWaiting(
                         "waiting-for-handles",
                         "Waiting for the first mirror frame",
-                        $"The layer is connected, but only {handles.Count(handle => handle != 0)}/{TextureCount} shared texture handles are published " +
-                        $"(generation {generation}). Start or resume the VR app to publish an image. {ReadLayerSummary()}",
-                        connected: true);
+                        Loc.E(waitingDetail, published, TextureCount, generation, ReadLayerSummary()),
+                        connected: true,
+                        localizedDetail: Loc.F(
+                            "Code_Svc_WaitingFirstMirrorFrameDetail",
+                            waitingDetail,
+                            published,
+                            TextureCount,
+                            generation,
+                            ReadLayerSummary()));
                 }
 
                 if (generation != _surfaceGeneration || !handles.SequenceEqual(_sharedHandles))
                 {
                     ResetGraphics();
                     if (!OpenSharedTextures(generation, handles, out var openError))
-                        return DiagnosticWaiting(
+                        return LocalizedWaiting(
                             "shared-texture-open-failed",
                             "Mirror image is not available",
                             $"{openError} Generation {generation}; {ReadLayerSummary()}",
@@ -216,12 +230,19 @@ public sealed class MirrorPreviewService : IDisposable
                 var description = texture.Description;
                 if (!IsSupportedPreviewFormat(description.Format))
                 {
-                    return DiagnosticWaiting(
+                    const string formatDetail = "The mirror is using {0} at {1} × {2}. OBS capture is unaffected.";
+                    return LocalizedWaiting(
                         "unsupported-format",
                         "Preview format is not supported",
-                        $"The mirror is using {description.Format} at {description.Width} × {description.Height}. OBS capture is unaffected.",
+                        Loc.E(formatDetail, description.Format, description.Width, description.Height),
                         warning: true,
-                        connected: true);
+                        connected: true,
+                        localizedDetail: Loc.F(
+                            "Code_Svc_PreviewFormatNotSupportedDetail",
+                            formatDetail,
+                            description.Format,
+                            description.Width,
+                            description.Height));
                 }
 
                 RenderPreview(textureIndex);
@@ -300,11 +321,11 @@ public sealed class MirrorPreviewService : IDisposable
                     $"path {path}, pixels {finalStats}, adapter {_selectedAdapterName} ({_selectedAdapterLuid}); {ReadLayerSummary()}";
 
                 string status = "Live mirror";
-                var detailSuffix = usedCpuFallback ? "  •  CPU fallback" : string.Empty;
+                var detailSuffix = usedCpuFallback ? Loc.S("Code_Svc_CpuFallbackSuffix", "  •  CPU fallback") : string.Empty;
                 if (finalStats.IsBlack && blackFor >= 2000)
                 {
                     status = "Black frames detected";
-                    detailSuffix += "  •  See Preview diagnostics";
+                    detailSuffix += Loc.S("Code_Svc_SeePreviewDiagnosticsSuffix", "  •  See Preview diagnostics");
                     var likelyCause = frameAge >= 3000
                         ? "The producer frame index is also stale, so the VR app/layer stopped feeding new frames."
                         : usedCpuFallback
@@ -318,7 +339,7 @@ public sealed class MirrorPreviewService : IDisposable
                 else if (frameAge >= 5000)
                 {
                     status = "Mirror frame is stale";
-                    detailSuffix += "  •  See Preview diagnostics";
+                    detailSuffix += Loc.S("Code_Svc_SeePreviewDiagnosticsSuffix", "  •  See Preview diagnostics");
                     RecordDiagnostic(
                         "stale-frame",
                         $"No new producer frame has been published for {frameAge / 1000.0:0.0}s. {frameContext}",
@@ -345,9 +366,15 @@ public sealed class MirrorPreviewService : IDisposable
 
                 return new MirrorPreviewResult(
                     frame,
-                    status,
+                    Loc.S(DescribeStatusKey(status), status),
                     (appName.Length > 0 ? $"{appName}  •  " : string.Empty) +
-                    $"Source {description.Width} × {description.Height}  •  Preview {frame.Width} × {frame.Height}" +
+                    Loc.F(
+                        "Code_Svc_LiveFrameDetail",
+                        "Source {0} × {1}  •  Preview {2} × {3}",
+                        description.Width,
+                        description.Height,
+                        frame.Width,
+                        frame.Height) +
                     detailSuffix,
                     true,
                     true);
@@ -355,7 +382,7 @@ public sealed class MirrorPreviewService : IDisposable
             catch (Exception ex)
             {
                 ResetGraphics();
-                return DiagnosticWaiting(
+                return LocalizedWaiting(
                     "capture-exception",
                     "Preview paused",
                     $"{FriendlyError(ex)} {ReadLayerSummary()}",
@@ -401,7 +428,9 @@ public sealed class MirrorPreviewService : IDisposable
         catch (FileNotFoundException)
         {
             ResetSurface();
-            error = "Start a VR app after enabling the OpenXR layer. The preview will connect automatically.";
+            error = Loc.S(
+                "Code_Svc_StartVrAppDetail",
+                "Start a VR app after enabling the OpenXR layer. The preview will connect automatically.");
             return false;
         }
         catch (Exception ex)
@@ -861,16 +890,46 @@ public sealed class MirrorPreviewService : IDisposable
     private static byte ScaleToByte(uint value, uint maximum) =>
         (byte)((value * 255u + maximum / 2u) / maximum);
 
-    private MirrorPreviewResult DiagnosticWaiting(
+    /// <summary>
+    /// Builds a waiting result whose Status (and, where a translation exists,
+    /// Detail) are localized for the UI.
+    ///
+    /// <paramref name="detail"/> must stay the English original: it is what the
+    /// diagnostics log records, so support logs remain in one language even
+    /// while the UI is translated. <paramref name="localizedDetail"/> is the
+    /// text shown in the UI instead, and is never written to the log.
+    /// </summary>
+    private MirrorPreviewResult LocalizedWaiting(
         string key,
         string status,
         string detail,
         bool warning = false,
-        bool connected = false)
+        bool connected = false,
+        string? localizedDetail = null)
     {
         RecordDiagnostic(key, $"{status}: {detail}", warning);
-        return new MirrorPreviewResult(null, status, detail, false, connected);
+        return new MirrorPreviewResult(
+            null,
+            Loc.S(DescribeStatusKey(status), status),
+            localizedDetail ?? detail,
+            false,
+            connected);
     }
+
+    /// <summary>Maps an English preview status to its localization key.</summary>
+    private static string DescribeStatusKey(string status) => status switch
+    {
+        "Preview stopped" => "Code_Svc_PreviewStopped",
+        "Waiting for an OpenXR app" => "Code_Svc_WaitingForOpenXrApp",
+        "Waiting for the first mirror frame" => "Code_Svc_WaitingFirstMirrorFrame",
+        "Mirror image is not available" => "Code_Svc_MirrorUnavailable",
+        "Preview format is not supported" => "Code_Svc_PreviewFormatUnsupported",
+        "Live mirror" => "Code_Svc_LiveMirror",
+        "Black frames detected" => "Code_Svc_BlackFramesDetected",
+        "Mirror frame is stale" => "Code_Svc_MirrorFrameStale",
+        "Preview paused" => "Code_Svc_PreviewPaused",
+        _ => status
+    };
 
     private void TrackFrameIndex(uint frameIndex)
     {

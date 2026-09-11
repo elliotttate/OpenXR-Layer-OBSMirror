@@ -1,0 +1,41 @@
+key	target	prop	english	zh-CN
+Code_Svc_PreviewStopped	MirrorPreviewService.cs	code	Preview stopped	预览已停止
+Code_Svc_PreviewStoppedReopenDetail	MirrorPreviewService.cs	code	Reopen the app to start the mirror preview again.	重新打开应用即可再次启动镜像预览。
+Code_Svc_WaitingForOpenXrApp	MirrorPreviewService.cs	code	Waiting for an OpenXR app	等待 OpenXR 应用
+Code_Svc_WaitingFirstMirrorFrame	MirrorPreviewService.cs	code	Waiting for the first mirror frame	等待首帧镜像画面
+Code_Svc_WaitingFirstMirrorFrameDetail	MirrorPreviewService.cs	code	The layer is connected, but only {0}/{1} shared texture handles are published (generation {2}). Start or resume the VR app to publish an image. {3}	层已连接，但只发布了 {0}/{1} 个共享纹理句柄（第 {2} 代）。请启动或恢复 VR 应用以发布画面。{3}
+Code_Svc_MirrorUnavailable	MirrorPreviewService.cs	code	Mirror image is not available	镜像画面不可用
+Code_Svc_PreviewFormatUnsupported	MirrorPreviewService.cs	code	Preview format is not supported	不支持该预览格式
+Code_Svc_PreviewFormatNotSupportedDetail	MirrorPreviewService.cs	code	The mirror is using {0} at {1} × {2}. OBS capture is unaffected.	镜像使用 {0}，分辨率 {1} × {2}。OBS 采集不受影响。
+Code_Svc_LiveMirror	MirrorPreviewService.cs	code	Live mirror	实时镜像
+Code_Svc_BlackFramesDetected	MirrorPreviewService.cs	code	Black frames detected	检测到黑帧
+Code_Svc_MirrorFrameStale	MirrorPreviewService.cs	code	Mirror frame is stale	镜像画面已过时
+Code_Svc_PreviewPaused	MirrorPreviewService.cs	code	Preview paused	预览已暂停
+Code_Svc_CpuFallbackSuffix	MirrorPreviewService.cs	code	  •  CPU fallback	  •  CPU 回退
+Code_Svc_SeePreviewDiagnosticsSuffix	MirrorPreviewService.cs	code	  •  See Preview diagnostics	  •  参见“预览诊断”
+Code_Svc_LiveFrameDetail	MirrorPreviewService.cs	code	Source {0} × {1}  •  Preview {2} × {3}	源 {0} × {1}  •  预览 {2} × {3}
+Code_Svc_StartVrAppDetail	MirrorPreviewService.cs	code	Start a VR app after enabling the OpenXR layer. The preview will connect automatically.	启用 OpenXR 层后启动 VR 应用，预览会自动连接。
+Code_Svc_SteamVrPreviewStopped	OpenVrPreviewService.cs	code	SteamVR preview stopped	SteamVR 预览已停止
+Code_Svc_SteamVrPreviewStoppedDetail	OpenVrPreviewService.cs	code	Reopen the app to restart the preview.	重新打开应用即可重新启动预览。
+Code_Svc_WaitingForSteamVrMirror	OpenVrPreviewService.cs	code	Waiting for a SteamVR mirror	等待 SteamVR 镜像
+Code_Svc_LiveSteamVrMirror	OpenVrPreviewService.cs	code	Live SteamVR mirror	实时 SteamVR 镜像
+Code_Svc_SteamVrFrameDetail	OpenVrPreviewService.cs	code	Right eye  •  Source {0} × {1}  •  Preview {2} × {3}  •  {4}	右眼  •  源 {0} × {1}  •  预览 {2} × {3}  •  {4}
+Code_Svc_SteamVrPreviewPaused	OpenVrPreviewService.cs	code	SteamVR preview paused	SteamVR 预览已暂停
+Code_Svc_StartSteamVrDetail	OpenVrPreviewService.cs	code	Start SteamVR and an OpenVR application; the preview will connect automatically.	启动 SteamVR 和 OpenVR 应用后，预览会自动连接。
+Code_Svc_ChecksumEntryMissing	AppUpdateService.cs	code	The release checksum manifest has no entry for {0}.	发行版校验和清单中没有 {0} 的条目。
+Code_Svc_ChecksumMismatch	AppUpdateService.cs	code	The downloaded installer did not match the release checksum and was deleted. Try again later.	下载的安装程序与发行版校验和不匹配，已删除。请稍后重试。
+Code_Svc_ElevationCanceled	ElevatedInstallService.cs	code	Installation was canceled before administrator permission was granted.	在授予管理员权限之前，安装已取消。
+Code_Svc_CloseObsBeforePluginUpdate	OBSMirrorService.cs	code	OBS is running. Close it before updating the OBS plugin.	OBS 正在运行。请先关闭 OBS 再更新 OBS 插件。
+Code_Svc_LayerInstalledEnabled	OBSMirrorService.cs	code	Installed and enabled layer {0}.	已安装并启用层 {0}。
+Code_Svc_ObsPluginCurrent	OBSMirrorService.cs	code	OBS plugin already current.	OBS 插件已是最新。
+Code_Svc_CloseObsPluginChanged	OBSMirrorService.cs	code	OBS is running and the plugin binary has changed. Stop recording and close OBS before updating the plugin.	OBS 正在运行且插件二进制文件已更改。请先停止录制并关闭 OBS，再更新插件。
+Code_Svc_ObsPluginUpdated	OBSMirrorService.cs	code	Updated the OBS plugin.	已更新 OBS 插件。
+Code_Svc_LayerRegisteredForUser	OBSMirrorService.cs	code	Registered OpenXR OBS Mirror for the current user: {0}	已为当前用户注册 OpenXR OBS Mirror：{0}
+Code_Svc_NoLayerRegistryKey	OBSMirrorService.cs	code	No current-user OpenXR implicit-layer registry key exists.	当前用户不存在 OpenXR 隐式层注册表项。
+Code_Svc_LayerRegistrationsRemoved	OBSMirrorService.cs	code	Removed {0} OpenXR OBS Mirror registration(s) for the current user.	已移除当前用户的 {0} 个 OpenXR OBS Mirror 注册。
+Code_Svc_NoConflictingPlugin	OBSMirrorService.cs	code	No conflicting OBS plugin copy was found.	未发现冲突的 OBS 插件副本。
+Code_Svc_CloseObsBeforePluginRemoval	OBSMirrorService.cs	code	Close OBS before removing the old plugin copy; OBS is holding the file.	移除旧插件副本前请先关闭 OBS，该文件正被 OBS 占用。
+Code_Svc_ConflictingPluginRemoved	OBSMirrorService.cs	code	Removed the conflicting plugin copy at {0}.	已移除位于 {0} 的冲突插件副本。
+Code_Svc_SelectObs64Executable	OBSMirrorService.cs	code	Select obs64.exe (the 64-bit OBS Studio executable).	请选择 obs64.exe（64 位 OBS Studio 可执行文件）。
+Code_Svc_ObsNotFound	OBSMirrorService.cs	code	OBS Studio (obs64.exe) could not be found automatically. This is normal for a custom or portable install - browse to obs64.exe once and it will be remembered.	无法自动找到 OBS Studio (obs64.exe)。自定义安装或便携版安装属于正常情况 —— 手动选择一次 obs64.exe 后即会被记住。
+Code_Svc_NoCaptureSessionLogged	OBSMirrorService.cs	code	No OpenXR capture session has been logged yet.	尚未记录任何 OpenXR 采集会话。

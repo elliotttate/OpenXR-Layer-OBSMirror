@@ -266,3 +266,28 @@ License:
     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
+
+OBS Studio and the win-openxr OBS plugin
+----------------------------------------
+
+OBS Studio is licensed under the GNU General Public License, version 2 or
+later. The OBS source plugin in OBSPlugin/win-openxr includes OBS Studio
+headers and links against OBS Studio's libobs, so its compiled binary is
+distributed under the terms of the GPL-2.0-or-later. The plugin's own source
+is contained in this repository; it is compiled against an OBS Studio source
+tree, which supplies the interface headers and the libobs library it links
+against.
+
+    OBS Studio: https://github.com/obsproject/obs-studio
+    GNU GPL version 2: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+
+
+Simplified Chinese localization (unofficial)
+--------------------------------------------
+
+This fork adds an unofficial community Simplified Chinese localization. It is
+not published or endorsed by the original author, Elliott Tate. The English
+resources are kept in place, so the localization only adds language packs.
+The installer language file installer/languages/ChineseSimplified.isl is a
+community translation of the Inno Setup messages, obtained from
+https://jrsoftware.org/files/istrans/ (maintainer: Zhenghan Yang (Kira)).

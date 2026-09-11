@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using OBSMirror.ControlCenter.Localization;
 using Valve.VR;
 using Vortice.D3DCompiler;
 using Vortice.Direct3D;
@@ -69,10 +70,14 @@ internal sealed class OpenVrPreviewService : IDisposable
     public MirrorPreviewResult CaptureFrame()
     {
         if (_disposed)
-            return Waiting("SteamVR preview stopped", "Reopen the app to restart the preview.");
+            return Waiting(
+                Loc.S("Code_Svc_SteamVrPreviewStopped", "SteamVR preview stopped"),
+                Loc.S("Code_Svc_SteamVrPreviewStoppedDetail", "Reopen the app to restart the preview."));
 
         if (_device is null && !TryInitialize())
-            return Waiting("Waiting for a SteamVR mirror", _lastInitializeError);
+            return Waiting(
+                Loc.S("Code_Svc_WaitingForSteamVrMirror", "Waiting for a SteamVR mirror"),
+                _lastInitializeError);
 
         try
         {
@@ -102,9 +107,15 @@ internal sealed class OpenVrPreviewService : IDisposable
 
             return new MirrorPreviewResult(
                 frame,
-                "Live SteamVR mirror",
-                $"Right eye  •  Source {_mirrorTexture.Description.Width} × {_mirrorTexture.Description.Height}  •  " +
-                $"Preview {frame.Width} × {frame.Height}  •  {_adapterName}",
+                Loc.S("Code_Svc_LiveSteamVrMirror", "Live SteamVR mirror"),
+                Loc.F(
+                    "Code_Svc_SteamVrFrameDetail",
+                    "Right eye  •  Source {0} × {1}  •  Preview {2} × {3}  •  {4}",
+                    _mirrorTexture.Description.Width,
+                    _mirrorTexture.Description.Height,
+                    frame.Width,
+                    frame.Height,
+                    _adapterName),
                 true,
                 true);
         }
@@ -112,7 +123,9 @@ internal sealed class OpenVrPreviewService : IDisposable
         {
             Reset();
             _lastInitializeError = $"SteamVR preview paused: {FriendlyError(ex)}";
-            return Waiting("SteamVR preview paused", _lastInitializeError);
+            return Waiting(
+                Loc.S("Code_Svc_SteamVrPreviewPaused", "SteamVR preview paused"),
+                _lastInitializeError);
         }
     }
 
@@ -126,7 +139,9 @@ internal sealed class OpenVrPreviewService : IDisposable
 
         if (!IsRuntimeRunning())
         {
-            _lastInitializeError = "Start SteamVR and an OpenVR application; the preview will connect automatically.";
+            _lastInitializeError = Loc.S(
+                "Code_Svc_StartSteamVrDetail",
+                "Start SteamVR and an OpenVR application; the preview will connect automatically.");
             return false;
         }
 

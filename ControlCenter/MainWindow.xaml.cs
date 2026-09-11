@@ -1,9 +1,10 @@
-﻿using Microsoft.UI;
+using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using OBSMirror.ControlCenter.Localization;
 using OBSMirror.ControlCenter.Models;
 using OBSMirror.ControlCenter.Services;
 using System.Diagnostics;
@@ -53,6 +54,7 @@ public sealed partial class MainWindow : Window
         App.LogStartup("MainWindow constructor entered");
         InitializeComponent();
         App.LogStartup("MainWindow.InitializeComponent completed");
+        Title = Loc.S("Ui_Window_MainTitle", "OBSMirror Control Center");
 
         ConfigureOverscanSlider(HorizontalSlider, 115);
         ConfigureOverscanSlider(VerticalSlider, 108);
@@ -190,17 +192,17 @@ public sealed partial class MainWindow : Window
         var dialog = new ContentDialog
         {
             XamlRoot = xamlRoot,
-            Title = $"Update available — {update.Title}",
-            PrimaryButtonText = "Yes, update",
-            CloseButtonText = "Later",
+            Title = Loc.F("Code_Main_UpdateAvailableTitle", "Update available — {0}", update.Title),
+            PrimaryButtonText = Loc.S("Code_Main_UpdateAvailableYes", "Yes, update"),
+            CloseButtonText = Loc.S("Code_Main_Later", "Later"),
             DefaultButton = ContentDialogButton.Primary,
             Content = new ScrollViewer
             {
                 MaxHeight = 340,
                 Content = new TextBlock
                 {
-                    Text = $"Version {update.Version} is available (you have {AppUpdateService.CurrentVersion}). " +
-                           "It downloads, installs, and reopens the app automatically." +
+                    Text = Loc.F("Code_Main_UpdateAvailableBody", "Version {0} is available (you have {1}).", update.Version, AppUpdateService.CurrentVersion) + " " +
+                           Loc.S("Code_Main_UpdateAvailableAuto", "It downloads, installs, and reopens the app automatically.") +
                            (string.IsNullOrWhiteSpace(notes) ? string.Empty : $"\n\n{notes}"),
                     TextWrapping = TextWrapping.Wrap,
                 },
@@ -214,14 +216,14 @@ public sealed partial class MainWindow : Window
         {
             var progress = new Progress<int>(percent =>
                 ShowMessage(
-                    $"Downloading update {update.Version}",
+                    Loc.F("Code_Main_DownloadingUpdate", "Downloading update {0}", update.Version),
                     $"{update.InstallerName} — {percent}%",
                     InfoBarSeverity.Informational));
             var installerPath = await _appUpdate.DownloadInstallerAsync(update, progress);
 
             ShowMessage(
-                "Installing update",
-                "The app closes now and reopens automatically when the update finishes.",
+                Loc.S("Code_Main_InstallingUpdate", "Installing update"),
+                Loc.S("Code_Main_UpdateInstallNote", "The app closes now and reopens automatically when the update finishes."),
                 InfoBarSeverity.Informational);
             AppUpdateService.StartUpdateAndRelaunch(installerPath);
             await Task.Delay(500);
@@ -231,8 +233,8 @@ public sealed partial class MainWindow : Window
         {
             App.LogStartup("App update failed", ex);
             ShowMessage(
-                "Update failed",
-                $"{ex.Message} You can retry from the dialog on next launch or download it from GitHub Releases.",
+                Loc.S("Code_Main_UpdateFailed", "Update failed"),
+                Loc.F("Code_Main_UpdateFailedBody", "{0} You can retry from the dialog on next launch or download it from GitHub Releases.", ex.Message),
                 InfoBarSeverity.Error);
         }
         finally
@@ -254,7 +256,7 @@ public sealed partial class MainWindow : Window
         catch (Exception ex)
         {
             App.LogStartup("RefreshSnapshotAsync failed", ex);
-            ShowMessage("Could not refresh status", ex.Message, InfoBarSeverity.Error);
+            ShowMessage(Loc.S("Code_Main_CouldNotRefreshStatus", "Could not refresh status"), ex.Message, InfoBarSeverity.Error);
         }
         finally
         {
@@ -266,26 +268,26 @@ public sealed partial class MainWindow : Window
     {
         SetStatus(LayerDot, LayerStatusText,
             snapshot.LayerRegistered && snapshot.LayerFilesInstalled && snapshot.LayerCurrent,
-            !snapshot.LayerRegistered ? "Disabled"
-            : snapshot.LayerCurrent ? "Enabled"
-            : _autoUpdateFailed ? "Update failed"
-            : "Updating…");
+            !snapshot.LayerRegistered ? Loc.S("Ui_Install_RegistrationState.OffContent", "Disabled")
+            : snapshot.LayerCurrent ? Loc.S("Ui_Install_RegistrationState.OnContent", "Enabled")
+            : _autoUpdateFailed ? Loc.S("Code_Main_UpdateFailed", "Update failed")
+            : Loc.S("Code_Main_Updating", "Updating…"));
         LayerDetailText.Text = snapshot.LayerFilesInstalled
-            ? snapshot.LayerCurrent ? $"Installed • {ShortHash(snapshot.LayerHash)}"
-              : _autoUpdateFailed ? "Retry from the Installation page"
-              : "Installing the new layer build automatically"
-            : "Release files are not installed";
+            ? snapshot.LayerCurrent ? Loc.F("Code_Main_LayerInstalled", "Installed • {0}", ShortHash(snapshot.LayerHash))
+              : _autoUpdateFailed ? Loc.S("Code_Main_RetryFromInstallationPage", "Retry from the Installation page")
+              : Loc.S("Code_Main_InstallingNewLayerAutomatically", "Installing the new layer build automatically")
+            : Loc.S("Code_Main_ReleaseFilesNotInstalled", "Release files are not installed");
 
         SetStatus(PluginDot, PluginStatusText,
             snapshot.PluginInstalled && snapshot.PluginCurrent,
-            !snapshot.PluginInstalled ? "Not installed"
-            : snapshot.PluginCurrent ? "Current"
-            : _autoUpdateFailed ? "Update failed"
-            : snapshot.ObsRunning ? "Close OBS to update"
-            : "Updating…");
+            !snapshot.PluginInstalled ? Loc.S("Code_Main_NotInstalled", "Not installed")
+            : snapshot.PluginCurrent ? Loc.S("Code_Main_Current", "Current")
+            : _autoUpdateFailed ? Loc.S("Code_Main_UpdateFailed", "Update failed")
+            : snapshot.ObsRunning ? Loc.S("Code_Main_CloseObsToUpdate", "Close OBS to update")
+            : Loc.S("Code_Main_Updating", "Updating…"));
         PluginDetailText.Text = !snapshot.PluginCurrent && snapshot.PluginInstalled && snapshot.ObsRunning
-            ? "OBS is running — the update installs when it closes"
-            : snapshot.ObsRunning ? "OBS is running" : "OBS is not running";
+            ? Loc.S("Code_Main_PluginUpdateWaitsForObs", "OBS is running — the update installs when it closes")
+            : snapshot.ObsRunning ? Loc.S("Code_Main_ObsRunning", "OBS is running") : Loc.S("Code_Main_ObsNotRunning", "OBS is not running");
 
         // A stale copy inside the OBS folder wins source registration over the
         // installed one, so the capture silently runs old code and stays blank.
@@ -293,10 +295,12 @@ public sealed partial class MainWindow : Window
         ConflictingPluginInfoBar.IsOpen = hasConflictingPlugin;
         if (hasConflictingPlugin)
         {
-            ConflictingPluginInfoBar.Message =
-                $"OBS is loading a second, older copy of the capture source from {snapshot.ConflictingPluginPath}. " +
+            ConflictingPluginInfoBar.Message = Loc.F(
+                "Code_Main_ConflictingPluginMessage",
+                "OBS is loading a second, older copy of the capture source from {0}. " +
                 "OBS uses whichever copy registers first, so the source can stay blank even though everything here " +
-                "reports as current. Removing the old copy leaves the installed source in place.";
+                "reports as current. Removing the old copy leaves the installed source in place.",
+                snapshot.ConflictingPluginPath);
         }
 
         // The automatic OBS source has a native SteamVR fallback. Other legacy
@@ -309,18 +313,21 @@ public sealed partial class MainWindow : Window
         if (showNonOpenXrVrStatus && isOpenVrCapture)
         {
             NonOpenXrVrInfoBar.Severity = InfoBarSeverity.Success;
-            NonOpenXrVrInfoBar.Title = "SteamVR capture is available";
-            NonOpenXrVrInfoBar.Message =
+            NonOpenXrVrInfoBar.Title = Loc.S("Code_Main_SteamVrCaptureAvailable", "SteamVR capture is available");
+            NonOpenXrVrInfoBar.Message = Loc.S(
+                "Code_Main_SteamVrCaptureMessage",
                 "The automatic OBS source will use SteamVR's native compositor mirror. " +
-                "OpenXR layer controls do not apply to this capture.";
+                "OpenXR layer controls do not apply to this capture.");
         }
         else if (showNonOpenXrVrStatus)
         {
             NonOpenXrVrInfoBar.Severity = InfoBarSeverity.Warning;
-            NonOpenXrVrInfoBar.Title = "This VR API is not capturable yet";
-            NonOpenXrVrInfoBar.Message =
-                $"{snapshot.NonOpenXrVrApp} is running VR through the {snapshot.NonOpenXrVrPath} path, not OpenXR. " +
-                "Switch the application to OpenXR or OpenVR/SteamVR, then start it again.";
+            NonOpenXrVrInfoBar.Title = Loc.S("Code_Main_VrApiNotCapturable", "This VR API is not capturable yet");
+            NonOpenXrVrInfoBar.Message = Loc.F(
+                "Code_Main_VrApiNotCapturableMessage",
+                "{0} is running VR through the {1} path, not OpenXR. " +
+                "Switch the application to OpenXR or OpenVR/SteamVR, then start it again.",
+                snapshot.NonOpenXrVrApp, snapshot.NonOpenXrVrPath);
         }
 
         var runtimeConfigured = !snapshot.RuntimeName.Equals("Not configured", StringComparison.OrdinalIgnoreCase);
@@ -329,41 +336,44 @@ public sealed partial class MainWindow : Window
                                  snapshot.RuntimePath.Contains("simulator", StringComparison.OrdinalIgnoreCase);
         var runtimeOkay = runtimeConfigured && !runtimeIsSimulator;
         SetStatus(RuntimeDot, RuntimeStatusText, runtimeOkay,
-            runtimeIsSimulator ? "Simulator selected" : snapshot.RuntimeName);
+            runtimeIsSimulator ? Loc.S("Code_Main_SimulatorSelected", "Simulator selected") : DisplayRuntimeLabel(snapshot.RuntimeName));
         RuntimeDetailText.Text = runtimeIsSimulator
             ? snapshot.SimulatorRuntimeOverrideActive
-                ? $"Restore {snapshot.SystemRuntimeName} for a headset"
-                : "Select your headset runtime in its desktop software"
-            : snapshot.RuntimeSource;
+                ? Loc.F("Code_Main_RestoreRuntimeForHeadset", "Restore {0} for a headset", DisplayRuntimeLabel(snapshot.SystemRuntimeName))
+                : Loc.S("Code_Main_SelectHeadsetRuntime", "Select your headset runtime in its desktop software")
+            : DisplayRuntimeLabel(snapshot.RuntimeSource);
 
         if (runtimeIsSimulator)
         {
             RuntimeModeInfoBar.Severity = InfoBarSeverity.Warning;
             RuntimeModeInfoBar.Title = snapshot.SimulatorRuntimeOverrideActive
-                ? "Simulator override is active"
-                : "Simulator is the system OpenXR runtime";
+                ? Loc.S("Code_Main_SimulatorOverrideActive", "Simulator override is active")
+                : Loc.S("Code_Main_SimulatorIsSystemRuntime", "Simulator is the system OpenXR runtime");
             RuntimeModeInfoBar.Message = snapshot.SimulatorRuntimeOverrideActive
-                ? $"OpenXR applications will bypass the normal headset runtime. Use headset runtime restores {snapshot.SystemRuntimeName} and clears the per-user override."
-                : "The app did not select this runtime. Choose 'Set as active OpenXR runtime' in your headset or SteamVR software before starting an OpenXR application.";
+                ? Loc.F("Code_Main_SimulatorOverrideMessage", "OpenXR applications will bypass the normal headset runtime. Use headset runtime restores {0} and clears the per-user override.", DisplayRuntimeLabel(snapshot.SystemRuntimeName))
+                : Loc.S("Code_Main_SimulatorNotSelectedByApp", "The app did not select this runtime. Choose 'Set as active OpenXR runtime' in your headset or SteamVR software before starting an OpenXR application.");
         }
         else if (!runtimeConfigured)
         {
             RuntimeModeInfoBar.Severity = InfoBarSeverity.Error;
-            RuntimeModeInfoBar.Title = "No OpenXR runtime is configured";
-            RuntimeModeInfoBar.Message = "Set your headset software as the active OpenXR runtime, then refresh this page.";
+            RuntimeModeInfoBar.Title = Loc.S("Code_Main_NoRuntimeConfigured", "No OpenXR runtime is configured");
+            RuntimeModeInfoBar.Message = Loc.S("Code_Main_NoRuntimeConfiguredMessage", "Set your headset software as the active OpenXR runtime, then refresh this page.");
         }
         else
         {
             RuntimeModeInfoBar.Severity = InfoBarSeverity.Success;
-            RuntimeModeInfoBar.Title = "Headset runtime selected";
-            RuntimeModeInfoBar.Message = $"OpenXR applications will use {snapshot.RuntimeName}. Simulator testing is optional and isolated under Installation.";
+            RuntimeModeInfoBar.Title = Loc.S("Code_Main_HeadsetRuntimeSelected", "Headset runtime selected");
+            RuntimeModeInfoBar.Message = Loc.F("Code_Main_HeadsetRuntimeSelectedMessage", "OpenXR applications will use {0}. Simulator testing is optional and isolated under Installation.", snapshot.RuntimeName);
         }
 
         SetStatus(OverscanDot, OverscanStatusText, snapshot.OverscanEnabled,
-            snapshot.OverscanEnabled ? "Enabled" : "Disabled", useWarningWhenFalse: false);
+            snapshot.OverscanEnabled
+                ? Loc.S("Ui_Install_RegistrationState.OnContent", "Enabled")
+                : Loc.S("Ui_Install_RegistrationState.OffContent", "Disabled"),
+            useWarningWhenFalse: false);
         OverscanDetailText.Text = snapshot.OverscanEnabled
             ? $"{snapshot.HorizontalPercent}% × {snapshot.VerticalPercent}%"
-            : "Headset-native FOV";
+            : Loc.S("Code_Main_HeadsetNativeFov", "Headset-native FOV");
 
         LaunchMetaButton.IsEnabled = !string.IsNullOrWhiteSpace(snapshot.MetaXrExecutable);
 
@@ -391,54 +401,55 @@ public sealed partial class MainWindow : Window
         if (!snapshot.PluginInstalled)
         {
             SmoothingAvailabilityInfoBar.Severity = InfoBarSeverity.Warning;
-            SmoothingAvailabilityInfoBar.Title = "Install the OBS source";
-            SmoothingAvailabilityInfoBar.Message = "The values can be saved now, but the OBS source must be installed before they can take effect.";
+            SmoothingAvailabilityInfoBar.Title = Loc.S("Code_Main_InstallObsSource", "Install the OBS source");
+            SmoothingAvailabilityInfoBar.Message = Loc.S("Code_Main_ObsSourceSaveNowNotEffective", "The values can be saved now, but the OBS source must be installed before they can take effect.");
         }
         else if (!snapshot.PluginCurrent)
         {
             SmoothingAvailabilityInfoBar.Severity = InfoBarSeverity.Warning;
-            SmoothingAvailabilityInfoBar.Title = "Source update required";
-            SmoothingAvailabilityInfoBar.Message = "The values can be saved now. Install the available source update and restart OBS to enable live control.";
+            SmoothingAvailabilityInfoBar.Title = Loc.S("Code_Main_SourceUpdateRequired", "Source update required");
+            SmoothingAvailabilityInfoBar.Message = Loc.S("Code_Main_ObsSourceUpdateNote", "The values can be saved now. Install the available source update and restart OBS to enable live control.");
         }
         else
         {
             SmoothingAvailabilityInfoBar.Severity = InfoBarSeverity.Informational;
-            SmoothingAvailabilityInfoBar.Title = "Applies live";
-            SmoothingAvailabilityInfoBar.Message = "The installed OBS source polls these settings four times per second. Saved values are used on the next session too.";
+            SmoothingAvailabilityInfoBar.Title = Loc.S("Ui_Smoothing_Availability.Title", "Applies live");
+            SmoothingAvailabilityInfoBar.Message = Loc.S("Ui_Smoothing_Availability.Message", "The installed OBS source polls these settings four times per second. Saved values are used on the next session too.");
         }
 
         if (!snapshot.LayerFilesInstalled)
         {
             QuadLayersAvailabilityInfoBar.Severity = InfoBarSeverity.Warning;
-            QuadLayersAvailabilityInfoBar.Title = "Install the OpenXR layer";
-            QuadLayersAvailabilityInfoBar.Message = "The preference can be saved now, but the updated layer must be installed before it can filter the recording.";
+            QuadLayersAvailabilityInfoBar.Title = Loc.S("Code_Main_InstallOpenXrLayer", "Install the OpenXR layer");
+            QuadLayersAvailabilityInfoBar.Message = Loc.S("Code_Main_LayerSaveNowNotEffective", "The preference can be saved now, but the updated layer must be installed before it can filter the recording.");
         }
         else if (!snapshot.LayerCurrent)
         {
             QuadLayersAvailabilityInfoBar.Severity = InfoBarSeverity.Warning;
-            QuadLayersAvailabilityInfoBar.Title = "Layer update required";
-            QuadLayersAvailabilityInfoBar.Message = "Save the preference now, then install the available layer update and restart the VR application once.";
+            QuadLayersAvailabilityInfoBar.Title = Loc.S("Code_Main_LayerUpdateRequired", "Layer update required");
+            QuadLayersAvailabilityInfoBar.Message = Loc.S("Code_Main_LayerUpdateNote", "Save the preference now, then install the available layer update and restart the VR application once.");
         }
         else
         {
             QuadLayersAvailabilityInfoBar.Severity = InfoBarSeverity.Informational;
-            QuadLayersAvailabilityInfoBar.Title = "Applies live";
-            QuadLayersAvailabilityInfoBar.Message = "The updated OpenXR layer polls this setting while recording. Restart the VR application once after installing the update.";
+            QuadLayersAvailabilityInfoBar.Title = Loc.S("Ui_QuadLayers_Availability.Title", "Applies live");
+            QuadLayersAvailabilityInfoBar.Message = Loc.S("Ui_QuadLayers_Availability.Message", "The updated OpenXR layer polls this setting while recording. Restart the VR application once after installing the update.");
         }
 
         InstallLayerStatusText.Text = snapshot.LayerFilesInstalled
-            ? !snapshot.LayerRegistered ? "Installed, disabled" : snapshot.LayerCurrent ? "Installed and enabled" : "Installed, update pending (automatic)"
-            : "Not installed";
+            ? !snapshot.LayerRegistered ? Loc.S("Code_Main_LayerInstalledDisabled", "Installed, disabled") : snapshot.LayerCurrent ? Loc.S("Code_Main_LayerInstalledEnabled", "Installed and enabled") : Loc.S("Code_Main_InstalledUpdatePending", "Installed, update pending (automatic)")
+            : Loc.S("Code_Main_NotInstalled", "Not installed");
         InstallLayerPathText.Text = snapshot.LayerManifestPath;
         InstallPluginStatusText.Text = snapshot.PluginInstalled
-            ? snapshot.PluginCurrent ? "Installed and current" : snapshot.ObsRunning ? "Installed, update waiting for OBS to close" : "Installed, update pending (automatic)"
-            : "Not installed";
+            ? snapshot.PluginCurrent ? Loc.S("Code_Main_PluginInstalledCurrent", "Installed and current") : snapshot.ObsRunning ? Loc.S("Code_Main_PluginUpdateWaitingForObs", "Installed, update waiting for OBS to close") : Loc.S("Code_Main_InstalledUpdatePending", "Installed, update pending (automatic)")
+            : Loc.S("Code_Main_NotInstalled", "Not installed");
         InstallPluginPathText.Text = _service.PluginPath;
 
-        DiagnosticRuntimeNameText.Text = snapshot.RuntimeName;
-        DiagnosticRuntimePathText.Text = $"{snapshot.RuntimeSource}\n{snapshot.RuntimePath}\nSystem default: {snapshot.SystemRuntimeName} — {snapshot.SystemRuntimePath}";
-        DiagnosticLayerHashText.Text = $"Layer   {DisplayHash(snapshot.LayerHash)}";
-        DiagnosticPluginHashText.Text = $"Plugin  {DisplayHash(snapshot.PluginHash)}";
+        DiagnosticRuntimeNameText.Text = DisplayRuntimeLabel(snapshot.RuntimeName);
+        DiagnosticRuntimePathText.Text = $"{DisplayRuntimeLabel(snapshot.RuntimeSource)}\n{snapshot.RuntimePath}\n" +
+            Loc.F("Code_Main_SystemDefault", "System default: {0} — {1}", DisplayRuntimeLabel(snapshot.SystemRuntimeName), snapshot.SystemRuntimePath);
+        DiagnosticLayerHashText.Text = Loc.F("Code_Main_DiagnosticLayerHash", "Layer   {0}", DisplayHash(snapshot.LayerHash));
+        DiagnosticPluginHashText.Text = Loc.F("Code_Main_DiagnosticPluginHash", "Plugin  {0}", DisplayHash(snapshot.PluginHash));
     }
 
     private void SidebarNav_Click(object sender, RoutedEventArgs e)
@@ -510,12 +521,12 @@ public sealed partial class MainWindow : Window
             _service.ApplyOverscan(enabled, horizontal, vertical);
             // A running application already built its swapchains from the old
             // values, so this is the one thing the user still has to act on.
-            MarkVrRestartRequired("the overscan change");
+            MarkVrRestartRequired(Loc.S("Code_Main_ReasonOverscanChange", "the overscan change"));
             await RefreshSnapshotAsync();
         }
         catch (Exception ex)
         {
-            ShowMessage("Could not save overscan", ex.Message, InfoBarSeverity.Error);
+            ShowMessage(Loc.S("Code_Main_CouldNotSaveOverscan", "Could not save overscan"), ex.Message, InfoBarSeverity.Error);
         }
     }
 
@@ -527,7 +538,7 @@ public sealed partial class MainWindow : Window
         VerticalValueText.Text = $"{vertical}%";
         var pixelCost = horizontal / 100.0 * (vertical / 100.0) - 1.0;
         PixelCostText.Text = $"+{pixelCost * 100:0.0}%";
-        ScaleSummaryText.Text = $"{horizontal / 100.0:0.00}× horizontal  •  {vertical / 100.0:0.00}× vertical";
+        ScaleSummaryText.Text = Loc.F("Code_Main_ScaleSummary", "{0:0.00}× horizontal  •  {1:0.00}× vertical", horizontal / 100.0, vertical / 100.0);
 
         // The per-eye size the runtime recommends is what overscan multiplies,
         // so its shape - not the slider percentages - decides how wide the
@@ -538,17 +549,22 @@ public sealed partial class MainWindow : Window
             var width = (int)Math.Round(snapshot.BaseViewWidth * (horizontal / 100.0));
             var height = (int)Math.Round(snapshot.BaseViewHeight * (vertical / 100.0));
             ExpectedTextureText.Text = $"{width} × {height}";
-            FrameShapeText.Text =
-                $"{(double)width / height:0.00} : 1 per eye, from the runtime's {snapshot.BaseViewWidth} × {snapshot.BaseViewHeight} " +
-                $"({(double)snapshot.BaseViewWidth / snapshot.BaseViewHeight:0.00} : 1). " +
-                "The application's own render scale multiplies both axes, so the shape holds.";
+            FrameShapeText.Text = Loc.F(
+                "Code_Main_FrameShapeKnown",
+                "{0:0.00} : 1 per eye, from the runtime's {1} × {2} ({3:0.00} : 1). " +
+                "The application's own render scale multiplies both axes, so the shape holds.",
+                (double)width / height,
+                snapshot.BaseViewWidth,
+                snapshot.BaseViewHeight,
+                (double)snapshot.BaseViewWidth / snapshot.BaseViewHeight);
         }
         else
         {
             ExpectedTextureText.Text = $"{horizontal / 100.0:0.00}×  ×  {vertical / 100.0:0.00}×";
-            FrameShapeText.Text =
+            FrameShapeText.Text = Loc.S(
+                "Code_Main_FrameShapeUnknown",
                 "relative to the runtime's recommended per-eye size. Run a VR application once and this will " +
-                "show the recording's real pixel size and shape.";
+                "show the recording's real pixel size and shape.");
         }
     }
 
@@ -610,10 +626,13 @@ public sealed partial class MainWindow : Window
             Math.Abs(reached - wanted) > 0.02)
         {
             ShowMessage(
-                "As wide as this build allows",
-                $"A {wanted:0.00} : 1 frame needs more than {maxPercent}% horizontal expansion from this headset's " +
-                $"{baseAspect:0.00} : 1 per-eye render. The sliders are set to the widest reachable shape, " +
-                $"{reached:0.00} : 1.",
+                Loc.S("Code_Main_WidestShapeTitle", "As wide as this build allows"),
+                Loc.F(
+                    "Code_Main_WidestShapeLimited",
+                    "A {0:0.00} : 1 frame needs more than {1}% horizontal expansion from this headset's " +
+                    "{2:0.00} : 1 per-eye render. The sliders are set to the widest reachable shape, " +
+                    "{3:0.00} : 1.",
+                    wanted, maxPercent, baseAspect, reached),
                 InfoBarSeverity.Informational);
         }
     }
@@ -826,11 +845,11 @@ public sealed partial class MainWindow : Window
             ? producer.ApplicationName
             : !string.IsNullOrWhiteSpace(_vrRestartProducerApp)
                 ? _vrRestartProducerApp
-                : "the running VR app";
-        VrRestartTitleText.Text = "RESTART VR APP";
+                : Loc.S("Code_Main_RunningVrApp", "the running VR app");
+        VrRestartTitleText.Text = Loc.S("Ui_VrRestart_Title.Text", "RESTART VR APP");
         VrRestartReasonText.Text = _vrRestartReasons.Count == 1
-            ? $"Restart {application} to apply {_vrRestartReasons.Single()}."
-            : $"Restart {application} to apply these changes: {string.Join("; ", _vrRestartReasons)}.";
+            ? Loc.F("Code_Main_RestartToApply", "Restart {0} to apply {1}.", application, _vrRestartReasons.Single())
+            : Loc.F("Code_Main_RestartToApplyMultiple", "Restart {0} to apply these changes: {1}.", application, string.Join("; ", _vrRestartReasons));
         VrRestartPanel.Visibility = Visibility.Visible;
     }
 
@@ -874,7 +893,7 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowMessage("Could not save camera smoothing", ex.Message, InfoBarSeverity.Error);
+            ShowMessage(Loc.S("Code_Main_CouldNotSaveCameraSmoothing", "Could not save camera smoothing"), ex.Message, InfoBarSeverity.Error);
         }
     }
 
@@ -887,7 +906,7 @@ public sealed partial class MainWindow : Window
 
         SmoothingValueText.Text = smoothing.ToString();
         SmoothingCropValueText.Text = $"{crop:0.0}%";
-        SmoothingResponseText.Text = smoothing == 0 || crop == 0 ? "Off" : $"{responseMs:0} ms";
+        SmoothingResponseText.Text = smoothing == 0 || crop == 0 ? Loc.S("Code_Main_Off", "Off") : $"{responseMs:0} ms";
         SmoothingVisibleText.Text = $"{100.0 - crop:0.0}%";
     }
 
@@ -900,8 +919,8 @@ public sealed partial class MainWindow : Window
     private void UpdateMirrorQuadLayersPreview()
     {
         MirrorQuadLayersSummaryText.Text = MirrorQuadLayersToggle.IsOn
-            ? "Projection + quad-layer UI"
-            : "Projection only";
+            ? Loc.S("Code_Main_ProjectionQuadLayerUi", "Projection + quad-layer UI")
+            : Loc.S("Code_Main_ProjectionOnly", "Projection only");
     }
 
     private async void QuadLayerPreset_Click(object sender, RoutedEventArgs e)
@@ -923,14 +942,14 @@ public sealed partial class MainWindow : Window
             var visible = MirrorQuadLayersToggle.IsOn;
             _service.ApplyMirrorQuadLayers(visible);
             ShowMessage(
-                visible ? "Quad-layer UI shown" : "Quad-layer UI hidden",
-                "The OBS mirror picks up this recording-only setting live when the updated layer is active. The headset remains unchanged.",
+                visible ? Loc.S("Code_Main_QuadLayerUiShown", "Quad-layer UI shown") : Loc.S("Code_Main_QuadLayerUiHidden", "Quad-layer UI hidden"),
+                Loc.S("Code_Main_QuadLayerUiSavedNote", "The OBS mirror picks up this recording-only setting live when the updated layer is active. The headset remains unchanged."),
                 InfoBarSeverity.Success);
             await RefreshSnapshotAsync();
         }
         catch (Exception ex)
         {
-            ShowMessage("Could not save the UI-layer setting", ex.Message, InfoBarSeverity.Error);
+            ShowMessage(Loc.S("Code_Main_CouldNotSaveUiLayerSetting", "Could not save the UI-layer setting"), ex.Message, InfoBarSeverity.Error);
         }
     }
 
@@ -987,9 +1006,12 @@ public sealed partial class MainWindow : Window
             {
                 _lastAutoUpdateKey = installedVersion;
                 ShowMessage(
-                    "Newer components are installed",
-                    $"The installed layer and OBS source come from {installedVersion}, which is newer than this " +
-                    $"Control Center ({AppUpdateService.CurrentVersion}). They were left alone; update the app to match.",
+                    Loc.S("Code_Main_NewerComponentsInstalled", "Newer components are installed"),
+                    Loc.F(
+                        "Code_Main_NewerComponentsMessage",
+                        "The installed layer and OBS source come from {0}, which is newer than this " +
+                        "Control Center ({1}). They were left alone; update the app to match.",
+                        installedVersion, AppUpdateService.CurrentVersion),
                     InfoBarSeverity.Informational);
             }
             return;
@@ -1024,22 +1046,22 @@ public sealed partial class MainWindow : Window
             if (!pluginDeferred)
                 _service.RecordInstalledComponentsVersion(AppUpdateService.CurrentVersion);
 
-            var restartRequired = layerOutdated && MarkVrRestartRequired("the OpenXR layer update");
+            var restartRequired = layerOutdated && MarkVrRestartRequired(Loc.S("Code_Main_ReasonLayerUpdate", "the OpenXR layer update"));
             var followUp =
-                (restartRequired ? " Restart the running VR application to load the new layer build." : string.Empty) +
-                (pluginDeferred ? " The OBS source update installs automatically once OBS is closed." : string.Empty) +
-                (pluginOutdated && !pluginDeferred ? " Restart OBS to load the updated source." : string.Empty);
+                (restartRequired ? " " + Loc.S("Code_Main_RestartVrForNewLayer", "Restart the running VR application to load the new layer build.") : string.Empty) +
+                (pluginDeferred ? " " + Loc.S("Code_Main_ObsSourceUpdateOnClose", "The OBS source update installs automatically once OBS is closed.") : string.Empty) +
+                (pluginOutdated && !pluginDeferred ? " " + Loc.S("Code_Main_RestartObsForSource", "Restart OBS to load the updated source.") : string.Empty);
             ShowMessage(
-                pluginDeferred && !layerOutdated ? "OBS source update waiting" : "Updated automatically",
-                (string.IsNullOrWhiteSpace(output) ? "A new build was detected." : LastLine(output)) + followUp,
+                pluginDeferred && !layerOutdated ? Loc.S("Code_Main_ObsSourceUpdateWaiting", "OBS source update waiting") : Loc.S("Code_Main_UpdatedAutomatically", "Updated automatically"),
+                (string.IsNullOrWhiteSpace(output) ? Loc.S("Code_Main_NewBuildDetected", "A new build was detected.") : LastLine(output)) + followUp,
                 InfoBarSeverity.Success);
         }
         catch (Exception ex)
         {
             _autoUpdateFailed = true;
             ShowMessage(
-                "Automatic update failed",
-                $"{ex.Message} Use Installation > Install / update to retry.",
+                Loc.S("Code_Main_AutomaticUpdateFailed", "Automatic update failed"),
+                Loc.F("Code_Main_AutomaticUpdateFailedBody", "{0} Use Installation > Install / update to retry.", ex.Message),
                 InfoBarSeverity.Warning);
         }
         finally
@@ -1068,7 +1090,7 @@ public sealed partial class MainWindow : Window
 
     private async void InstallUpdate_Click(object sender, RoutedEventArgs e)
     {
-        await RunActionAsync("Installing OBSMirror", async () =>
+        await RunActionAsync(Loc.S("Code_Main_ActionInstallingObsmirror", "Installing OBSMirror"), async () =>
         {
             var snapshot = _service.GetSnapshot();
             var layerWillChange = !snapshot.LayerFilesInstalled || !snapshot.LayerCurrent;
@@ -1078,10 +1100,10 @@ public sealed partial class MainWindow : Window
                 ? await _service.SetupAsync(snapshot.ObsRunning)
                 : $"{await _service.InstallLayerOnlyAsync()} {await ElevatedInstallService.InstallPluginElevatedAsync()}";
             _service.RecordInstalledComponentsVersion(AppUpdateService.CurrentVersion);
-            var restartRequired = layerWillChange && MarkVrRestartRequired("the OpenXR layer update");
+            var restartRequired = layerWillChange && MarkVrRestartRequired(Loc.S("Code_Main_ReasonLayerUpdate", "the OpenXR layer update"));
             ShowMessage(
-                "Installation complete",
-                LastLine(output) + (restartRequired ? " Restart the running VR application to load the new layer build." : string.Empty),
+                Loc.S("Code_Main_InstallationComplete", "Installation complete"),
+                LastLine(output) + (restartRequired ? " " + Loc.S("Code_Main_RestartVrForNewLayer", "Restart the running VR application to load the new layer build.") : string.Empty),
                 InfoBarSeverity.Success);
         });
     }
@@ -1092,25 +1114,27 @@ public sealed partial class MainWindow : Window
             return;
 
         var enable = toggle.IsOn;
-        await RunActionAsync(enable ? "Enabling the OpenXR layer" : "Disabling the OpenXR layer", async () =>
+        await RunActionAsync(enable
+            ? Loc.S("Code_Main_ActionEnablingLayer", "Enabling the OpenXR layer")
+            : Loc.S("Code_Main_ActionDisablingLayer", "Disabling the OpenXR layer"), async () =>
         {
             if (enable)
             {
                 var output = await _service.RegisterLayerAsync();
-                var restartRequired = MarkVrRestartRequired("the OpenXR layer registration change");
+                var restartRequired = MarkVrRestartRequired(Loc.S("Code_Main_ReasonLayerRegistrationChange", "the OpenXR layer registration change"));
                 ShowMessage(
-                    "OpenXR layer enabled",
-                    LastLine(output) + (restartRequired ? " Restart the running VR application to load the layer." : string.Empty),
+                    Loc.S("Code_Main_LayerEnabled", "OpenXR layer enabled"),
+                    LastLine(output) + (restartRequired ? " " + Loc.S("Code_Main_RestartVrToLoadLayer", "Restart the running VR application to load the layer.") : string.Empty),
                     InfoBarSeverity.Success);
             }
             else
             {
                 var output = await _service.UnregisterLayerAsync();
-                var restartRequired = MarkVrRestartRequired("the OpenXR layer registration change");
+                var restartRequired = MarkVrRestartRequired(Loc.S("Code_Main_ReasonLayerRegistrationChange", "the OpenXR layer registration change"));
                 ShowMessage(
-                    "OpenXR layer disabled",
-                    LastLine(output) + " Installed files and the OBS source were left in place." +
-                    (restartRequired ? " Restart the running VR application to unload the layer." : string.Empty),
+                    Loc.S("Code_Main_LayerDisabled", "OpenXR layer disabled"),
+                    LastLine(output) + " " + Loc.S("Code_Main_FilesLeftInPlace", "Installed files and the OBS source were left in place.") +
+                    (restartRequired ? " " + Loc.S("Code_Main_RestartVrToUnloadLayer", "Restart the running VR application to unload the layer.") : string.Empty),
                     InfoBarSeverity.Success);
             }
         });
@@ -1143,7 +1167,7 @@ public sealed partial class MainWindow : Window
 
     private async void RemoveConflictingPlugin_Click(object sender, RoutedEventArgs e)
     {
-        await RunActionAsync("Removing the old OBS source copy", async () =>
+        await RunActionAsync(Loc.S("Code_Main_ActionRemovingOldSource", "Removing the old OBS source copy"), async () =>
         {
             if (_snapshot?.ObsRunning == true)
                 throw new InvalidOperationException("Close OBS first; it is holding the old plugin file open.");
@@ -1152,8 +1176,8 @@ public sealed partial class MainWindow : Window
             // the same elevation path the plugin installer uses.
             var message = await ElevatedInstallService.RemoveConflictingPluginElevatedAsync();
             ShowMessage(
-                "Old OBS source copy removed",
-                $"{message} Start OBS again; the installed source will now be the one that loads.",
+                Loc.S("Code_Main_OldSourceCopyRemoved", "Old OBS source copy removed"),
+                Loc.F("Code_Main_OldSourceCopyRemovedBody", "{0} Start OBS again; the installed source will now be the one that loads.", message),
                 InfoBarSeverity.Success);
         });
     }
@@ -1164,11 +1188,14 @@ public sealed partial class MainWindow : Window
         {
             if (_snapshot?.ObsRunning == true)
             {
-                ShowMessage("OBS is already running", "The saved OpenXR Mirror Capture source is ready in the current OBS session.", InfoBarSeverity.Informational);
+                ShowMessage(
+                    Loc.S("Code_Main_ObsAlreadyRunning", "OBS is already running"),
+                    Loc.S("Code_Main_ObsAlreadyRunningBody", "The saved OpenXR Mirror Capture source is ready in the current OBS session."),
+                    InfoBarSeverity.Informational);
                 return;
             }
             _service.LaunchObs();
-            ShowMessage("OBS launched", "Refresh status after OBS finishes loading.", InfoBarSeverity.Success);
+            ShowMessage(Loc.S("Code_Main_ObsLaunched", "OBS launched"), Loc.S("Code_Main_ObsLaunchedBody", "Refresh status after OBS finishes loading."), InfoBarSeverity.Success);
         }
         catch (OBSMirrorService.ObsNotFoundException ex)
         {
@@ -1178,7 +1205,7 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowMessage("Could not launch OBS", ex.Message, InfoBarSeverity.Error);
+            ShowMessage(Loc.S("Code_Main_CouldNotLaunchObs", "Could not launch OBS"), ex.Message, InfoBarSeverity.Error);
         }
     }
 
@@ -1190,13 +1217,13 @@ public sealed partial class MainWindow : Window
         var dialog = new ContentDialog
         {
             XamlRoot = xamlRoot,
-            Title = "Locate OBS Studio",
-            PrimaryButtonText = "Browse for obs64.exe",
-            CloseButtonText = "Cancel",
+            Title = Loc.S("Code_Main_LocateObsStudio", "Locate OBS Studio"),
+            PrimaryButtonText = Loc.S("Code_Main_BrowseForObs64", "Browse for obs64.exe"),
+            CloseButtonText = Loc.S("Code_Main_Cancel", "Cancel"),
             DefaultButton = ContentDialogButton.Primary,
             Content = new TextBlock
             {
-                Text = $"{reason}\n\nobs64.exe is usually in the OBS install folder under bin\\64bit.",
+                Text = $"{reason}\n\n" + Loc.S("Code_Main_ObsExeHint", "obs64.exe is usually in the OBS install folder under bin\\64bit."),
                 TextWrapping = TextWrapping.Wrap,
             },
         };
@@ -1217,13 +1244,13 @@ public sealed partial class MainWindow : Window
             _service.SetObsExecutable(file.Path);
             _service.LaunchObs();
             ShowMessage(
-                "OBS launched",
-                $"Saved this location for future launches: {file.Path}",
+                Loc.S("Code_Main_ObsLaunched", "OBS launched"),
+                Loc.F("Code_Main_SavedObsLocation", "Saved this location for future launches: {0}", file.Path),
                 InfoBarSeverity.Success);
         }
         catch (Exception ex)
         {
-            ShowMessage("Could not launch OBS", ex.Message, InfoBarSeverity.Error);
+            ShowMessage(Loc.S("Code_Main_CouldNotLaunchObs", "Could not launch OBS"), ex.Message, InfoBarSeverity.Error);
         }
     }
 
@@ -1237,27 +1264,27 @@ public sealed partial class MainWindow : Window
             if (_snapshot?.RuntimeOverrideActive != true && systemRuntimeIsSimulator)
             {
                 ShowMessage(
-                    "Select a headset runtime first",
-                    "The system runtime itself is currently the simulator, so there is no headset runtime for this button to restore. Open your headset or SteamVR desktop software and choose 'Set as active OpenXR runtime'.",
+                    Loc.S("Code_Main_SelectHeadsetRuntimeFirst", "Select a headset runtime first"),
+                    Loc.S("Code_Main_SystemRuntimeIsSimulator", "The system runtime itself is currently the simulator, so there is no headset runtime for this button to restore. Open your headset or SteamVR desktop software and choose 'Set as active OpenXR runtime'."),
                     InfoBarSeverity.Warning);
                 return;
             }
 
-            var systemRuntimeName = _snapshot?.SystemRuntimeName ?? "the system OpenXR runtime";
+            var systemRuntimeName = _snapshot?.SystemRuntimeName ?? Loc.S("Code_Main_TheSystemOpenXrRuntime", "the system OpenXR runtime");
             var runtimeChanged = _snapshot?.RuntimeOverrideActive == true ||
                                  _snapshot?.SimulatorRuntimeOverrideActive == true;
             var runtimePath = await Task.Run(_service.RestoreSystemRuntime);
-            var restartRequired = runtimeChanged && MarkVrRestartRequired("the OpenXR runtime change");
+            var restartRequired = runtimeChanged && MarkVrRestartRequired(Loc.S("Code_Main_ReasonRuntimeChange", "the OpenXR runtime change"));
             ShowMessage(
-                "Headset runtime restored",
-                $"Per-user simulator overrides were cleared. New OpenXR applications will use {systemRuntimeName} ({runtimePath})." +
-                (restartRequired ? " Restart the running VR application to switch runtimes." : string.Empty),
+                Loc.S("Code_Main_HeadsetRuntimeRestored", "Headset runtime restored"),
+                Loc.F("Code_Main_HeadsetRuntimeRestoredBody", "Per-user simulator overrides were cleared. New OpenXR applications will use {0} ({1}).", systemRuntimeName, runtimePath) +
+                (restartRequired ? " " + Loc.S("Code_Main_RestartVrToSwitchRuntimes", "Restart the running VR application to switch runtimes.") : string.Empty),
                 InfoBarSeverity.Success);
             await RefreshSnapshotAsync();
         }
         catch (Exception ex)
         {
-            ShowMessage("Could not restore the headset runtime", ex.Message, InfoBarSeverity.Error);
+            ShowMessage(Loc.S("Code_Main_CouldNotRestoreRuntime", "Could not restore the headset runtime"), ex.Message, InfoBarSeverity.Error);
         }
     }
 
@@ -1267,15 +1294,21 @@ public sealed partial class MainWindow : Window
         {
             if (_snapshot?.MetaXrRunning == true)
             {
-                ShowMessage("Simulator testing tool is already running", "The manager has not changed your active OpenXR runtime.", InfoBarSeverity.Informational);
+                ShowMessage(
+                    Loc.S("Code_Main_SimulatorAlreadyRunning", "Simulator testing tool is already running"),
+                    Loc.S("Code_Main_SimulatorAlreadyRunningBody", "The manager has not changed your active OpenXR runtime."),
+                    InfoBarSeverity.Informational);
                 return;
             }
             _service.LaunchMetaXr(_snapshot?.MetaXrExecutable ?? string.Empty);
-            ShowMessage("Simulator testing tool launched", "It opened without inheriting a simulator runtime override. Runtime selection remains an explicit testing action.", InfoBarSeverity.Success);
+            ShowMessage(
+                Loc.S("Code_Main_SimulatorLaunched", "Simulator testing tool launched"),
+                Loc.S("Code_Main_SimulatorLaunchedBody", "It opened without inheriting a simulator runtime override. Runtime selection remains an explicit testing action."),
+                InfoBarSeverity.Success);
         }
         catch (Exception ex)
         {
-            ShowMessage("Could not launch the simulator testing tool", ex.Message, InfoBarSeverity.Error);
+            ShowMessage(Loc.S("Code_Main_CouldNotLaunchSimulator", "Could not launch the simulator testing tool"), ex.Message, InfoBarSeverity.Error);
         }
     }
 
@@ -1323,17 +1356,17 @@ public sealed partial class MainWindow : Window
 
     private async void ShareLogs_Click(object sender, RoutedEventArgs e)
     {
-        await RunActionAsync("Log sharing", async () =>
+        await RunActionAsync(Loc.S("Code_Main_ActionLogSharing", "Log sharing"), async () =>
         {
             var files = await Task.Run(() => LogSharingService.CollectDiagnostics(_service, _snapshot, _previewService));
             var result = await _logSharing.UploadAsync(files);
 
             var copied = LogSharingService.TryCopyToClipboard(result.BinUrl);
-            var summary = $"{result.BinUrl} ({result.FileUrls.Count} file(s); the link expires after about a week)";
+            var summary = Loc.F("Code_Main_ShareSummary", "{0} ({1} file(s); the link expires after about a week)", result.BinUrl, result.FileUrls.Count);
             if (result.Failures.Count > 0)
-                summary += $" Not uploaded: {string.Join("; ", result.Failures)}";
+                summary += " " + Loc.F("Code_Main_NotUploaded", "Not uploaded: {0}", string.Join("; ", result.Failures));
             ShowMessage(
-                copied ? "Logs uploaded - share link copied to the clipboard" : "Logs uploaded",
+                copied ? Loc.S("Code_Main_LogsUploadedLinkCopied", "Logs uploaded - share link copied to the clipboard") : Loc.S("Code_Main_LogsUploaded", "Logs uploaded"),
                 summary,
                 result.Failures.Count > 0 ? InfoBarSeverity.Warning : InfoBarSeverity.Success);
         });
@@ -1350,7 +1383,7 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowMessage(actionName + " failed", ex.Message, InfoBarSeverity.Error);
+            ShowMessage(Loc.F("Code_Main_ActionFailed", "{0} failed", actionName), ex.Message, InfoBarSeverity.Error);
         }
         finally
         {
@@ -1380,7 +1413,22 @@ public sealed partial class MainWindow : Window
 
     private SolidColorBrush GetBrush(string key) => (SolidColorBrush)Application.Current.Resources[key];
 
-    private static string ShortHash(string hash) => string.IsNullOrWhiteSpace(hash) ? "hash unavailable" : hash[..Math.Min(10, hash.Length)];
-    private static string DisplayHash(string hash) => string.IsNullOrWhiteSpace(hash) ? "not installed" : hash;
-    private static string LastLine(string text) => text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? "Completed successfully.";
+    private static string ShortHash(string hash) => string.IsNullOrWhiteSpace(hash) ? Loc.S("Code_Main_HashUnavailable", "hash unavailable") : hash[..Math.Min(10, hash.Length)];
+    private static string DisplayHash(string hash) => string.IsNullOrWhiteSpace(hash) ? Loc.S("Code_Main_HashNotInstalled", "not installed") : hash;
+    private static string LastLine(string text) => text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? Loc.S("Code_Main_CompletedSuccessfully", "Completed successfully.");
+
+    // 服务层返回的运行时名称同时参与逻辑判断（RuntimeName.Equals("Not configured")、
+    // RuntimeName.Contains("Simulator") 等），因此这里只翻译展示用的已知状态短语；
+    // 第三方运行时与设备名按原文显示。
+    private static string DisplayRuntimeLabel(string value)
+    {
+        return value switch
+        {
+            "Not configured" => Loc.S("Code_Main_RuntimeNotConfigured", "Not configured"),
+            "No runtime configured" => Loc.S("Code_Main_RuntimeNoneConfigured", "No runtime configured"),
+            "System headset runtime" => Loc.S("Code_Main_RuntimeSystemHeadset", "System headset runtime"),
+            "Process environment override" => Loc.S("Code_Main_RuntimeProcessOverride", "Process environment override"),
+            _ => value,
+        };
+    }
 }

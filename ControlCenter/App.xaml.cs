@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using OBSMirror.ControlCenter.Localization;
 using OBSMirror.ControlCenter.Services;
 
 namespace OBSMirror.ControlCenter;
@@ -16,6 +17,13 @@ public partial class App : Application
         LogStartup("App constructor entered");
         try
         {
+            // Must run before any window is created: the language override has to
+            // be in place before XAML resolves x:Uid resources.
+            Loc.Initialize();
+            LogStartup(
+                $"Localization: language={Loc.CurrentLanguage}, overridden={Loc.IsOverridden}, " +
+                $"dashboardNav={Loc.S("Ui_Nav_Dashboard.Text", "Dashboard")}");
+
             InitializeComponent();
             LogStartup("App.InitializeComponent completed");
         }

@@ -92,10 +92,14 @@ foreach ($scriptName in @(
 Copy-Item -Path (Join-Path $repoRoot 'OBSPlugin\win-openxr\data\*') `
     -Destination (Join-Path $payloadRoot 'OBSPlugin\win-openxr\data') -Recurse -Force
 
-foreach ($fileName in @('README.md', 'LICENSE', 'THIRD_PARTY', 'Launch OpenXR OBS Mirror.cmd')) {
+foreach ($fileName in @('README.md', 'README.zh-CN.md', 'LICENSE', 'THIRD_PARTY', 'Launch OpenXR OBS Mirror.cmd')) {
     Copy-Item -LiteralPath (Join-Path $repoRoot $fileName) -Destination $payloadRoot -Force
 }
 Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\INSTALL.md') `
+    -Destination (Join-Path $payloadRoot 'docs') -Force
+Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\INSTALL.zh-CN.md') `
+    -Destination (Join-Path $payloadRoot 'docs') -Force
+Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\NOTICE-ZH-CN.md') `
     -Destination (Join-Path $payloadRoot 'docs') -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "docs\release-notes\$tag.md") `
     -Destination (Join-Path $payloadRoot 'docs\release-notes') -Force

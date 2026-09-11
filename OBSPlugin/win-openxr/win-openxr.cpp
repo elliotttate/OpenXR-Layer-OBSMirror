@@ -14,6 +14,7 @@
 #include <graphics/image-file.h>
 #include <util/platform.h>
 #include <util/dstr.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <d3d11.h>
 #include <winrt/base.h>
@@ -1084,7 +1085,20 @@ static obs_properties_t *win_openxrmirror_properties(void *data)
 	obs_property_list_add_int(p, obs_module_text("CropPresetNone"), 0);
 	int i = 1;
 	for (const auto &c : croppresets) {
-		obs_property_list_add_int(p, c.name, i++);
+		// A preset name that starts with '@' is a locale key, so the
+		// shipped preset can be translated; device names stay literal.
+		// Resolved here rather than in load_presets() because
+		// obs_module_text only reflects the active locale once the
+		// source properties are built.
+		// A name that starts with '@' but has no translation is kept verbatim,
+		// so a literal device name is never silently rewritten.
+		const char *label = c.name;
+		if (c.name[0] == '@') {
+			const char *translated = obs_module_text(c.name + 1);
+			if (translated != nullptr && *translated != 0 && strcmp(translated, c.name + 1) != 0)
+				label = translated;
+		}
+		obs_property_list_add_int(p, label, i++);
 	}
 	obs_property_set_modified_callback(p, crop_preset_changed);
 

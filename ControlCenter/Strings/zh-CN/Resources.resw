@@ -1,0 +1,951 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Ui_TitleBar_Eyebrow.Text" xml:space="preserve">
+    <value>控制中心</value>
+  </data>
+  <data name="Ui_Sidebar_Eyebrow.Text" xml:space="preserve">
+    <value>采集工具</value>
+  </data>
+  <data name="Ui_Nav_Dashboard.Text" xml:space="preserve">
+    <value>仪表盘</value>
+  </data>
+  <data name="Ui_Nav_Overscan.Text" xml:space="preserve">
+    <value>过扫描</value>
+  </data>
+  <data name="Ui_Nav_Smoothing.Text" xml:space="preserve">
+    <value>相机平滑</value>
+  </data>
+  <data name="Ui_Nav_QuadLayers.Text" xml:space="preserve">
+    <value>UI 层</value>
+  </data>
+  <data name="Ui_Nav_Installation.Text" xml:space="preserve">
+    <value>安装</value>
+  </data>
+  <data name="Ui_Nav_Diagnostics.Text" xml:space="preserve">
+    <value>诊断</value>
+  </data>
+  <data name="Ui_VrRestart_Title.Text" xml:space="preserve">
+    <value>重启 VR 应用</value>
+  </data>
+  <data name="Ui_VrRestart_Reason.Text" xml:space="preserve">
+    <value>重启正在运行的 VR 应用以应用此更改。</value>
+  </data>
+  <data name="Ui_Dashboard_Eyebrow.Text" xml:space="preserve">
+    <value>系统总览</value>
+  </data>
+  <data name="Ui_Dashboard_Title.Text" xml:space="preserve">
+    <value>已就绪，可开始下一次采集。</value>
+  </data>
+  <data name="Ui_Dashboard_Subtitle.Text" xml:space="preserve">
+    <value>OpenXR 层、OpenXR/OpenVR OBS 源、运行时以及录制过扫描的实时状态。</value>
+  </data>
+  <data name="Ui_Action_Refresh.Text" xml:space="preserve">
+    <value>刷新</value>
+  </data>
+  <data name="Ui_Card_Layer_Eyebrow.Text" xml:space="preserve">
+    <value>OPENXR 层</value>
+  </data>
+  <data name="Ui_Status_Checking.Text" xml:space="preserve">
+    <value>检查中…</value>
+  </data>
+  <data name="Ui_Card_Plugin_Eyebrow.Text" xml:space="preserve">
+    <value>OBS 源</value>
+  </data>
+  <data name="Ui_Card_Runtime_Eyebrow.Text" xml:space="preserve">
+    <value>OPENXR 运行时</value>
+  </data>
+  <data name="Ui_Card_Overscan_Eyebrow.Text" xml:space="preserve">
+    <value>过扫描</value>
+  </data>
+  <data name="Ui_QuickActions_Eyebrow.Text" xml:space="preserve">
+    <value>快捷操作</value>
+  </data>
+  <data name="Ui_QuickActions_Title.Text" xml:space="preserve">
+    <value>采集流程</value>
+  </data>
+  <data name="Ui_QuickActions_Layer.Text" xml:space="preserve">
+    <value>层</value>
+  </data>
+  <data name="Ui_Action_OpenObs.Text" xml:space="preserve">
+    <value>打开 OBS</value>
+  </data>
+  <data name="Ui_Action_OpenObsButton.Content" xml:space="preserve">
+    <value>打开 OBS</value>
+  </data>
+  <data name="Ui_Action_UseHeadsetRuntime.Text" xml:space="preserve">
+    <value>使用头显运行时</value>
+  </data>
+  <data name="Ui_Action_OpenLayerLog.Text" xml:space="preserve">
+    <value>打开层日志</value>
+  </data>
+  <data name="Ui_RuntimeMode_Checking.Title" xml:space="preserve">
+    <value>正在检查运行时选择</value>
+  </data>
+  <data name="Ui_RuntimeMode_Checking.Message" xml:space="preserve">
+    <value>正在读取当前生效的与系统级的 OpenXR 运行时设置。</value>
+  </data>
+  <data name="Ui_Conflict_Title.Title" xml:space="preserve">
+    <value>存在旧版 OBS 源正在抢占</value>
+  </data>
+  <data name="Ui_Conflict_Action.Content" xml:space="preserve">
+    <value>移除旧版副本</value>
+  </data>
+  <data name="Ui_NonOpenXr_Checking.Title" xml:space="preserve">
+    <value>正在检查运行中的 VR 应用</value>
+  </data>
+  <data name="Ui_Preview_Eyebrow.Text" xml:space="preserve">
+    <value>实时镜像预览</value>
+  </data>
+  <data name="Ui_Preview_StatusWaiting.Text" xml:space="preserve">
+    <value>等待 VR 应用</value>
+  </data>
+  <data name="Ui_Preview_DetailIdle.Text" xml:space="preserve">
+    <value>启动 OpenXR 或 OpenVR 应用后，预览会自动连接。</value>
+  </data>
+  <data name="Ui_Preview_RefreshTooltip.ToolTipService.ToolTip" xml:space="preserve">
+    <value>立即刷新预览</value>
+  </data>
+  <data name="Ui_Preview_OpenLarger.Text" xml:space="preserve">
+    <value>放大查看</value>
+  </data>
+  <data name="Ui_Preview_PlaceholderTitle.Text" xml:space="preserve">
+    <value>暂无镜像画面</value>
+  </data>
+  <data name="Ui_Preview_PlaceholderDetail.Text" xml:space="preserve">
+    <value>预览会自动连接到 OpenXR 或 OpenVR 采集。</value>
+  </data>
+  <data name="Ui_Overscan_Eyebrow.Text" xml:space="preserve">
+    <value>录制过扫描</value>
+  </data>
+  <data name="Ui_Overscan_Title.Text" xml:space="preserve">
+    <value>给录制画面留出更多余量。</value>
+  </data>
+  <data name="Ui_Overscan_Subtitle.Text" xml:space="preserve">
+    <value>向 OpenXR 应用申请更大的视场角（FOV）与渲染目标，而头显仍然获得原始的中央裁切画面。</value>
+  </data>
+  <data name="Ui_Overscan_Enable.Text" xml:space="preserve">
+    <value>启用录制过扫描</value>
+  </data>
+  <data name="Ui_Overscan_EnableHint.Text" xml:space="preserve">
+    <value>该设置会在 VR 应用下次创建 OpenXR 时生效。</value>
+  </data>
+  <data name="Ui_Overscan_Horizontal.Text" xml:space="preserve">
+    <value>水平扩展</value>
+  </data>
+  <data name="Ui_Overscan_HorizontalHint.Text" xml:space="preserve">
+    <value>为录制画面的左右两侧增加余量。</value>
+  </data>
+  <data name="Ui_Overscan_Vertical.Text" xml:space="preserve">
+    <value>垂直扩展</value>
+  </data>
+  <data name="Ui_Overscan_VerticalHint.Text" xml:space="preserve">
+    <value>在头显裁切区域的上方与下方增加余量。</value>
+  </data>
+  <data name="Ui_Overscan_ShapeEyebrow.Text" xml:space="preserve">
+    <value>录制画面比例</value>
+  </data>
+  <data name="Ui_Overscan_ShapeHint.Text" xml:space="preserve">
+    <value>头显每只眼睛的渲染画面接近正方形，因此在水平扩展超过垂直扩展之前，录制画面都是正方形。</value>
+  </data>
+  <data name="Ui_Overscan_ShapeNative.Content" xml:space="preserve">
+    <value>头显原生</value>
+  </data>
+  <data name="Ui_Overscan_ShapeWidest.Content" xml:space="preserve">
+    <value>尽可能宽</value>
+  </data>
+  <data name="Ui_Overscan_PresetsEyebrow.Text" xml:space="preserve">
+    <value>各边额外余量</value>
+  </data>
+  <data name="Ui_Overscan_PresetBalanced.Content" xml:space="preserve">
+    <value>均衡  115 × 108</value>
+  </data>
+  <data name="Ui_Overscan_PresetWide.Content" xml:space="preserve">
+    <value>宽幅  120 × 110</value>
+  </data>
+  <data name="Ui_Overscan_PresetExtraWide.Content" xml:space="preserve">
+    <value>超宽  130 × 115</value>
+  </data>
+  <data name="Ui_Overscan_PixelCostEyebrow.Text" xml:space="preserve">
+    <value>预计像素开销</value>
+  </data>
+  <data name="Ui_Overscan_FrameEyebrow.Text" xml:space="preserve">
+    <value>录制帧尺寸</value>
+  </data>
+  <data name="Ui_Overscan_Restart.Title" xml:space="preserve">
+    <value>重启 VR 应用</value>
+  </data>
+  <data name="Ui_Overscan_Restart.Message" xml:space="preserve">
+    <value>修改这些数值无法改变已存在的 OpenXR 交换链大小。</value>
+  </data>
+  <data name="Ui_Overscan_Footer.Text" xml:space="preserve">
+    <value>改动会即时保存，重启 VR 应用后生效。</value>
+  </data>
+  <data name="Ui_Smoothing_Eyebrow.Text" xml:space="preserve">
+    <value>录制相机</value>
+  </data>
+  <data name="Ui_Smoothing_Title.Text" xml:space="preserve">
+    <value>在不改动头显画面的前提下平滑运动。</value>
+  </data>
+  <data name="Ui_Smoothing_Subtitle.Text" xml:space="preserve">
+    <value>经过滤波的虚拟相机只作用于 OBS 镜像；头显仍然接收原始的位姿与画面。</value>
+  </data>
+  <data name="Ui_Smoothing_Managed.Text" xml:space="preserve">
+    <value>由本应用控制平滑</value>
+  </data>
+  <data name="Ui_Smoothing_ManagedHint.Text" xml:space="preserve">
+    <value>关闭后改用直接保存在 OBS 源上的数值。</value>
+  </data>
+  <data name="Ui_Smoothing_Strength.Text" xml:space="preserve">
+    <value>平滑强度</value>
+  </data>
+  <data name="Ui_Smoothing_StrengthHint.Text" xml:space="preserve">
+    <value>数值越高画面越稳但漂浮感越强；设为 0 可关闭滤波相机。</value>
+  </data>
+  <data name="Ui_Smoothing_Crop.Text" xml:space="preserve">
+    <value>平移边距裁切</value>
+  </data>
+  <data name="Ui_Smoothing_CropHint.Text" xml:space="preserve">
+    <value>为平滑相机预留边缘余量，使其平移时不会露出黑边。</value>
+  </data>
+  <data name="Ui_Smoothing_PresetsEyebrow.Text" xml:space="preserve">
+    <value>预设</value>
+  </data>
+  <data name="Ui_Smoothing_PresetSubtle.Content" xml:space="preserve">
+    <value>轻微  20 / 5%</value>
+  </data>
+  <data name="Ui_Smoothing_PresetBalanced.Content" xml:space="preserve">
+    <value>均衡  40 / 8%</value>
+  </data>
+  <data name="Ui_Smoothing_PresetSteady.Content" xml:space="preserve">
+    <value>稳定  65 / 12%</value>
+  </data>
+  <data name="Ui_Smoothing_ResponseEyebrow.Text" xml:space="preserve">
+    <value>滤波响应</value>
+  </data>
+  <data name="Ui_Smoothing_ResponseHint.Text" xml:space="preserve">
+    <value>估算的滤波时间常数</value>
+  </data>
+  <data name="Ui_Smoothing_VisibleEyebrow.Text" xml:space="preserve">
+    <value>可见画面</value>
+  </data>
+  <data name="Ui_Smoothing_VisibleHint.Text" xml:space="preserve">
+    <value>为安全裁切后各轴保留的比例</value>
+  </data>
+  <data name="Ui_Smoothing_Availability.Title" xml:space="preserve">
+    <value>实时生效</value>
+  </data>
+  <data name="Ui_Smoothing_Availability.Message" xml:space="preserve">
+    <value>已安装的 OBS 源每秒轮询这些设置 4 次；保存的数值也会在下次会话中继续使用。</value>
+  </data>
+  <data name="Ui_QuadLayers_Eyebrow.Text" xml:space="preserve">
+    <value>录制 UI</value>
+  </data>
+  <data name="Ui_QuadLayers_Title.Text" xml:space="preserve">
+    <value>选择 UI 层是否出现在录制画面中。</value>
+  </data>
+  <data name="Ui_QuadLayers_Subtitle.Text" xml:space="preserve">
+    <value>可以在不影响头显画面的前提下，把 OpenXR 合成四边形层包含进 OBS 镜像或从中移除。</value>
+  </data>
+  <data name="Ui_QuadLayers_Toggle.Text" xml:space="preserve">
+    <value>OpenXR 四边形层 UI</value>
+  </data>
+  <data name="Ui_QuadLayers_ToggleHint.Text" xml:space="preserve">
+    <value>控制与主投影画面分开提交的 UI。</value>
+  </data>
+  <data name="Ui_QuadLayers_ToggleState.OnContent" xml:space="preserve">
+    <value>显示</value>
+  </data>
+  <data name="Ui_QuadLayers_ToggleState.OffContent" xml:space="preserve">
+    <value>隐藏</value>
+  </data>
+  <data name="Ui_QuadLayers_ObsEyebrow.Text" xml:space="preserve">
+    <value>OBS 录制</value>
+  </data>
+  <data name="Ui_QuadLayers_ObsHint.Text" xml:space="preserve">
+    <value>该过滤在层构建镜像画面时生效。</value>
+  </data>
+  <data name="Ui_QuadLayers_HeadsetEyebrow.Text" xml:space="preserve">
+    <value>头显</value>
+  </data>
+  <data name="Ui_QuadLayers_HeadsetValue.Text" xml:space="preserve">
+    <value>始终不受影响</value>
+  </data>
+  <data name="Ui_QuadLayers_HeadsetHint.Text" xml:space="preserve">
+    <value>所有层仍然会提交给当前生效的 OpenXR 运行时。</value>
+  </data>
+  <data name="Ui_QuadLayers_Availability.Title" xml:space="preserve">
+    <value>实时生效</value>
+  </data>
+  <data name="Ui_QuadLayers_Availability.Message" xml:space="preserve">
+    <value>更新后的 OpenXR 层会在录制时轮询该设置；安装更新后请重启一次 VR 应用。</value>
+  </data>
+  <data name="Ui_QuadLayers_ScopeEyebrow.Text" xml:space="preserve">
+    <value>可分离的范围</value>
+  </data>
+  <data name="Ui_QuadLayers_ScopeHint.Text" xml:space="preserve">
+    <value>该选项只影响 XR_COMPOSITION_LAYER_QUAD 内容。直接绘制进投影眼图里的 UI（包括世界空间或后处理 UI）属于该图像的一部分，无法单独隐藏。</value>
+  </data>
+  <data name="Ui_QuadLayers_Hide.Content" xml:space="preserve">
+    <value>从录制中隐藏</value>
+  </data>
+  <data name="Ui_QuadLayers_Show.Content" xml:space="preserve">
+    <value>在录制中显示</value>
+  </data>
+  <data name="Ui_QuadLayers_Apply.Content" xml:space="preserve">
+    <value>应用 UI 设置</value>
+  </data>
+  <data name="Ui_Install_Eyebrow.Text" xml:space="preserve">
+    <value>安装</value>
+  </data>
+  <data name="Ui_Install_Title.Text" xml:space="preserve">
+    <value>层与 OBS 集成。</value>
+  </data>
+  <data name="Ui_Install_Subtitle.Text" xml:space="preserve">
+    <value>安装已构建的层、为当前用户注册其清单，并部署匹配的 OBS 源。</value>
+  </data>
+  <data name="Ui_Install_LayerEyebrow.Text" xml:space="preserve">
+    <value>OPENXR API 层</value>
+  </data>
+  <data name="Ui_Install_EnableCurrentUser.Text" xml:space="preserve">
+    <value>为当前用户启用</value>
+  </data>
+  <data name="Ui_Install_EnableCurrentUserHint.Text" xml:space="preserve">
+    <value>关闭后 OpenXR 应用将不再加载该层；已安装的文件与 OBS 源都会保留。</value>
+  </data>
+  <data name="Ui_Install_RegistrationState.OnContent" xml:space="preserve">
+    <value>已启用</value>
+  </data>
+  <data name="Ui_Install_RegistrationState.OffContent" xml:space="preserve">
+    <value>已禁用</value>
+  </data>
+  <data name="Ui_Install_PluginEyebrow.Text" xml:space="preserve">
+    <value>OBS 插件</value>
+  </data>
+  <data name="Ui_Install_PluginHint.Text" xml:space="preserve">
+    <value>会同时安装 OpenXR 镜像采集与 OpenVR / SteamVR 镜像采集两个源。</value>
+  </data>
+  <data name="Ui_Install_BothEyebrow.Text" xml:space="preserve">
+    <value>安装或更新两个组件</value>
+  </data>
+  <data name="Ui_Install_BothTitle.Text" xml:space="preserve">
+    <value>使用本仓库中已构建好的发布产物。</value>
+  </data>
+  <data name="Ui_Install_BothHint.Text" xml:space="preserve">
+    <value>如果 OBS 正在运行且已装有完全相同的插件，安装程序只会安全地更新层。插件二进制发生变化时请先关闭 OBS，此时 Windows 可能会请求管理员权限。</value>
+  </data>
+  <data name="Ui_Install_OpenFolder.Content" xml:space="preserve">
+    <value>打开安装目录</value>
+  </data>
+  <data name="Ui_Install_InstallUpdate.Content" xml:space="preserve">
+    <value>安装 / 更新</value>
+  </data>
+  <data name="Ui_Install_RuntimeNote.Title" xml:space="preserve">
+    <value>默认使用头显的正常运行时</value>
+  </data>
+  <data name="Ui_Install_RuntimeNote.Message" xml:space="preserve">
+    <value>管理器启动模拟器时不会自动选中它。请只在下方测试区域使用模拟器，测试完成后恢复头显运行时。</value>
+  </data>
+  <data name="Ui_Install_SimulatorHeader.Header" xml:space="preserve">
+    <value>模拟器测试</value>
+  </data>
+  <data name="Ui_Install_SimulatorTitle.Text" xml:space="preserve">
+    <value>打开可选的模拟器工具</value>
+  </data>
+  <data name="Ui_Install_SimulatorHint.Text" xml:space="preserve">
+    <value>从这里打开可以保证运行时选择是明确的，也不会带上过期的模拟器环境变量覆盖。</value>
+  </data>
+  <data name="Ui_Install_OpenSimulator.Content" xml:space="preserve">
+    <value>打开模拟器（测试）</value>
+  </data>
+  <data name="Ui_Diagnostics_Eyebrow.Text" xml:space="preserve">
+    <value>诊断</value>
+  </data>
+  <data name="Ui_Diagnostics_Title.Text" xml:space="preserve">
+    <value>查看运行时实际看到的内容。</value>
+  </data>
+  <data name="Ui_Diagnostics_Refresh.Text" xml:space="preserve">
+    <value>刷新状态</value>
+  </data>
+  <data name="Ui_Diagnostics_RuntimeEyebrow.Text" xml:space="preserve">
+    <value>当前运行时</value>
+  </data>
+  <data name="Ui_Diagnostics_HashesEyebrow.Text" xml:space="preserve">
+    <value>已安装文件的哈希值</value>
+  </data>
+  <data name="Ui_Diagnostics_LogLayer.Content" xml:space="preserve">
+    <value>OpenXR 层日志</value>
+  </data>
+  <data name="Ui_Diagnostics_LogObs.Content" xml:space="preserve">
+    <value>OBS 日志</value>
+  </data>
+  <data name="Ui_Diagnostics_LogPreview.Content" xml:space="preserve">
+    <value>预览诊断</value>
+  </data>
+  <data name="Ui_Diagnostics_RefreshLog.Content" xml:space="preserve">
+    <value>刷新日志</value>
+  </data>
+  <data name="Ui_Diagnostics_ShareLogsTooltip.ToolTipService.ToolTip" xml:space="preserve">
+    <value>将诊断报告、层日志与 OBS 日志上传到 filebin.net，并把分享链接复制到剪贴板。链接约一周后失效。</value>
+  </data>
+  <data name="Ui_Diagnostics_ShareLogs.Text" xml:space="preserve">
+    <value>上传并分享日志</value>
+  </data>
+  <data name="Ui_Diagnostics_OpenExplorer.Content" xml:space="preserve">
+    <value>在资源管理器中打开</value>
+  </data>
+  <data name="Ui_LargePreview_Eyebrow.Text" xml:space="preserve">
+    <value>实时镜像预览</value>
+  </data>
+  <data name="Ui_LargePreview_Status.Text" xml:space="preserve">
+    <value>等待 VR 应用</value>
+  </data>
+  <data name="Ui_LargePreview_Detail.Text" xml:space="preserve">
+    <value>有画面输出后，预览会自动连接。</value>
+  </data>
+  <data name="Ui_LargePreview_PlaceholderTitle.Text" xml:space="preserve">
+    <value>暂无镜像画面</value>
+  </data>
+  <data name="Ui_LargePreview_PlaceholderDetail.Text" xml:space="preserve">
+    <value>启动 OpenXR 或 OpenVR 应用后，预览会自动连接。</value>
+  </data>
+  <data name="Ui_LargePreview_Footer.Text" xml:space="preserve">
+    <value>此视图与仪表盘使用同一条实时预览流，无需打开 OBS。</value>
+  </data>
+  <data name="Ui_Window_MainTitle" xml:space="preserve">
+    <value>OBSMirror 控制中心</value>
+  </data>
+  <data name="Ui_Window_PreviewTitle" xml:space="preserve">
+    <value>OBSMirror — 实时预览</value>
+  </data>
+  <data name="Code_Main_RuntimeNotConfigured" xml:space="preserve">
+    <value>未配置</value>
+  </data>
+  <data name="Code_Main_RuntimeNoneConfigured" xml:space="preserve">
+    <value>未配置运行时</value>
+  </data>
+  <data name="Code_Main_RuntimeSystemHeadset" xml:space="preserve">
+    <value>系统头显运行时</value>
+  </data>
+  <data name="Code_Main_RuntimeProcessOverride" xml:space="preserve">
+    <value>进程环境变量覆盖</value>
+  </data>
+  <data name="Code_Main_UpdateAvailableTitle" xml:space="preserve">
+    <value>有可用更新 — {0}</value>
+  </data>
+  <data name="Code_Main_UpdateAvailableYes" xml:space="preserve">
+    <value>是，更新</value>
+  </data>
+  <data name="Code_Main_Later" xml:space="preserve">
+    <value>稍后</value>
+  </data>
+  <data name="Code_Main_UpdateAvailableBody" xml:space="preserve">
+    <value>版本 {0} 已发布（当前版本为 {1}）。</value>
+  </data>
+  <data name="Code_Main_UpdateAvailableAuto" xml:space="preserve">
+    <value>更新会自动下载、安装并重新打开应用。</value>
+  </data>
+  <data name="Code_Main_DownloadingUpdate" xml:space="preserve">
+    <value>正在下载更新 {0}</value>
+  </data>
+  <data name="Code_Main_InstallingUpdate" xml:space="preserve">
+    <value>正在安装更新</value>
+  </data>
+  <data name="Code_Main_UpdateInstallNote" xml:space="preserve">
+    <value>应用现在会关闭，更新完成后会自动重新打开。</value>
+  </data>
+  <data name="Code_Main_UpdateFailed" xml:space="preserve">
+    <value>更新失败</value>
+  </data>
+  <data name="Code_Main_UpdateFailedBody" xml:space="preserve">
+    <value>{0} 可以在下次启动时的对话框中重试，也可从 GitHub Releases 下载。</value>
+  </data>
+  <data name="Code_Main_CouldNotRefreshStatus" xml:space="preserve">
+    <value>无法刷新状态</value>
+  </data>
+  <data name="Code_Main_Updating" xml:space="preserve">
+    <value>正在更新…</value>
+  </data>
+  <data name="Code_Main_RetryFromInstallationPage" xml:space="preserve">
+    <value>请在“安装”页面重试</value>
+  </data>
+  <data name="Code_Main_InstallingNewLayerAutomatically" xml:space="preserve">
+    <value>正在自动安装新的层构建</value>
+  </data>
+  <data name="Code_Main_ReleaseFilesNotInstalled" xml:space="preserve">
+    <value>发布文件尚未安装</value>
+  </data>
+  <data name="Code_Main_LayerInstalled" xml:space="preserve">
+    <value>已安装 • {0}</value>
+  </data>
+  <data name="Code_Main_NotInstalled" xml:space="preserve">
+    <value>未安装</value>
+  </data>
+  <data name="Code_Main_Current" xml:space="preserve">
+    <value>已是最新</value>
+  </data>
+  <data name="Code_Main_CloseObsToUpdate" xml:space="preserve">
+    <value>关闭 OBS 后更新</value>
+  </data>
+  <data name="Code_Main_PluginUpdateWaitsForObs" xml:space="preserve">
+    <value>OBS 正在运行 — 更新会在其关闭后安装</value>
+  </data>
+  <data name="Code_Main_ObsRunning" xml:space="preserve">
+    <value>OBS 正在运行</value>
+  </data>
+  <data name="Code_Main_ObsNotRunning" xml:space="preserve">
+    <value>OBS 未运行</value>
+  </data>
+  <data name="Code_Main_ConflictingPluginMessage" xml:space="preserve">
+    <value>OBS 正在从 {0} 加载第二份、更旧的采集源副本。OBS 会使用最先注册的那份副本，因此即使本页所有信息都显示为最新，该源仍可能一直黑屏。移除旧副本后，已安装的源会保留在原位。</value>
+  </data>
+  <data name="Code_Main_SteamVrCaptureAvailable" xml:space="preserve">
+    <value>可使用 SteamVR 采集</value>
+  </data>
+  <data name="Code_Main_SteamVrCaptureMessage" xml:space="preserve">
+    <value>自动 OBS 源将使用 SteamVR 原生合成器镜像。OpenXR 层控制不适用于此采集。</value>
+  </data>
+  <data name="Code_Main_VrApiNotCapturable" xml:space="preserve">
+    <value>暂不支持采集此 VR API</value>
+  </data>
+  <data name="Code_Main_VrApiNotCapturableMessage" xml:space="preserve">
+    <value>{0} 正通过 {1} 路径运行 VR，而非 OpenXR。请将该应用切换为 OpenXR 或 OpenVR/SteamVR，然后重新启动。</value>
+  </data>
+  <data name="Code_Main_SimulatorSelected" xml:space="preserve">
+    <value>已选择模拟器</value>
+  </data>
+  <data name="Code_Main_RestoreRuntimeForHeadset" xml:space="preserve">
+    <value>请恢复 {0} 以使用头显</value>
+  </data>
+  <data name="Code_Main_SelectHeadsetRuntime" xml:space="preserve">
+    <value>请在头显配套的桌面软件中选择其运行时</value>
+  </data>
+  <data name="Code_Main_SimulatorOverrideActive" xml:space="preserve">
+    <value>模拟器覆盖已生效</value>
+  </data>
+  <data name="Code_Main_SimulatorIsSystemRuntime" xml:space="preserve">
+    <value>模拟器当前是系统 OpenXR 运行时</value>
+  </data>
+  <data name="Code_Main_SimulatorOverrideMessage" xml:space="preserve">
+    <value>OpenXR 应用将绕过正常的头显运行时。点击“使用头显运行时”会恢复 {0} 并清除每用户覆盖。</value>
+  </data>
+  <data name="Code_Main_SimulatorNotSelectedByApp" xml:space="preserve">
+    <value>本应用未选择此运行时。请在启动 OpenXR 应用前，在头显或 SteamVR 软件中选择“设为活动的 OpenXR 运行时”。</value>
+  </data>
+  <data name="Code_Main_NoRuntimeConfigured" xml:space="preserve">
+    <value>未配置 OpenXR 运行时</value>
+  </data>
+  <data name="Code_Main_NoRuntimeConfiguredMessage" xml:space="preserve">
+    <value>请将头显软件设为活动的 OpenXR 运行时，然后刷新此页面。</value>
+  </data>
+  <data name="Code_Main_HeadsetRuntimeSelected" xml:space="preserve">
+    <value>已选择头显运行时</value>
+  </data>
+  <data name="Code_Main_HeadsetRuntimeSelectedMessage" xml:space="preserve">
+    <value>OpenXR 应用将使用 {0}。模拟器测试是可选的，且仅在“安装”页面中提供。</value>
+  </data>
+  <data name="Code_Main_HeadsetNativeFov" xml:space="preserve">
+    <value>头显原生 FOV</value>
+  </data>
+  <data name="Code_Main_InstallObsSource" xml:space="preserve">
+    <value>请安装 OBS 源</value>
+  </data>
+  <data name="Code_Main_ObsSourceSaveNowNotEffective" xml:space="preserve">
+    <value>现在可以保存这些数值，但必须先安装 OBS 源才能生效。</value>
+  </data>
+  <data name="Code_Main_SourceUpdateRequired" xml:space="preserve">
+    <value>需要更新源</value>
+  </data>
+  <data name="Code_Main_ObsSourceUpdateNote" xml:space="preserve">
+    <value>现在可以保存这些数值。安装可用的源更新并重启 OBS 后即可实时控制。</value>
+  </data>
+  <data name="Code_Main_InstallOpenXrLayer" xml:space="preserve">
+    <value>请安装 OpenXR 层</value>
+  </data>
+  <data name="Code_Main_LayerSaveNowNotEffective" xml:space="preserve">
+    <value>现在可以保存该偏好设置，但必须先安装更新后的层，才能过滤录制画面。</value>
+  </data>
+  <data name="Code_Main_LayerUpdateRequired" xml:space="preserve">
+    <value>需要更新层</value>
+  </data>
+  <data name="Code_Main_LayerUpdateNote" xml:space="preserve">
+    <value>现在即可保存该偏好设置，然后安装可用的层更新并重启一次 VR 应用。</value>
+  </data>
+  <data name="Code_Main_LayerInstalledDisabled" xml:space="preserve">
+    <value>已安装，已禁用</value>
+  </data>
+  <data name="Code_Main_LayerInstalledEnabled" xml:space="preserve">
+    <value>已安装并启用</value>
+  </data>
+  <data name="Code_Main_InstalledUpdatePending" xml:space="preserve">
+    <value>已安装，等待更新（自动）</value>
+  </data>
+  <data name="Code_Main_PluginInstalledCurrent" xml:space="preserve">
+    <value>已安装且为最新</value>
+  </data>
+  <data name="Code_Main_PluginUpdateWaitingForObs" xml:space="preserve">
+    <value>已安装，等待 OBS 关闭后更新</value>
+  </data>
+  <data name="Code_Main_SystemDefault" xml:space="preserve">
+    <value>系统默认：{0} — {1}</value>
+  </data>
+  <data name="Code_Main_DiagnosticLayerHash" xml:space="preserve">
+    <value>层   {0}</value>
+  </data>
+  <data name="Code_Main_DiagnosticPluginHash" xml:space="preserve">
+    <value>插件  {0}</value>
+  </data>
+  <data name="Code_Main_CouldNotSaveOverscan" xml:space="preserve">
+    <value>无法保存过扫描设置</value>
+  </data>
+  <data name="Code_Main_ReasonOverscanChange" xml:space="preserve">
+    <value>过扫描改动</value>
+  </data>
+  <data name="Code_Main_ScaleSummary" xml:space="preserve">
+    <value>{0:0.00}× 水平  •  {1:0.00}× 垂直</value>
+  </data>
+  <data name="Code_Main_FrameShapeKnown" xml:space="preserve">
+    <value>单眼 {0:0.00} : 1，来自运行时推荐的 {1} × {2}（{3:0.00} : 1）。应用自身的渲染缩放会同时作用于两个轴，因此画幅比例保持不变。</value>
+  </data>
+  <data name="Code_Main_FrameShapeUnknown" xml:space="preserve">
+    <value>相对于运行时推荐的单眼尺寸。运行一次 VR 应用后，这里会显示录制画面的实际像素尺寸与画幅比例。</value>
+  </data>
+  <data name="Code_Main_WidestShapeTitle" xml:space="preserve">
+    <value>已达此版本允许的最宽画幅</value>
+  </data>
+  <data name="Code_Main_WidestShapeLimited" xml:space="preserve">
+    <value>要得到 {0:0.00} : 1 的画幅，需要在这款头显 {2:0.00} : 1 的单眼渲染基础上增加超过 {1}% 的水平扩展。滑块已设置为可达到的最宽画幅 {3:0.00} : 1。</value>
+  </data>
+  <data name="Code_Main_RunningVrApp" xml:space="preserve">
+    <value>正在运行的 VR 应用</value>
+  </data>
+  <data name="Code_Main_RestartToApply" xml:space="preserve">
+    <value>重启 {0} 以应用{1}。</value>
+  </data>
+  <data name="Code_Main_RestartToApplyMultiple" xml:space="preserve">
+    <value>重启 {0} 以应用以下更改：{1}。</value>
+  </data>
+  <data name="Code_Main_CouldNotSaveCameraSmoothing" xml:space="preserve">
+    <value>无法保存相机平滑设置</value>
+  </data>
+  <data name="Code_Main_Off" xml:space="preserve">
+    <value>关闭</value>
+  </data>
+  <data name="Code_Main_ProjectionQuadLayerUi" xml:space="preserve">
+    <value>投影 + 四边形层 UI</value>
+  </data>
+  <data name="Code_Main_ProjectionOnly" xml:space="preserve">
+    <value>仅投影</value>
+  </data>
+  <data name="Code_Main_QuadLayerUiShown" xml:space="preserve">
+    <value>已显示四边形层 UI</value>
+  </data>
+  <data name="Code_Main_QuadLayerUiHidden" xml:space="preserve">
+    <value>已隐藏四边形层 UI</value>
+  </data>
+  <data name="Code_Main_QuadLayerUiSavedNote" xml:space="preserve">
+    <value>更新后的层生效时，OBS 镜像会实时采用这一仅影响录制的设置；头显画面保持不变。</value>
+  </data>
+  <data name="Code_Main_CouldNotSaveUiLayerSetting" xml:space="preserve">
+    <value>无法保存 UI 层设置</value>
+  </data>
+  <data name="Code_Main_NewerComponentsInstalled" xml:space="preserve">
+    <value>已安装更新的组件</value>
+  </data>
+  <data name="Code_Main_NewerComponentsMessage" xml:space="preserve">
+    <value>已安装的层与 OBS 源来自 {0}，比当前控制中心（{1}）更新。它们未被改动；请更新本应用以保持一致。</value>
+  </data>
+  <data name="Code_Main_ReasonLayerUpdate" xml:space="preserve">
+    <value>OpenXR 层更新</value>
+  </data>
+  <data name="Code_Main_RestartVrForNewLayer" xml:space="preserve">
+    <value>重启正在运行的 VR 应用以加载新的层构建。</value>
+  </data>
+  <data name="Code_Main_ObsSourceUpdateOnClose" xml:space="preserve">
+    <value>OBS 关闭后会自动安装 OBS 源更新。</value>
+  </data>
+  <data name="Code_Main_RestartObsForSource" xml:space="preserve">
+    <value>重启 OBS 以加载更新后的源。</value>
+  </data>
+  <data name="Code_Main_ObsSourceUpdateWaiting" xml:space="preserve">
+    <value>OBS 源更新等待中</value>
+  </data>
+  <data name="Code_Main_UpdatedAutomatically" xml:space="preserve">
+    <value>已自动更新</value>
+  </data>
+  <data name="Code_Main_NewBuildDetected" xml:space="preserve">
+    <value>检测到新的构建。</value>
+  </data>
+  <data name="Code_Main_AutomaticUpdateFailed" xml:space="preserve">
+    <value>自动更新失败</value>
+  </data>
+  <data name="Code_Main_AutomaticUpdateFailedBody" xml:space="preserve">
+    <value>{0} 请使用“安装 &gt; 安装 / 更新”重试。</value>
+  </data>
+  <data name="Code_Main_ActionInstallingObsmirror" xml:space="preserve">
+    <value>OBSMirror 安装</value>
+  </data>
+  <data name="Code_Main_InstallationComplete" xml:space="preserve">
+    <value>安装完成</value>
+  </data>
+  <data name="Code_Main_ActionEnablingLayer" xml:space="preserve">
+    <value>OpenXR 层启用</value>
+  </data>
+  <data name="Code_Main_ActionDisablingLayer" xml:space="preserve">
+    <value>OpenXR 层禁用</value>
+  </data>
+  <data name="Code_Main_ReasonLayerRegistrationChange" xml:space="preserve">
+    <value>OpenXR 层注册变更</value>
+  </data>
+  <data name="Code_Main_LayerEnabled" xml:space="preserve">
+    <value>OpenXR 层已启用</value>
+  </data>
+  <data name="Code_Main_RestartVrToLoadLayer" xml:space="preserve">
+    <value>重启正在运行的 VR 应用以加载该层。</value>
+  </data>
+  <data name="Code_Main_LayerDisabled" xml:space="preserve">
+    <value>OpenXR 层已禁用</value>
+  </data>
+  <data name="Code_Main_FilesLeftInPlace" xml:space="preserve">
+    <value>已安装的文件与 OBS 源均保持原样。</value>
+  </data>
+  <data name="Code_Main_RestartVrToUnloadLayer" xml:space="preserve">
+    <value>重启正在运行的 VR 应用以卸载该层。</value>
+  </data>
+  <data name="Code_Main_ActionRemovingOldSource" xml:space="preserve">
+    <value>移除旧版 OBS 源副本</value>
+  </data>
+  <data name="Code_Main_OldSourceCopyRemoved" xml:space="preserve">
+    <value>已移除旧版 OBS 源副本</value>
+  </data>
+  <data name="Code_Main_OldSourceCopyRemovedBody" xml:space="preserve">
+    <value>{0} 请重新启动 OBS，此后加载的将是已安装的源。</value>
+  </data>
+  <data name="Code_Main_ObsAlreadyRunning" xml:space="preserve">
+    <value>OBS 已在运行</value>
+  </data>
+  <data name="Code_Main_ObsAlreadyRunningBody" xml:space="preserve">
+    <value>已保存的 OpenXR 镜像采集源已在当前 OBS 会话中就绪。</value>
+  </data>
+  <data name="Code_Main_ObsLaunched" xml:space="preserve">
+    <value>OBS 已启动</value>
+  </data>
+  <data name="Code_Main_ObsLaunchedBody" xml:space="preserve">
+    <value>OBS 加载完成后请刷新状态。</value>
+  </data>
+  <data name="Code_Main_CouldNotLaunchObs" xml:space="preserve">
+    <value>无法启动 OBS</value>
+  </data>
+  <data name="Code_Main_LocateObsStudio" xml:space="preserve">
+    <value>定位 OBS Studio</value>
+  </data>
+  <data name="Code_Main_BrowseForObs64" xml:space="preserve">
+    <value>浏览以查找 obs64.exe</value>
+  </data>
+  <data name="Code_Main_Cancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="Code_Main_ObsExeHint" xml:space="preserve">
+    <value>obs64.exe 通常位于 OBS 安装目录的 bin\64bit 文件夹中。</value>
+  </data>
+  <data name="Code_Main_SavedObsLocation" xml:space="preserve">
+    <value>已保存此位置，供以后启动使用：{0}</value>
+  </data>
+  <data name="Code_Main_SelectHeadsetRuntimeFirst" xml:space="preserve">
+    <value>请先选择头显运行时</value>
+  </data>
+  <data name="Code_Main_SystemRuntimeIsSimulator" xml:space="preserve">
+    <value>当前系统运行时本身就是模拟器，因此此按钮没有可恢复的头显运行时。请打开头显或 SteamVR 桌面软件，并选择“设为活动的 OpenXR 运行时”。</value>
+  </data>
+  <data name="Code_Main_TheSystemOpenXrRuntime" xml:space="preserve">
+    <value>系统 OpenXR 运行时</value>
+  </data>
+  <data name="Code_Main_ReasonRuntimeChange" xml:space="preserve">
+    <value>OpenXR 运行时变更</value>
+  </data>
+  <data name="Code_Main_HeadsetRuntimeRestored" xml:space="preserve">
+    <value>头显运行时已恢复</value>
+  </data>
+  <data name="Code_Main_HeadsetRuntimeRestoredBody" xml:space="preserve">
+    <value>已清除每用户的模拟器覆盖。新的 OpenXR 应用将使用 {0}（{1}）。</value>
+  </data>
+  <data name="Code_Main_RestartVrToSwitchRuntimes" xml:space="preserve">
+    <value>重启正在运行的 VR 应用以切换运行时。</value>
+  </data>
+  <data name="Code_Main_CouldNotRestoreRuntime" xml:space="preserve">
+    <value>无法恢复头显运行时</value>
+  </data>
+  <data name="Code_Main_SimulatorAlreadyRunning" xml:space="preserve">
+    <value>模拟器测试工具已在运行</value>
+  </data>
+  <data name="Code_Main_SimulatorAlreadyRunningBody" xml:space="preserve">
+    <value>管理器未更改当前活动的 OpenXR 运行时。</value>
+  </data>
+  <data name="Code_Main_SimulatorLaunched" xml:space="preserve">
+    <value>模拟器测试工具已启动</value>
+  </data>
+  <data name="Code_Main_SimulatorLaunchedBody" xml:space="preserve">
+    <value>启动时未继承模拟器运行时覆盖。运行时选择仍需通过测试操作显式指定。</value>
+  </data>
+  <data name="Code_Main_CouldNotLaunchSimulator" xml:space="preserve">
+    <value>无法启动模拟器测试工具</value>
+  </data>
+  <data name="Code_Main_ActionLogSharing" xml:space="preserve">
+    <value>日志分享</value>
+  </data>
+  <data name="Code_Main_ShareSummary" xml:space="preserve">
+    <value>{0}（{1} 个文件；链接约一周后失效）</value>
+  </data>
+  <data name="Code_Main_NotUploaded" xml:space="preserve">
+    <value>未上传：{0}</value>
+  </data>
+  <data name="Code_Main_LogsUploadedLinkCopied" xml:space="preserve">
+    <value>日志已上传 — 分享链接已复制到剪贴板</value>
+  </data>
+  <data name="Code_Main_LogsUploaded" xml:space="preserve">
+    <value>日志已上传</value>
+  </data>
+  <data name="Code_Main_ActionFailed" xml:space="preserve">
+    <value>{0}失败</value>
+  </data>
+  <data name="Code_Main_HashUnavailable" xml:space="preserve">
+    <value>哈希不可用</value>
+  </data>
+  <data name="Code_Main_HashNotInstalled" xml:space="preserve">
+    <value>未安装</value>
+  </data>
+  <data name="Code_Main_CompletedSuccessfully" xml:space="preserve">
+    <value>已成功完成。</value>
+  </data>
+  <data name="Code_Svc_PreviewStopped" xml:space="preserve">
+    <value>预览已停止</value>
+  </data>
+  <data name="Code_Svc_PreviewStoppedReopenDetail" xml:space="preserve">
+    <value>重新打开应用即可再次启动镜像预览。</value>
+  </data>
+  <data name="Code_Svc_WaitingForOpenXrApp" xml:space="preserve">
+    <value>等待 OpenXR 应用</value>
+  </data>
+  <data name="Code_Svc_WaitingFirstMirrorFrame" xml:space="preserve">
+    <value>等待首帧镜像画面</value>
+  </data>
+  <data name="Code_Svc_WaitingFirstMirrorFrameDetail" xml:space="preserve">
+    <value>层已连接，但只发布了 {0}/{1} 个共享纹理句柄（第 {2} 代）。请启动或恢复 VR 应用以发布画面。{3}</value>
+  </data>
+  <data name="Code_Svc_MirrorUnavailable" xml:space="preserve">
+    <value>镜像画面不可用</value>
+  </data>
+  <data name="Code_Svc_PreviewFormatUnsupported" xml:space="preserve">
+    <value>不支持该预览格式</value>
+  </data>
+  <data name="Code_Svc_PreviewFormatNotSupportedDetail" xml:space="preserve">
+    <value>镜像使用 {0}，分辨率 {1} × {2}。OBS 采集不受影响。</value>
+  </data>
+  <data name="Code_Svc_LiveMirror" xml:space="preserve">
+    <value>实时镜像</value>
+  </data>
+  <data name="Code_Svc_BlackFramesDetected" xml:space="preserve">
+    <value>检测到黑帧</value>
+  </data>
+  <data name="Code_Svc_MirrorFrameStale" xml:space="preserve">
+    <value>镜像画面已过时</value>
+  </data>
+  <data name="Code_Svc_PreviewPaused" xml:space="preserve">
+    <value>预览已暂停</value>
+  </data>
+  <data name="Code_Svc_CpuFallbackSuffix" xml:space="preserve">
+    <value>  •  CPU 回退</value>
+  </data>
+  <data name="Code_Svc_SeePreviewDiagnosticsSuffix" xml:space="preserve">
+    <value>  •  参见“预览诊断”</value>
+  </data>
+  <data name="Code_Svc_LiveFrameDetail" xml:space="preserve">
+    <value>源 {0} × {1}  •  预览 {2} × {3}</value>
+  </data>
+  <data name="Code_Svc_StartVrAppDetail" xml:space="preserve">
+    <value>启用 OpenXR 层后启动 VR 应用，预览会自动连接。</value>
+  </data>
+  <data name="Code_Svc_SteamVrPreviewStopped" xml:space="preserve">
+    <value>SteamVR 预览已停止</value>
+  </data>
+  <data name="Code_Svc_SteamVrPreviewStoppedDetail" xml:space="preserve">
+    <value>重新打开应用即可重新启动预览。</value>
+  </data>
+  <data name="Code_Svc_WaitingForSteamVrMirror" xml:space="preserve">
+    <value>等待 SteamVR 镜像</value>
+  </data>
+  <data name="Code_Svc_LiveSteamVrMirror" xml:space="preserve">
+    <value>实时 SteamVR 镜像</value>
+  </data>
+  <data name="Code_Svc_SteamVrFrameDetail" xml:space="preserve">
+    <value>右眼  •  源 {0} × {1}  •  预览 {2} × {3}  •  {4}</value>
+  </data>
+  <data name="Code_Svc_SteamVrPreviewPaused" xml:space="preserve">
+    <value>SteamVR 预览已暂停</value>
+  </data>
+  <data name="Code_Svc_StartSteamVrDetail" xml:space="preserve">
+    <value>启动 SteamVR 和 OpenVR 应用后，预览会自动连接。</value>
+  </data>
+  <data name="Code_Svc_ChecksumEntryMissing" xml:space="preserve">
+    <value>发行版校验和清单中没有 {0} 的条目。</value>
+  </data>
+  <data name="Code_Svc_ChecksumMismatch" xml:space="preserve">
+    <value>下载的安装程序与发行版校验和不匹配，已删除。请稍后重试。</value>
+  </data>
+  <data name="Code_Svc_ElevationCanceled" xml:space="preserve">
+    <value>在授予管理员权限之前，安装已取消。</value>
+  </data>
+  <data name="Code_Svc_CloseObsBeforePluginUpdate" xml:space="preserve">
+    <value>OBS 正在运行。请先关闭 OBS 再更新 OBS 插件。</value>
+  </data>
+  <data name="Code_Svc_LayerInstalledEnabled" xml:space="preserve">
+    <value>已安装并启用层 {0}。</value>
+  </data>
+  <data name="Code_Svc_ObsPluginCurrent" xml:space="preserve">
+    <value>OBS 插件已是最新。</value>
+  </data>
+  <data name="Code_Svc_CloseObsPluginChanged" xml:space="preserve">
+    <value>OBS 正在运行且插件二进制文件已更改。请先停止录制并关闭 OBS，再更新插件。</value>
+  </data>
+  <data name="Code_Svc_ObsPluginUpdated" xml:space="preserve">
+    <value>已更新 OBS 插件。</value>
+  </data>
+  <data name="Code_Svc_LayerRegisteredForUser" xml:space="preserve">
+    <value>已为当前用户注册 OpenXR OBS Mirror：{0}</value>
+  </data>
+  <data name="Code_Svc_NoLayerRegistryKey" xml:space="preserve">
+    <value>当前用户不存在 OpenXR 隐式层注册表项。</value>
+  </data>
+  <data name="Code_Svc_LayerRegistrationsRemoved" xml:space="preserve">
+    <value>已移除当前用户的 {0} 个 OpenXR OBS Mirror 注册。</value>
+  </data>
+  <data name="Code_Svc_NoConflictingPlugin" xml:space="preserve">
+    <value>未发现冲突的 OBS 插件副本。</value>
+  </data>
+  <data name="Code_Svc_CloseObsBeforePluginRemoval" xml:space="preserve">
+    <value>移除旧插件副本前请先关闭 OBS，该文件正被 OBS 占用。</value>
+  </data>
+  <data name="Code_Svc_ConflictingPluginRemoved" xml:space="preserve">
+    <value>已移除位于 {0} 的冲突插件副本。</value>
+  </data>
+  <data name="Code_Svc_SelectObs64Executable" xml:space="preserve">
+    <value>请选择 obs64.exe（64 位 OBS Studio 可执行文件）。</value>
+  </data>
+  <data name="Code_Svc_ObsNotFound" xml:space="preserve">
+    <value>无法自动找到 OBS Studio (obs64.exe)。自定义安装或便携版安装属于正常情况 —— 手动选择一次 obs64.exe 后即会被记住。</value>
+  </data>
+  <data name="Code_Svc_NoCaptureSessionLogged" xml:space="preserve">
+    <value>尚未记录任何 OpenXR 采集会话。</value>
+  </data>
+</root>

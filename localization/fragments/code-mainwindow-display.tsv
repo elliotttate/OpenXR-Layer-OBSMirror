@@ -1,0 +1,5 @@
+key	target	prop	english	zh-CN
+Code_Main_RuntimeNotConfigured	MainWindow.xaml.cs	code	Not configured	未配置
+Code_Main_RuntimeNoneConfigured	MainWindow.xaml.cs	code	No runtime configured	未配置运行时
+Code_Main_RuntimeSystemHeadset	MainWindow.xaml.cs	code	System headset runtime	系统头显运行时
+Code_Main_RuntimeProcessOverride	MainWindow.xaml.cs	code	Process environment override	进程环境变量覆盖

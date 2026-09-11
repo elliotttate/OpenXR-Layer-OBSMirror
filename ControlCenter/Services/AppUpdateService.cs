@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.Json;
+using OBSMirror.ControlCenter.Localization;
 
 namespace OBSMirror.ControlCenter.Services;
 
@@ -247,7 +248,10 @@ public sealed class AppUpdateService
         }
         if (string.IsNullOrWhiteSpace(expected))
             throw new InvalidOperationException(
-                $"The release checksum manifest has no entry for {update.InstallerName}.");
+                Loc.F(
+                    "Code_Svc_ChecksumEntryMissing",
+                    "The release checksum manifest has no entry for {0}.",
+                    update.InstallerName));
 
         string actual;
         await using (var stream = File.OpenRead(installerPath))
@@ -257,7 +261,9 @@ public sealed class AppUpdateService
         {
             File.Delete(installerPath);
             throw new InvalidOperationException(
-                "The downloaded installer did not match the release checksum and was deleted. Try again later.");
+                Loc.S(
+                    "Code_Svc_ChecksumMismatch",
+                    "The downloaded installer did not match the release checksum and was deleted. Try again later."));
         }
     }
 
