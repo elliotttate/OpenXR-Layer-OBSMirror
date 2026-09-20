@@ -6,6 +6,7 @@ override_functions = [
     "xrDestroySwapchain",
     "xrEnumerateSwapchainImages",
     "xrAcquireSwapchainImage",
+    "xrWaitSwapchainImage",
     "xrReleaseSwapchainImage",
     "xrEnumerateViewConfigurationViews",
     "xrLocateViews",

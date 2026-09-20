@@ -64,7 +64,7 @@ using obs_mirror_ipc::kMirrorTextureCount;
 
 // Logged at load and published through the shared diagnostics block so the
 // layer log records which plugin build it talked to.
-static const char *const kPluginVersion = "0.3.0-beta.14";
+static const char *const kPluginVersion = "0.4.0-beta.2";
 
 struct win_openxrmirror {
 	obs_source_t *source;
@@ -1148,8 +1148,17 @@ OBS_MODULE_USE_DEFAULT_LOCALE("win_openxrmirror", "en-US")
 
 bool obs_module_load(void)
 {
+	static_assert(LIBOBS_API_MAJOR_VER >= 32, "Build with the supported OBS 32 SDK or newer");
+	if ((obs_get_version() >> 24) < 32) {
+		blog(LOG_ERROR, "OBS Studio 32 or newer is required; found %s. Update OBS to load the mirror sources.",
+		     obs_get_version_string());
+		return false;
+	}
 	blog(LOG_INFO, "plugin version %s (IPC diagnostics v%u)",
 	     kPluginVersion, obs_mirror_ipc::kDiagnosticsVersion);
+	blog(LOG_INFO, "OBS runtime %s, build API %u.%u.%u, source registration size %zu",
+	     obs_get_version_string(), LIBOBS_API_MAJOR_VER, LIBOBS_API_MINOR_VER,
+	     LIBOBS_API_PATCH_VER, sizeof(obs_source_info));
 
 	obs_source_info info = {};
 	info.id = "openxrmirror_capture";

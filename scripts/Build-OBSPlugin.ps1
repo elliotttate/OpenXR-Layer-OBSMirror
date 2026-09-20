@@ -36,6 +36,9 @@ $versionParts = @('MAJOR', 'MINOR', 'PATCH') | ForEach-Object {
     [int]$match.Groups[1].Value
 }
 $sourceVersion = [Version]::new($versionParts[0], $versionParts[1], $versionParts[2])
+if ($sourceVersion.Major -lt 32 -or $installedVersion.Major -lt 32) {
+    throw 'OBS Studio 32 or newer is required for the SDK and build runtime. Older OBS versions are unsupported.'
+}
 if ($sourceVersion -ne $installedVersion) {
     throw "OBS source version $sourceVersion does not match installed OBS $installedVersion."
 }

@@ -28,6 +28,7 @@
 #include "log.h"
 #include "util.h"
 #include "dx11mirror.h"
+#include "vulkan_readback.h"
 
 #include <directxmath.h> // Matrix math functions and objects
 #include <d3dcompiler.h> // For compiling shaders! D3DCompile
@@ -135,6 +136,23 @@ namespace {
                XMScalarNearEqual(a.angleDown, b.angleDown, 0.001f);
     }
 
+    DXGI_FORMAT vulkanMirrorFormat(int64_t format) {
+        switch (static_cast<VkFormat>(format)) {
+        case VK_FORMAT_R8G8B8A8_UNORM:
+            return DXGI_FORMAT_R8G8B8A8_UNORM;
+        case VK_FORMAT_R8G8B8A8_SRGB:
+            return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+        case VK_FORMAT_B8G8R8A8_UNORM:
+            return DXGI_FORMAT_B8G8R8A8_UNORM;
+        case VK_FORMAT_B8G8R8A8_SRGB:
+            return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+        case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+            return DXGI_FORMAT_R10G10B10A2_UNORM;
+        default:
+            return DXGI_FORMAT_UNKNOWN;
+        }
+    }
+
     class OpenXrLayer : public layer_OBSMirror::OpenXrApi {
       public:
         OpenXrLayer() {
@@ -208,6 +226,16 @@ namespace {
                               TLArg(createInfo->systemId, "SystemId"),
                               TLArg(createInfo->createFlags, "CreateFlags"));
 
+            const XrResult result = OpenXrApi::xrCreateSession(instance, createInfo, session);
+            if (XR_FAILED(result))
+                return result;
+            // The compositor and D3D bindings are instance-wide. Do not let a
+            // second (possibly headless) session overwrite the active binding.
+            if (!_sessions.empty()) {
+                Log("Additional session is not mirrored while the first session is active\n");
+                return result;
+            }
+
             // Walk the next chain looking for a graphics binding we support.
             // Unrelated chained structures (overlay extensions, vendor structs)
             // are ignored rather than clearing an already-found binding.
@@ -227,6 +255,27 @@ namespace {
                         reinterpret_cast<const XrGraphicsBindingD3D12KHR*>(entry);
                     _d3d12Device = d3d12Bindings->device;
                     _d3d12CommandQueue = d3d12Bindings->queue;
+                } else if (entry->type == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR) {
+                    // Vulkan2 is an alias of this binding, including its type.
+                    const auto* binding = reinterpret_cast<const XrGraphicsBindingVulkanKHR*>(entry);
+                    _vulkanLoader.reset(LoadLibraryExW(L"vulkan-1.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32));
+                    const auto getProc = _vulkanLoader ? reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(
+                                                             _vulkanLoader.get(), "vkGetInstanceProcAddr"))
+                                                       : nullptr;
+                    auto dispatch = std::make_shared<VulkanDispatch>();
+                    if (dispatch->initialize(getProc,
+                                             binding->instance,
+                                             binding->physicalDevice,
+                                             binding->device,
+                                             binding->queueFamilyIndex,
+                                             binding->queueIndex)) {
+                        _vulkanDevice = std::move(dispatch);
+                        boundApi = entry->type;
+                        Log("Vulkan capture uses asynchronous host readback into the D3D11 compositor\n");
+                    } else {
+                        Log("Vulkan entry points unavailable; mirroring disabled for this session\n");
+                        _vulkanLoader.reset();
+                    }
                 }
 
                 entry = entry->next;
@@ -234,13 +283,17 @@ namespace {
 
             if (boundApi != XR_TYPE_UNKNOWN) {
                 _xrGraphicsAPI = boundApi;
-                Log("Graphics binding: %s\n", boundApi == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR ? "D3D11" : "D3D12");
+                Log("Graphics binding: %s\n",
+                    boundApi == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR   ? "D3D11"
+                    : boundApi == XR_TYPE_GRAPHICS_BINDING_D3D12_KHR ? "D3D12"
+                                                                     : "Vulkan");
             } else {
-                Log("No supported graphics binding found (D3D11 or D3D12 required); mirroring disabled for this "
+                Log("No supported graphics binding found (D3D11, D3D12 or Vulkan required); mirroring disabled for "
+                    "this "
                     "session\n");
+                return result;
             }
 
-            const XrResult result = OpenXrApi::xrCreateSession(instance, createInfo, session);
             if (XR_SUCCEEDED(result)) {
                 Session newSession;
                 newSession._xrSession = *session;
@@ -327,6 +380,11 @@ namespace {
             TraceLoggingWrite(g_traceProvider, "xrDestroySession", TLXArg(session, "Session"));
             Log("xrDestroySession\n");
 
+            for (auto& item : _swapchains) {
+                if (item.second._xrSession == session && item.second._vulkanReadback)
+                    item.second._vulkanReadback->wait();
+            }
+
             const XrResult result = OpenXrApi::xrDestroySession(session);
             if (XR_SUCCEEDED(result) && isSessionHandled(session)) {
                 // Destroying a session destroys all of its child handles, so
@@ -359,6 +417,9 @@ namespace {
                     _d3d11Device = nullptr;
                     _d3d12Device = nullptr;
                     _d3d12CommandQueue = nullptr;
+                    _vulkanDevice.reset();
+                    _vulkanLoader.reset();
+                    _mirror.reset();
                     _xrGraphicsAPI = XR_TYPE_UNKNOWN;
                 }
             }
@@ -389,6 +450,15 @@ namespace {
 
             XrSwapchainCreateInfo chainCreateInfo = *createInfo;
             const bool handled = isSessionHandled(session);
+            const bool vulkan = handled && _xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR;
+            // Transfer usage is required even when the application only asks
+            // for a render target. Protected images must never be read back.
+            const bool vulkanCapture = vulkan && createInfo->faceCount == 1 &&
+                                       !(createInfo->createFlags & XR_SWAPCHAIN_CREATE_PROTECTED_CONTENT_BIT) &&
+                                       (createInfo->usageFlags & XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT) &&
+                                       IsVulkanMirrorFormat(static_cast<VkFormat>(createInfo->format));
+            if (vulkanCapture)
+                chainCreateInfo.usageFlags |= XR_SWAPCHAIN_USAGE_TRANSFER_SRC_BIT;
 
             if (handled) {
                 Log("Creating swapchain with dimensions=%ux%u, arraySize=%u, mipCount=%u, sampleCount=%u, format=%d, "
@@ -402,13 +472,24 @@ namespace {
                     createInfo->usageFlags);
             }
 
-            const XrResult result = OpenXrApi::xrCreateSwapchain(session, &chainCreateInfo, swapchain);
+            XrResult result = OpenXrApi::xrCreateSwapchain(session, &chainCreateInfo, swapchain);
+            if (XR_FAILED(result) && chainCreateInfo.usageFlags != createInfo->usageFlags) {
+                // A runtime may reject the added usage. Preserve the game's
+                // original request and simply disable capture of this chain.
+                Log("Vulkan transfer-source swapchain rejected (%d); retrying without mirror usage\n", result);
+                chainCreateInfo = *createInfo;
+                result = OpenXrApi::xrCreateSwapchain(session, &chainCreateInfo, swapchain);
+            }
             if (handled && XR_SUCCEEDED(result)) {
                 // On success, record the state.
                 Swapchain newSwapchain;
                 newSwapchain._xrSwapchain = *swapchain;
                 newSwapchain._xrSession = session;
                 newSwapchain._createInfo = chainCreateInfo;
+                newSwapchain._mirrorFormat =
+                    vulkan ? vulkanMirrorFormat(createInfo->format) : static_cast<DXGI_FORMAT>(createInfo->format);
+                newSwapchain._vulkanCapture =
+                    vulkanCapture && (chainCreateInfo.usageFlags & XR_SWAPCHAIN_USAGE_TRANSFER_SRC_BIT);
                 _swapchains.insert_or_assign(*swapchain, std::move(newSwapchain));
                 Log("Tracking swapchain %p\n", *swapchain);
 
@@ -422,6 +503,8 @@ namespace {
             TraceLoggingWrite(g_traceProvider, "xrDestroySwapchain", TLXArg(swapchain, "Swapchain"));
 
             Log("xrDestroySwapchain %p\n", swapchain);
+            if (isSwapchainHandled(swapchain) && _swapchains[swapchain]._vulkanReadback)
+                _swapchains[swapchain]._vulkanReadback->wait();
             const XrResult result = OpenXrApi::xrDestroySwapchain(swapchain);
             if (XR_SUCCEEDED(result) && isSwapchainHandled(swapchain)) {
                 if (_mirror) {
@@ -451,14 +534,53 @@ namespace {
                 return result;
             }
 
-            // Enumerate the actual D3D swapchain images.
+            // Enumerate the runtime-owned swapchain images.
             auto& swapchainState = _swapchains[swapchain];
             const XrResult result =
                 OpenXrApi::xrEnumerateSwapchainImages(swapchain, imageCapacityInput, imageCountOutput, images);
+            if (_xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR) {
+                if (XR_SUCCEEDED(result) && images && imageCountOutput && imageCapacityInput >= *imageCountOutput &&
+                    *imageCountOutput && swapchainState._vulkanCapture && _mirror && _mirror->initialized()) {
+                    swapchainState._vulkanImages.resize(*imageCountOutput);
+                    for (uint32_t i = 0; i < *imageCountOutput; ++i)
+                        swapchainState._vulkanImages[i] = reinterpret_cast<XrSwapchainImageVulkanKHR*>(images)[i].image;
+                    if (!swapchainState._vulkanReadback) {
+                        auto readback = std::make_unique<VulkanReadback>(_vulkanDevice);
+                        const auto& info = swapchainState._createInfo;
+                        const VkResult init =
+                            readback->initialize(static_cast<VkFormat>(info.format),
+                                                 info.width,
+                                                 info.height,
+                                                 info.arraySize,
+                                                 static_cast<VkSampleCountFlagBits>(info.sampleCount));
+                        if (init == VK_SUCCESS) {
+                            swapchainState._vulkanReadback = std::move(readback);
+                            Log("Mirroring Vulkan swapchain %p: %ux%u format %lld samples %u array %u\n",
+                                swapchain,
+                                info.width,
+                                info.height,
+                                info.format,
+                                info.sampleCount,
+                                info.arraySize);
+                        } else {
+                            Log("Vulkan readback initialization failed for swapchain %p: %d\n", swapchain, init);
+                            swapchainState._vulkanCapture = false;
+                        }
+                    }
+                } else if (XR_SUCCEEDED(result) && !swapchainState._mirrorDecisionLogged) {
+                    Log("NOT mirroring Vulkan swapchain %p: requires a supported unprotected 2D color format "
+                        "and transfer-source usage (format %lld, usage 0x%llx)\n",
+                        swapchain,
+                        swapchainState._createInfo.format,
+                        swapchainState._createInfo.usageFlags);
+                }
+                if (XR_SUCCEEDED(result))
+                    swapchainState._mirrorDecisionLogged = true;
+                return result;
+            }
             if (XR_SUCCEEDED(result) && _mirror && _mirror->initialized()) {
                 Mirror::DxgiFormatInfo formatInfo{};
-                const bool knownFormat =
-                    Mirror::GetFormatInfo((DXGI_FORMAT)swapchainState._createInfo.format, formatInfo);
+                const bool knownFormat = Mirror::GetFormatInfo(swapchainState._mirrorFormat, formatInfo);
                 const bool colorAttachment =
                     (swapchainState._createInfo.usageFlags & XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT) != 0;
                 const bool mirrorable = knownFormat && formatInfo.bpc <= 10 && colorAttachment;
@@ -510,7 +632,7 @@ namespace {
                             if (srcDesc.Width != swapchainState._createInfo.width ||
                                 srcDesc.Height != swapchainState._createInfo.height ||
                                 srcDesc.ArraySize != swapchainState._createInfo.arraySize ||
-                                srcDesc.Format != (DXGI_FORMAT)swapchainState._createInfo.format) {
+                                srcDesc.Format != swapchainState._mirrorFormat) {
                                 swapchainState._dx11LastTexture = nullptr;
                                 swapchainState._dx11KeyedMutex = nullptr;
                             }
@@ -522,7 +644,7 @@ namespace {
                             desc.Height = swapchainState._createInfo.height;
                             desc.MipLevels = 1;
                             desc.ArraySize = swapchainState._createInfo.arraySize;
-                            desc.Format = (DXGI_FORMAT)swapchainState._createInfo.format;
+                            desc.Format = swapchainState._mirrorFormat;
                             desc.SampleDesc.Count = 1;
                             desc.SampleDesc.Quality = 0;
                             desc.Usage = D3D11_USAGE_DEFAULT;
@@ -579,7 +701,7 @@ namespace {
                             if (srcDesc.Width != swapchainState._createInfo.width ||
                                 srcDesc.Height != swapchainState._createInfo.height ||
                                 srcDesc.DepthOrArraySize != swapchainState._createInfo.arraySize ||
-                                srcDesc.Format != (DXGI_FORMAT)swapchainState._createInfo.format) {
+                                srcDesc.Format != swapchainState._mirrorFormat) {
                                 swapchainState._dx12LastTexture = nullptr;
                             }
                         }
@@ -591,7 +713,7 @@ namespace {
                             d3d12TextureDesc.Height = swapchainState._createInfo.height;
                             d3d12TextureDesc.DepthOrArraySize = swapchainState._createInfo.arraySize;
                             d3d12TextureDesc.MipLevels = 1;
-                            d3d12TextureDesc.Format = (DXGI_FORMAT)swapchainState._createInfo.format;
+                            d3d12TextureDesc.Format = swapchainState._mirrorFormat;
                             d3d12TextureDesc.SampleDesc.Count = 1;
                             d3d12TextureDesc.SampleDesc.Quality = 0;
                             d3d12TextureDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
@@ -686,6 +808,32 @@ namespace {
         XrResult updateSwapChainImages(XrSwapchain swapchain,
                                        const XrSwapchainImageReleaseInfo* releaseInfo,
                                        bool doXRcall) {
+            if (_xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR && isSwapchainHandled(swapchain)) {
+                auto& state = _swapchains[swapchain];
+                // Never read a Vulkan image from xrEndFrame after release. The
+                // runtime owns it by then; persistent quads use our cached copy.
+                if (doXRcall && (!releaseInfo || releaseInfo->type == XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO) &&
+                    state._vulkanCapture && state._vulkanImageWaited && !state._acquiredIndices.empty() &&
+                    state._vulkanReadback) {
+                    collectVulkanReadback(state);
+                    const uint32_t index = state._acquiredIndices.front();
+                    // Cache the first image even without OBS, especially static
+                    // overlays that can only ever be acquired/released once.
+                    if (state._vulkanCapture && index < state._vulkanImages.size() && _mirror &&
+                        (_mirror->enabled() || !state._vulkanTextureReady)) {
+                        const VkResult copy = state._vulkanReadback->submit(state._vulkanImages[index]);
+                        if (copy == VK_SUCCESS)
+                            state._vulkanPendingIndex = index;
+                        else if (copy < 0) {
+                            state._vulkanCapture = false;
+                            Log("Vulkan capture disabled for swapchain %p after submission error %d\n",
+                                swapchain,
+                                copy);
+                        }
+                        noteMirrorCopyResult(state, copy == VK_SUCCESS, "Vulkan readback busy or submission failed");
+                    }
+                }
+            }
             if (_mirror && _mirror->enabled() && isSwapchainHandled(swapchain)) {
                 Swapchain& swapchainState = _swapchains[swapchain];
 
@@ -752,6 +900,7 @@ namespace {
                     auto& acquiredIndices = _swapchains[swapchain]._acquiredIndices;
                     if (!acquiredIndices.empty())
                         acquiredIndices.pop_front();
+                    _swapchains[swapchain]._vulkanImageWaited = false;
                 }
             }
 
@@ -775,6 +924,14 @@ namespace {
             return updateSwapChainImages(swapchain, releaseInfo, true);
         }
 
+        XrResult xrWaitSwapchainImage(XrSwapchain swapchain, const XrSwapchainImageWaitInfo* waitInfo) override {
+            const XrResult result = OpenXrApi::xrWaitSwapchainImage(swapchain, waitInfo);
+            // XR_TIMEOUT_EXPIRED is also a success code, but does not grant
+            // access to the image. Do not submit work until a wait succeeds.
+            if ((result == XR_SUCCESS || result == XR_SESSION_LOSS_PENDING) && isSwapchainHandled(swapchain))
+                _swapchains[swapchain]._vulkanImageWaited = true;
+            return result;
+        }
 
         XrResult xrLocateViews(XrSession session,
                                const XrViewLocateInfo* viewLocateInfo,
@@ -784,6 +941,8 @@ namespace {
                                XrView* views) override {
             XrResult res =
                 OpenXrApi::xrLocateViews(session, viewLocateInfo, viewState, viewCapacityInput, viewCountOutput, views);
+            if (!isSessionHandled(session))
+                return res;
 
             // Hand the game a widened FOV so it renders extra perimeter for the
             // recording. The submission is cropped back in xrEndFrame, so the
@@ -844,7 +1003,8 @@ namespace {
             // overscan the game would stencil away perimeter pixels that the
             // recording needs. Report an empty mask so everything is rendered;
             // the runtime still applies its own mask to the displayed crop.
-            if (overscanActive() && viewConfigurationType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO) {
+            if (isSessionHandled(session) && overscanActive() &&
+                viewConfigurationType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO) {
                 if (visibilityMask) {
                     visibilityMask->vertexCountOutput = 0;
                     visibilityMask->indexCountOutput = 0;
@@ -868,7 +1028,7 @@ namespace {
                                         const XrReferenceSpaceCreateInfo* createInfo,
                                         XrSpace* space) override {
             XrResult res = OpenXrApi::xrCreateReferenceSpace(session, createInfo, space);
-            if (_mirror && XR_SUCCEEDED(res)) {
+            if (_mirror && isSessionHandled(session) && XR_SUCCEEDED(res)) {
                 _mirror->addSpace(*space, createInfo);
             }
             return res;
@@ -883,7 +1043,7 @@ namespace {
         }
 
         XrResult xrBeginFrame(XrSession session, const XrFrameBeginInfo* frameBeginInfo) override {
-            if (_mirror)
+            if (_mirror && isSessionHandled(session))
                 _mirror->flush();
             return OpenXrApi::xrBeginFrame(session, frameBeginInfo);
         }
@@ -893,8 +1053,12 @@ namespace {
                 return XR_ERROR_VALIDATION_FAILURE;
             }
 
-            if (_mirror) {
+            if (_mirror && isSessionHandled(session)) {
                 _mirror->checkOBSRunning();
+                for (auto& item : _swapchains) {
+                    if (item.second._xrSession == session && item.second._vulkanReadback)
+                        collectVulkanReadback(item.second);
+                }
 
                 // Classify how far this frame makes it through the mirror
                 // pipeline; noteMirrorOutcome() logs the transitions.
@@ -985,17 +1149,17 @@ namespace {
                                         outcome = std::max(outcome, MirrorOutcome::Mirroring);
                                     } else if (isSwapchainHandled(projView->subImage.swapchain)) {
                                         auto& swapchainState = _swapchains[projView->subImage.swapchain];
-                                        if (swapchainState._dx11LastTexture || swapchainState._dx12LastTexture) {
+                                        if (swapchainState._dx11LastTexture || swapchainState._dx12LastTexture ||
+                                            swapchainState._vulkanTextureReady) {
                                             const XrFovf& mirrorFov = eyeIndex < _projectionViews.size()
                                                                                 ? _projectionViews[eyeIndex].fov
                                                                                 : _projectionViews[0].fov;
                                             _lastMirroredExtent = projView->subImage.imageRect.extent;
-                                            const bool drew =
-                                                _mirror->Blend(projView,
-                                                               mirrorFov,
-                                                               (DXGI_FORMAT)swapchainState._createInfo.format,
-                                                               projLayer->space,
-                                                               frameEndInfo->displayTime);
+                                            const bool drew = _mirror->Blend(projView,
+                                                                             mirrorFov,
+                                                                             swapchainState._mirrorFormat,
+                                                                             projLayer->space,
+                                                                             frameEndInfo->displayTime);
                                             outcome = std::max(
                                                 outcome,
                                                 drew ? MirrorOutcome::Mirroring : MirrorOutcome::DrawFailed);
@@ -1012,17 +1176,18 @@ namespace {
                                         isSwapchainHandled(projView2->subImage.swapchain)) {
                                         auto& swapchainState = _swapchains[projView->subImage.swapchain];
                                         auto& swapchainState2 = _swapchains[projView2->subImage.swapchain];
-                                        if ((swapchainState._dx11LastTexture || swapchainState._dx12LastTexture) &&
-                                            (swapchainState2._dx11LastTexture || swapchainState2._dx12LastTexture)) {
+                                        if ((swapchainState._dx11LastTexture || swapchainState._dx12LastTexture ||
+                                             swapchainState._vulkanTextureReady) &&
+                                            (swapchainState2._dx11LastTexture || swapchainState2._dx12LastTexture ||
+                                             swapchainState2._vulkanTextureReady)) {
                                             _lastMirroredExtent = projView->subImage.imageRect.extent;
-                                            const bool drew =
-                                                _mirror->Blend(projView,
-                                                               _projectionViews[0].fov,
-                                                               projView2,
-                                                               _projectionViews[1].fov,
-                                                               (DXGI_FORMAT)swapchainState._createInfo.format,
-                                                               projLayer->space,
-                                                               frameEndInfo->displayTime);
+                                            const bool drew = _mirror->Blend(projView,
+                                                                             _projectionViews[0].fov,
+                                                                             projView2,
+                                                                             _projectionViews[1].fov,
+                                                                             swapchainState._mirrorFormat,
+                                                                             projLayer->space,
+                                                                             frameEndInfo->displayTime);
                                             outcome = std::max(
                                                 outcome,
                                                 drew ? MirrorOutcome::Mirroring : MirrorOutcome::DrawFailed);
@@ -1039,17 +1204,19 @@ namespace {
                                 reinterpret_cast<const XrCompositionLayerQuad*>(hdr);
                             if (isSwapchainHandled(quadLayer->subImage.swapchain)) {
                                 auto& swapchainState = _swapchains[quadLayer->subImage.swapchain];
-                                if (swapchainState._lastAcquiredIndex != swapchainState._lastCopiedIndex) {
+                                if (_xrGraphicsAPI != XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR &&
+                                    swapchainState._lastAcquiredIndex != swapchainState._lastCopiedIndex) {
                                     // Probably missed an update to swap chain whilst waiting for OBS plugin
                                     // Swapchains don't need to be updated every frame so just copy the last one aquired
                                     updateSwapChainImages(quadLayer->subImage.swapchain, nullptr, false);
                                 }
-                                if (swapchainState._dx11LastTexture || swapchainState._dx12LastTexture) {
+                                if (swapchainState._dx11LastTexture || swapchainState._dx12LastTexture ||
+                                    swapchainState._vulkanTextureReady) {
                                     if (projView) {
                                         _mirror->Blend(projView,
                                                        _projectionViews[0].fov,
                                                        quadLayer,
-                                                       (DXGI_FORMAT)swapchainState._createInfo.format,
+                                                       swapchainState._mirrorFormat,
                                                        projLayer ? projLayer->space : XR_NULL_HANDLE,
                                                        frameEndInfo->displayTime);
                                     }
@@ -1072,8 +1239,8 @@ namespace {
             // central crop to the runtime so the headset view is unchanged.
             const XrFrameEndInfo* submitInfo = frameEndInfo;
             XrFrameEndInfo patchedFrameEndInfo;
-            if (overscanActive() && frameEndInfo->layerCount > 0 && !_originalViewFovs.empty() &&
-                buildOverscanSubmission(frameEndInfo, patchedFrameEndInfo)) {
+            if (isSessionHandled(session) && overscanActive() && frameEndInfo->layerCount > 0 &&
+                !_originalViewFovs.empty() && buildOverscanSubmission(frameEndInfo, patchedFrameEndInfo)) {
                 submitInfo = &patchedFrameEndInfo;
             }
 
@@ -1090,6 +1257,13 @@ namespace {
             XrSwapchain _xrSwapchain{XR_NULL_HANDLE};
             XrSession _xrSession{XR_NULL_HANDLE};
             XrSwapchainCreateInfo _createInfo{};
+            DXGI_FORMAT _mirrorFormat = DXGI_FORMAT_UNKNOWN;
+            std::vector<VkImage> _vulkanImages;
+            std::unique_ptr<VulkanReadback> _vulkanReadback;
+            uint32_t _vulkanPendingIndex = UINT32_MAX;
+            bool _vulkanCapture = false;
+            bool _vulkanImageWaited = false;
+            bool _vulkanTextureReady = false;
             std::vector<XrSwapchainImageD3D11KHR> _dx11SurfaceImages;
             std::vector<XrSwapchainImageD3D12KHR> _dx12SurfaceImages;
             std::deque<uint32_t> _acquiredIndices;
@@ -1114,6 +1288,37 @@ namespace {
             uint32_t _copySkipStreak = 0;
             bool _copySkipWarned = false;
         };
+
+        void collectVulkanReadback(Swapchain& state) {
+            if (!state._vulkanCapture || !state._vulkanReadback || !_mirror)
+                return;
+            const void* pixels = nullptr;
+            const VkResult result = state._vulkanReadback->poll(pixels);
+            if (result == VK_SUCCESS) {
+                const auto& info = state._createInfo;
+                const bool uploaded = _mirror->uploadMirrorTexture(state._xrSwapchain,
+                                                                   info.width,
+                                                                   info.height,
+                                                                   info.arraySize,
+                                                                   state._mirrorFormat,
+                                                                   pixels,
+                                                                   state._vulkanReadback->rowPitch(),
+                                                                   state._vulkanReadback->slicePitch());
+                if (uploaded) {
+                    state._vulkanTextureReady = true;
+                    state._lastCopiedIndex = state._vulkanPendingIndex;
+                    state._vulkanReadback->markConsumed();
+                } else {
+                    state._vulkanCapture = false;
+                    Log("Vulkan capture disabled for swapchain %p after D3D11 upload failure\n", state._xrSwapchain);
+                }
+                noteMirrorCopyResult(state, uploaded, "Vulkan texture upload failed");
+            } else if (result != VK_NOT_READY) {
+                state._vulkanCapture = false;
+                Log("Vulkan capture disabled for swapchain %p after readback error %d\n", state._xrSwapchain, result);
+                noteMirrorCopyResult(state, false, "Vulkan readback completion failed");
+            }
+        }
 
         // CopyResource silently does nothing unless both resources have
         // identical descriptions - including mip count. Applications that ask
@@ -1742,6 +1947,11 @@ namespace {
 
         ID3D12Device* _d3d12Device = nullptr;
         ID3D12CommandQueue* _d3d12CommandQueue = nullptr;
+
+        // Declared before swapchains so their Vulkan resources are destroyed
+        // before the dispatch and DLL, including implicit instance teardown.
+        wil::unique_hmodule _vulkanLoader;
+        std::shared_ptr<VulkanDispatch> _vulkanDevice;
 
         XrSystemId _systemId{XR_NULL_SYSTEM_ID};
 

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$Version = '0.3.0-beta.14',
-    [string]$FileVersion = '0.3.0.14',
+    [string]$Version = '0.4.0-beta.2',
+    [string]$FileVersion = '0.4.0.2',
     [string]$OBSSourcePath = 'E:\Github\obs-studio',
     [string]$OBSInstallPath = 'C:\Program Files\obs-studio'
 )
@@ -97,6 +97,10 @@ foreach ($fileName in @('README.md', 'LICENSE', 'THIRD_PARTY', 'Launch OpenXR OB
 }
 Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\INSTALL.md') `
     -Destination (Join-Path $payloadRoot 'docs') -Force
+Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\VULKAN.md') `
+    -Destination (Join-Path $payloadRoot 'docs') -Force
+Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\LINUX.md') `
+    -Destination (Join-Path $payloadRoot 'docs') -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "docs\release-notes\$tag.md") `
     -Destination (Join-Path $payloadRoot 'docs\release-notes') -Force
 
@@ -107,7 +111,7 @@ $metadata = [ordered]@{
     platform = 'Windows x64'
     obs_version = (Get-Item -LiteralPath (Join-Path $OBSInstallPath 'bin\64bit\obs64.exe')).VersionInfo.ProductVersion
     runtime_apis = @('OpenXR', 'OpenVR / SteamVR')
-    graphics_apis = @('Direct3D 11', 'Direct3D 12')
+    graphics_apis = @('Direct3D 11', 'Direct3D 12', 'Vulkan')
 }
 $metadata | ConvertTo-Json -Depth 4 | Set-Content `
     -LiteralPath (Join-Path $payloadRoot 'release.json') -Encoding utf8

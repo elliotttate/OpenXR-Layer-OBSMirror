@@ -585,6 +585,46 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         _sourceData[swapchain] = std::move(srcData);
     }
 
+    bool D3D11Mirror::uploadMirrorTexture(XrSwapchain swapchain,
+                                          uint32_t width,
+                                          uint32_t height,
+                                          uint32_t arraySize,
+                                          DXGI_FORMAT format,
+                                          const void* pixels,
+                                          uint32_t rowPitch,
+                                          uint32_t slicePitch) {
+        if (!_initialized || !pixels)
+            return false;
+        auto it = _sourceData.find(swapchain);
+        if (it == _sourceData.end()) {
+            SourceData source;
+            D3D11_TEXTURE2D_DESC desc{};
+            desc.Width = width;
+            desc.Height = height;
+            desc.MipLevels = 1;
+            desc.ArraySize = arraySize;
+            desc.Format = format;
+            desc.SampleDesc.Count = 1;
+            desc.Usage = D3D11_USAGE_DEFAULT;
+            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+            const HRESULT result = _d3d11MirrorDevice->CreateTexture2D(&desc, nullptr, &source._texture);
+            if (FAILED(result)) {
+                Log("Vulkan mirror upload texture creation failed: 0x%08x\n", result);
+                return false;
+            }
+            if (!createSourceView(source))
+                return false;
+            it = _sourceData.emplace(swapchain, std::move(source)).first;
+            Log("Mirror source registered for swapchain %p (Vulkan readback)\n", swapchain);
+        }
+        const auto* bytes = static_cast<const uint8_t*>(pixels);
+        for (uint32_t slice = 0; slice < arraySize; ++slice) {
+            _d3d11MirrorContext->UpdateSubresource(
+                it->second._texture.Get(), slice, nullptr, bytes + size_t(slice) * slicePitch, rowPitch, slicePitch);
+        }
+        return true;
+    }
+
     void D3D11Mirror::removeSwapchain(const XrSwapchain swapchain) {
         _sourceData.erase(swapchain);
     }

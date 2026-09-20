@@ -1,0 +1,101 @@
+name: Build release packages
+on:
+  push:
+    branches: [main, vulkan-support]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install native build and test dependencies
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan-dev mesa-vulkan-drivers vulkan-validationlayers libsimde-dev xvfb
+          gh release download 32.2.2 --repo obsproject/obs-studio --pattern OBS-Studio-32.2.2-Ubuntu-24.04-x86_64.deb --dir "$RUNNER_TEMP"
+          sudo apt-get install -y "$RUNNER_TEMP/OBS-Studio-32.2.2-Ubuntu-24.04-x86_64.deb"
+          sudo ldconfig
+          python3 - <<'PY'
+          import glob, os
+          drivers = glob.glob('/usr/share/vulkan/icd.d/lvp_icd*.json')
+          assert drivers, 'Mesa lavapipe ICD was not installed'
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write('VK_DRIVER_FILES=' + drivers[0] + '\n')
+          PY
+      - name: Build Linux layer and OBS plugin
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DOBS_INCLUDE_DIR=/usr/local/include/obs -DOBS_LIBRARY=/usr/local/lib/x86_64-linux-gnu/libobs.so
+          cmake --build build --parallel 4
+      - name: Vulkan, OpenXR interception and OBS plugin tests
+        env:
+          VK_LAYER_VALIDATE_SYNC: '1'
+          VK_LOADER_LAYERS_DISABLE: '~implicit~'
+        run: xvfb-run -a ctest --test-dir build --output-on-failure -V
+      - name: Package Linux release
+        run: |
+          cmake --install build --prefix "$PWD/package/OpenXR-OBSMirror-0.4.0-beta.2-Linux-x86_64"
+          mkdir -p artifacts
+          tar -C package -czf artifacts/OpenXR-OBSMirror-0.4.0-beta.2-Linux-x86_64.tar.gz OpenXR-OBSMirror-0.4.0-beta.2-Linux-x86_64
+          cd artifacts
+          sha256sum *.tar.gz > SHA256SUMS-Linux.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: artifacts/*
+          if-no-files-found: error
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: microsoft/setup-msbuild@v2
+      - uses: NuGet/setup-nuget@v2
+      - name: Fetch pinned build dependencies
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git clone --depth 1 --branch v1.3.290 https://github.com/KhronosGroup/Vulkan-Headers "$env:RUNNER_TEMP\vulkan"
+          if ($LASTEXITCODE) { throw 'Vulkan headers checkout failed' }
+          "VULKAN_SDK=$env:RUNNER_TEMP\vulkan" >> $env:GITHUB_ENV
+          git clone --depth 1 --branch 32.2.2 https://github.com/obsproject/obs-studio "$env:RUNNER_TEMP\obs-source"
+          if ($LASTEXITCODE) { throw 'OBS checkout failed' }
+          gh release download 32.2.2 --repo obsproject/obs-studio --pattern OBS-Studio-32.2.2-Windows-x64.zip --dir "$env:RUNNER_TEMP"
+          if ($LASTEXITCODE) { throw 'OBS download failed' }
+          Expand-Archive "$env:RUNNER_TEMP\OBS-Studio-32.2.2-Windows-x64.zip" "$env:RUNNER_TEMP\obs"
+          nuget restore .\OpenXR-Layer-OBSMirror.sln -Source https://api.nuget.org/v3/index.json
+          if ($LASTEXITCODE) { throw 'NuGet restore failed' }
+          if (!(Test-Path 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe')) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE) { throw 'Inno Setup installation failed' }
+          }
+      - name: Build Windows layer, OBS plugin, Control Center and installer
+        shell: pwsh
+        run: |
+          .\scripts\Build-Release.ps1 -Version 0.4.0-beta.2 -FileVersion 0.4.0.2 -OBSSourcePath "$env:RUNNER_TEMP\obs-source" -OBSInstallPath "$env:RUNNER_TEMP\obs"
+      - name: Test packaged OBS sources on OBS 32.2.2
+        shell: pwsh
+        run: |
+          .\scripts\Test-OBSPlugin.ps1 -OBSInstallPath "$env:RUNNER_TEMP\obs" -PortablePackage artifacts\v0.4.0-beta.2\OpenXR-OBSMirror-0.4.0-beta.2-Portable.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: artifacts/v0.4.0-beta.2/*
+          if-no-files-found: error

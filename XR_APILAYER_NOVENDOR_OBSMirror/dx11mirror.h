@@ -37,6 +37,18 @@ namespace Mirror
 
         void removeSwapchain(const XrSwapchain swapchain);
 
+        // Upload completed Vulkan readbacks on the compositor's own device.
+        // UpdateSubresource copies the host bytes before returning; no shared
+        // texture handles or cross-device mutexes are needed for this source.
+        bool uploadMirrorTexture(XrSwapchain swapchain,
+                                 uint32_t width,
+                                 uint32_t height,
+                                 uint32_t arraySize,
+                                 DXGI_FORMAT format,
+                                 const void* pixels,
+                                 uint32_t rowPitch,
+                                 uint32_t slicePitch);
+
         /// Fence value the game's D3D12 queue will signal once its copy into
         /// the shared texture for this swapchain has completed.
         void notifyFenceValue(const XrSwapchain swapchain, const UINT64 value);

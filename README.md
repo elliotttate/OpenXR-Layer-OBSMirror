@@ -1,12 +1,14 @@
 # OpenXR + OpenVR OBS Mirror
 
+Vulkan capture is available on Windows and in experimental native Linux packages. See [Linux installation and limitations](docs/LINUX.md) and [Vulkan capture](docs/VULKAN.md).
+
 **Capture native OpenXR applications or the SteamVR/OpenVR compositor directly
 in OBS Studio. OpenXR capture can also use a wider, steadier recording camera
 while the headset continues to look and track normally.**
 
 OpenXR OBS Mirror combines a native OpenXR API layer, native OpenXR and OpenVR
 OBS sources, and a self-contained dark WinUI 3 Control Center. It supports
-Direct3D 11 and Direct3D 12 OpenXR applications plus SteamVR/OpenVR compositor
+Direct3D 11, Direct3D 12, and Vulkan OpenXR applications plus SteamVR/OpenVR compositor
 capture on Windows x64, while keeping the machine's normal headset runtime as
 the default.
 
@@ -32,6 +34,9 @@ The OpenXR layer template was based on
 [OpenXR-Layer-Template](https://github.com/mbucchia/OpenXR-Layer-Template).
 
 ## Quick install
+
+Requires OBS Studio 32 (release builds are tested with 32.2.2). Older OBS
+versions are unsupported.
 
 1. Open the [latest GitHub release](https://github.com/elliotttate/OpenXR-Layer-OBSMirror/releases/latest).
 2. Close OBS Studio and any running OpenXR application.
@@ -70,21 +75,28 @@ nuget restore .\OpenXR-Layer-OBSMirror.sln `
   -Source https://api.nuget.org/v3/index.json
 ```
 
-Build the x64 layer with Visual Studio 2022:
+Install the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) and make sure
+`VULKAN_SDK` points to its installation directory, then build the x64 layer
+with Visual Studio 2022. Only Vulkan headers are needed at build time; the
+layer loads the Vulkan driver dynamically for Vulkan sessions.
 
 ```powershell
 msbuild .\OpenXR-Layer-OBSMirror.sln /m `
   /p:Configuration=Release /p:Platform=x64
 ```
 
-The OBS plugin must be compiled against source matching the installed OBS
-version. For example, for OBS 32.2.1:
+OBS Studio 32 is the supported baseline on Windows and Linux. Older OBS
+versions are unsupported. Releases build and test against OBS 32.2.2, including
+loading the packaged Windows DLL and registering both capture sources. For a
+Windows release build, extract the official OBS 32.2.2 Windows ZIP and use
+matching source:
 
 ```powershell
-git clone --depth 1 --branch 32.2.1 `
-  https://github.com/obsproject/obs-studio.git C:\src\obs-studio-32.2.1
+git clone --depth 1 --branch 32.2.2 `
+  https://github.com/obsproject/obs-studio.git C:\src\obs-studio-32.2.2
 pwsh -File .\scripts\Build-OBSPlugin.ps1 `
-  -OBSSourcePath C:\src\obs-studio-32.2.1
+  -OBSSourcePath C:\src\obs-studio-32.2.2 `
+  -OBSInstallPath C:\build-deps\obs-studio-32.2.2
 ```
 
 With OBS closed, install both freshly built components for the current user:
@@ -109,7 +121,10 @@ installs the plugin under OBS's Windows discovery path at
   is available, then automatically falls back to SteamVR's native compositor
   mirror for OpenVR applications. Existing scenes saved with the older
   **OpenXR Mirror Capture** name are upgraded in place because the source ID is
-  unchanged. Direct3D 11 and Direct3D 12 OpenXR applications are supported.
+  unchanged. Direct3D 11, Direct3D 12, and Vulkan OpenXR applications are supported.
+  Vulkan uses asynchronous host readback into the existing D3D11 compositor,
+  which adds transfer overhead and can add capture latency. See
+  [Vulkan support](docs/VULKAN.md) for formats, limitations, and validation steps.
 - **OpenVR / SteamVR Mirror Capture** reads SteamVR's native compositor mirror
   directly and remains available as an explicit advanced source. It offers left,
   right, and side-by-side stereo modes, percentage crop controls, automatic
@@ -138,13 +153,14 @@ Build a self-contained x64 copy:
 pwsh -File .\scripts\Build-ControlCenter.ps1
 ```
 
-Build the native layer, matching OBS 32.2.1 source, Control Center, installer,
+Build the native layer, OBS plugin using the 32.2.2 baseline, Control Center, installer,
 portable ZIP, and checksums in one reproducible command:
 
 ```powershell
 pwsh -File .\scripts\Build-Release.ps1 `
-  -Version 0.3.0-beta.4 `
-  -OBSSourcePath E:\Github\obs-studio
+  -Version 0.4.0-beta.2 `
+  -OBSSourcePath C:\src\obs-studio-32.2.2 `
+  -OBSInstallPath C:\build-deps\obs-studio-32.2.2
 ```
 
 Run `bin\x64\Release\ControlCenter\OBSMirror.ControlCenter.exe`. Overscan

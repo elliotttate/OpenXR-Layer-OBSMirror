@@ -6,6 +6,9 @@ headset's normal runtime, view, and tracking.
 
 ## Recommended: Windows installer
 
+OBS Studio 32 is required. Release builds use and test OBS 32.2.2. Older OBS
+versions are unsupported.
+
 1. Close OBS Studio and any running OpenXR application.
 2. Run the downloaded `OpenXR-OBSMirror-...-Setup.exe`.
 3. Accept the Windows administrator prompt. It is used only to place the OBS
@@ -93,6 +96,19 @@ the Installation page. Turning it back on restores the current-user OpenXR
 registration; both switches always show the same live state.
 
 ## Troubleshooting
+
+- If the OBS log says `obs_source_info` is larger than libobs supports (424
+  versus 408 bytes), update OBS to the supported OBS 32 baseline. OBS 30/31
+  are unsupported. New plugin builds log this requirement and refuse to load
+  on older OBS versions.
+- For VirtualDesktopXR, add **VR Mirror Capture (Auto: OpenXR / SteamVR)**.
+  The separate **OpenVR Capture** source supplied by `win-openvr.dll` requires
+  SteamVR and cannot capture a VirtualDesktopXR session.
+- If locale or preset files are missing, install the complete package instead
+  of copying only `win-openxr.dll`. For a manual install into OBS's application
+  directory, copy `OBSPlugin/win-openxr/data` contents into
+  `data/obs-plugins/win-openxr`, and both DLLs from `OBS_Plugin` into
+  `obs-plugins/64bit`. Avoid keeping a second copy in the shared plugin folder.
 
 - If the Dashboard preview or OBS source stays black, open **Diagnostics**, pick
   **Preview diagnostics**, and use **Upload & share logs**. The preview log
