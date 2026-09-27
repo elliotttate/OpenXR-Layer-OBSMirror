@@ -38,7 +38,9 @@ if ($Scope -eq 'AllUsers') {
 }
 
 if ($PSCmdlet.ShouldProcess($registryPath, "Register $manifestFullPath")) {
+    if (-not (Test-Path -LiteralPath $registryPath)) {
     New-Item -Path $registryPath -Force | Out-Null
+}
 
     $manifestName = [IO.Path]::GetFileName($manifestFullPath)
     $propertyNames = @(
