@@ -940,7 +940,14 @@ float4 ps_quad(psIn inputPS) : SV_TARGET
         if (it == _sourceData.end() || !it->second._texture)
             return;
 
-        checkCopyTex(view->subImage.imageRect.extent.width, view->subImage.imageRect.extent.height, format);
+        // Quads composite onto the target the projection pass set up. Passing
+        // the quad swapchain's format here rebuilt the compositor and mirror
+        // ring whenever it differed from the projection's (e.g. OpenKneeboard
+        // submits BGRA over an RGBA game), discarding the game image and
+        // flipping the shared surface twice per frame (#21, #17). Only create
+        // the target if a quad arrives before any projection has.
+        if (_compositorTexture == nullptr)
+            checkCopyTex(view->subImage.imageRect.extent.width, view->subImage.imageRect.extent.height, format);
 
         if (_compositorTexture == nullptr || _mirrorTextures.size() == 0)
             return;
