@@ -1,9 +1,10 @@
 [CmdletBinding()]
 param(
-    [string]$Version = '0.3.0-beta.14',
-    [string]$FileVersion = '0.3.0.14',
+    [string]$Version = '0.3.0-beta.15',
+    [string]$FileVersion = '0.3.0.15',
     [string]$OBSSourcePath = 'E:\Github\obs-studio',
-    [string]$OBSInstallPath = 'C:\Program Files\obs-studio'
+    [string]$OBSInstallPath = 'C:\Program Files\obs-studio',
+    [string]$InnoSetupCompilerPath = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
 )
 
 Set-StrictMode -Version Latest
@@ -112,7 +113,7 @@ $metadata = [ordered]@{
 $metadata | ConvertTo-Json -Depth 4 | Set-Content `
     -LiteralPath (Join-Path $payloadRoot 'release.json') -Encoding utf8
 
-$iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+$iscc = $InnoSetupCompilerPath
 if (-not (Test-Path -LiteralPath $iscc -PathType Leaf)) {
     throw "Inno Setup 6 compiler not found: $iscc"
 }

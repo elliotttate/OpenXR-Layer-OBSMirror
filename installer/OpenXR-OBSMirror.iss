@@ -1,8 +1,8 @@
 #ifndef MyAppVersion
-  #define MyAppVersion "0.3.0-beta.14"
+  #define MyAppVersion "0.3.0-beta.15"
 #endif
 #ifndef MyFileVersion
-  #define MyFileVersion "0.3.0.14"
+  #define MyFileVersion "0.3.0.15"
 #endif
 #ifndef PayloadRoot
   #define PayloadRoot "..\artifacts\payload"

@@ -283,7 +283,7 @@
                             <StackPanel Spacing="5">
                                 <TextBlock Text="RECORDING OVERSCAN" Style="{StaticResource EyebrowStyle}" />
                                 <TextBlock Text="Give the recording more room." Style="{StaticResource SectionTitleStyle}" />
-                                <TextBlock Text="Ask the OpenXR application for a wider FOV and a larger render target while the headset receives the original central crop." Style="{StaticResource MutedTextStyle}" />
+                                <TextBlock Text="Ask the OpenXR application for a wider FOV and a larger render target while the headset receives its original view." Style="{StaticResource MutedTextStyle}" />
                             </StackPanel>
 
                             <Border Style="{StaticResource CardStyle}">
@@ -307,7 +307,7 @@
                                                 <TextBlock x:Name="HorizontalValueText" Text="115%" HorizontalAlignment="Right" Foreground="{StaticResource BrandBrush}" FontSize="18" FontWeight="SemiBold" />
                                             </Grid>
                                             <Slider x:Name="HorizontalSlider" ValueChanged="OverscanSlider_ValueChanged" />
-                                            <TextBlock Text="Adds room to the left and right edges of the recording." Style="{StaticResource MutedTextStyle}" FontSize="12" />
+                                            <TextBlock Text="Adds room toward the center of your vision: leftward for the right eye, rightward for the left eye." Style="{StaticResource MutedTextStyle}" FontSize="12" />
                                         </StackPanel>
 
                                         <StackPanel Spacing="6">
@@ -330,7 +330,7 @@
                                         </StackPanel>
 
                                         <StackPanel Spacing="9">
-                                            <TextBlock Text="EXTRA ROOM ON EVERY EDGE" Style="{StaticResource EyebrowStyle}" />
+                                            <TextBlock Text="EXPANSION PRESETS" Style="{StaticResource EyebrowStyle}" />
                                             <StackPanel Orientation="Horizontal" Spacing="9">
                                                 <Button Tag="115,108" Click="Preset_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Balanced  115 × 108" />
                                                 <Button Tag="120,110" Click="Preset_Click" Style="{StaticResource SecondaryButtonStyle}" Content="Wide  120 × 110" />

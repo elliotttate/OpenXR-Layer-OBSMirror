@@ -12,7 +12,7 @@ the default.
 
 Key recording controls include:
 
-- recording-only FOV overscan with an unchanged headset center crop;
+- recording-only FOV overscan with an unchanged headset view;
 - live camera smoothing and crop margin;
 - independent show/hide control for OpenXR composition quad layers;
 - an in-app preview that follows either OpenXR or OpenVR/SteamVR capture;
@@ -185,8 +185,12 @@ active OpenXR runtime.
 Recordings normally show exactly the headset's field of view, so head motion
 sits at the very edge of the frame. Recording overscan asks the OpenXR application to render
 a wider field of view and a proportionally larger image, feeds the full wide
-image to OBS, and submits only the original central crop to the OpenXR runtime
+image to OBS, and submits only the original headset crop to the OpenXR runtime
 — the headset view is unchanged, including its pixels-per-degree.
+
+Horizontal expansion adds all extra width toward the center of your vision:
+leftward for the right eye and rightward for the left eye. Each eye's outer edge
+stays fixed. Vertical expansion continues to add room above and below.
 
 ```powershell
 # Enable with the defaults (115% horizontal, 108% vertical, ~24% more pixels)

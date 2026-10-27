@@ -794,7 +794,7 @@ namespace {
                 _originalViewFovs.resize(*viewCountOutput);
                 for (uint32_t nView = 0; nView < *viewCountOutput; nView++) {
                     _originalViewFovs[nView] = views[nView].fov;
-                    views[nView].fov = widenFov(views[nView].fov);
+                    views[nView].fov = widenFov(views[nView].fov, nView);
                 }
             }
 
@@ -1069,7 +1069,7 @@ namespace {
 
             // With overscan active, OBS has already been fed the full wide
             // image above; now restore the original FOV and submit only the
-            // central crop to the runtime so the headset view is unchanged.
+            // headset crop to the runtime so the headset view is unchanged.
             const XrFrameEndInfo* submitInfo = frameEndInfo;
             XrFrameEndInfo patchedFrameEndInfo;
             if (overscanActive() && frameEndInfo->layerCount > 0 && !_originalViewFovs.empty() &&
@@ -1520,19 +1520,27 @@ namespace {
             }
         }
 
-        // Widen by scaling the tangent of each half-angle, not the angle
-        // itself, so the expansion is linear in render-target pixels.
-        XrFovf widenFov(const XrFovf& fov) const {
-            XrFovf wide;
-            wide.angleLeft = atanf(tanf(fov.angleLeft) * _overscanHScale);
-            wide.angleRight = atanf(tanf(fov.angleRight) * _overscanHScale);
+        // Expand toward the other eye: rightward for the left eye (view 0),
+        // leftward for the right eye (view 1). Keep the outer edge fixed and
+        // add the entire extra tan-space width to the inner edge so the render
+        // target scale and headset pixels-per-degree stay the same.
+        XrFovf widenFov(const XrFovf& fov, uint32_t viewIndex) const {
+            XrFovf wide = fov;
+            const float left = tanf(fov.angleLeft);
+            const float right = tanf(fov.angleRight);
+            const float extraWidth = (right - left) * (_overscanHScale - 1.0f);
+            if (viewIndex == 0) {
+                wide.angleRight = atanf(right + extraWidth);
+            } else {
+                wide.angleLeft = atanf(left - extraWidth);
+            }
             wide.angleUp = atanf(tanf(fov.angleUp) * _overscanVScale);
             wide.angleDown = atanf(tanf(fov.angleDown) * _overscanVScale);
             return wide;
         }
 
         // Sub-rect of `rect` (rendered with fov `wide`) covering exactly `orig`.
-        static XrRect2Di computeCenterCrop(const XrRect2Di& rect, const XrFovf& wide, const XrFovf& orig) {
+        static XrRect2Di computeHeadsetCrop(const XrRect2Di& rect, const XrFovf& wide, const XrFovf& orig) {
             const float wideLeft = tanf(wide.angleLeft);
             const float wideRight = tanf(wide.angleRight);
             const float wideUp = tanf(wide.angleUp);
@@ -1580,7 +1588,7 @@ namespace {
                     reinterpret_cast<const XrCompositionLayerDepthInfoKHR*>(entry);
                 _patchedDepthInfos.push_back(*depth);
                 XrCompositionLayerDepthInfoKHR& newDepth = _patchedDepthInfos.back();
-                newDepth.subImage.imageRect = computeCenterCrop(depth->subImage.imageRect, wide, orig);
+                newDepth.subImage.imageRect = computeHeadsetCrop(depth->subImage.imageRect, wide, orig);
                 view.next = &newDepth;
                 return;
             }
@@ -1596,7 +1604,7 @@ namespace {
             }
         }
 
-        // Deep-copies the projection layers with the original FOV and central
+        // Deep-copies the projection layers with the original FOV and headset
         // crop applied. Returns false when nothing needed patching.
         bool buildOverscanSubmission(const XrFrameEndInfo* frameEndInfo, XrFrameEndInfo& patched) {
             size_t projLayerCount = 0;
@@ -1643,14 +1651,14 @@ namespace {
                         continue;
 
                     const XrFovf orig = _originalViewFovs[v];
-                    const XrFovf wide = widenFov(orig);
+                    const XrFovf wide = widenFov(orig, v);
                     // Only patch views rendered with the FOV we handed out;
                     // anything else passes through untouched.
                     if (!fovNearEqual(view.fov, wide))
                         continue;
 
                     const XrRect2Di wideRect = view.subImage.imageRect;
-                    const XrRect2Di croppedRect = computeCenterCrop(wideRect, wide, orig);
+                    const XrRect2Di croppedRect = computeHeadsetCrop(wideRect, wide, orig);
                     view.subImage.imageRect = croppedRect;
                     view.fov = orig;
                     patchDepthInfo(view, wide, orig);
