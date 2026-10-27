@@ -934,6 +934,11 @@ namespace {
                     }
 
                     const bool includeQuadLayers = mirrorQuadLayers();
+                    // Quads must be projected with the same eye's FOV as the
+                    // view they are drawn over. Eye FOVs are asymmetric, so
+                    // pairing the right eye's pose with the left eye's FOV
+                    // misplaces world-locked quads and makes them swim (#21).
+                    XrFovf quadFov = _projectionViews[0].fov;
                     // Set when the mirrored view belongs to the eye we are not
                     // publishing this frame (see trackAlternateEyeRendering).
                     bool holdPublish = false;
@@ -971,6 +976,8 @@ namespace {
                                             "mirroring it as mono (the OBS eye selection has no effect here)\n");
                                     }
                                     projView = &projLayer->views[eyeIndex];
+                                    quadFov = eyeIndex < _projectionViews.size() ? _projectionViews[eyeIndex].fov
+                                                                                 : _projectionViews[0].fov;
                                     // An alternate-eye application moves the
                                     // viewpoint behind this view index by one
                                     // eye separation on every other frame;
@@ -1047,7 +1054,7 @@ namespace {
                                 if (swapchainState._dx11LastTexture || swapchainState._dx12LastTexture) {
                                     if (projView) {
                                         _mirror->Blend(projView,
-                                                       _projectionViews[0].fov,
+                                                       quadFov,
                                                        quadLayer,
                                                        (DXGI_FORMAT)swapchainState._createInfo.format,
                                                        projLayer ? projLayer->space : XR_NULL_HANDLE,
