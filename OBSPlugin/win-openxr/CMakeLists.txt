@@ -52,6 +52,11 @@ add_custom_command(TARGET win-openxr POST_BUILD
 	COMMENT "Copying the optional OpenVR runtime beside the OBS plugin")
 
 if(MSVC)
+	# VS 2026 still sees C++/WinRT's compatibility include of
+	# <experimental/coroutine>; acknowledge that dependency until it moves to
+	# the standard C++20 header.
+	target_compile_definitions(win-openxr PRIVATE
+		_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
 	# Keep the installed-binary hash stable across no-op rebuilds so the
 	# Control Center only reports an update when the plugin actually changed.
 	target_compile_options(win-openxr PRIVATE /Brepro)

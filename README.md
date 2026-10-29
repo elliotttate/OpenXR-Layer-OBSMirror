@@ -4,6 +4,10 @@
 in OBS Studio. OpenXR capture can also use a wider, steadier recording camera
 while the headset continues to look and track normally.**
 
+This fork's VDXR package is an unofficial community project and is not
+affiliated with or endorsed by Virtual Desktop, OBS Studio, or their
+developers. Product names identify compatibility only.
+
 OpenXR OBS Mirror combines a native OpenXR API layer, native OpenXR and OpenVR
 OBS sources, and a self-contained dark WinUI 3 Control Center. It supports
 Direct3D 11 and Direct3D 12 OpenXR applications plus SteamVR/OpenVR compositor
@@ -30,6 +34,25 @@ Click either preview to watch on YouTube.
 
 The OpenXR layer template was based on
 [OpenXR-Layer-Template](https://github.com/mbucchia/OpenXR-Layer-Template).
+
+## Lightweight Virtual Desktop / VDXR package
+
+The repository also produces a slim OpenXR-only package for Virtual Desktop's
+VDXR runtime. It omits the Control Center and OpenVR runtime files, installs the
+native OBS source into OBS's shared Windows plugin directory, and registers the
+implicit layer only for the current user. The current profile was validated
+with Virtual Desktop Streamer 1.34.22, VDXR 1.0.10, OBS Studio 32.2.0, and
+Elements Divided.
+
+Build it from existing Release binaries with:
+
+```powershell
+pwsh -File .\scripts\Build-VDXRPackage.ps1 -Version 1.0.3
+```
+
+See [docs/VDXR-COMPATIBILITY.md](docs/VDXR-COMPATIBILITY.md) for the capture
+boundary and performance path. The package is OBS-ABI-specific: users must not
+install its OBS 32.2.0 plugin into a different OBS version.
 
 ## Quick install
 

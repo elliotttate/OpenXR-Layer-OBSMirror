@@ -40,13 +40,46 @@ $vswhere = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe
 if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) {
     throw "Visual Studio locator not found: $vswhere"
 }
-$msbuild = & $vswhere -latest -version '[17.0,18.0)' -products * `
-    -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' |
-    Select-Object -First 1
-if (-not $msbuild) { throw 'Visual Studio 2022 MSBuild was not found.' }
+$vsJson = & $vswhere -latest -version '[17.0,19.0)' -products * `
+    -requires Microsoft.Component.MSBuild Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+    -format json
+if ($LASTEXITCODE -ne 0 -or -not $vsJson) {
+    throw 'Visual Studio 2022 or 2026 with both MSBuild and the C++ x64 tools was not found.'
+}
+$vsInstall = @(($vsJson -join "`n") | ConvertFrom-Json) | Select-Object -First 1
+if (-not $vsInstall -or -not $vsInstall.installationPath -or -not $vsInstall.installationVersion) {
+    throw 'Visual Studio discovery returned incomplete installation metadata.'
+}
+$msbuild = Join-Path $vsInstall.installationPath 'MSBuild\Current\Bin\MSBuild.exe'
+if (-not (Test-Path -LiteralPath $msbuild -PathType Leaf)) {
+    throw "MSBuild was not found in the selected Visual Studio installation: $msbuild"
+}
+$vsVersion = [Version]$vsInstall.installationVersion
+$platformToolset = if ($vsVersion.Major -ge 18) { 'v145' } else { 'v143' }
+$pythonExe = $null
+foreach ($pythonName in @('python', 'py')) {
+    $pythonCommand = @(Get-Command $pythonName -CommandType Application -ErrorAction SilentlyContinue) |
+        Select-Object -First 1
+    if (-not $pythonCommand) { continue }
+
+    try {
+        & $pythonCommand.Source -c 'import sys; sys.exit(0 if sys.version_info.major == 3 else 1)' *> $null
+        if ($LASTEXITCODE -eq 0) {
+            $pythonExe = $pythonCommand.Source
+            break
+        }
+    } catch {
+        # Continue searching when an app-execution alias or broken interpreter
+        # cannot run without user interaction.
+    }
+}
+if (-not $pythonExe) {
+    throw 'A runnable Python 3 interpreter was not found. Install Python 3 or add python/py to PATH before building the native layer.'
+}
 
 & $msbuild (Join-Path $repoRoot 'OpenXR-Layer-OBSMirror.sln') /m `
-    /t:Build /p:Configuration=Release /p:Platform=x64
+    /t:Build /p:Configuration=Release /p:Platform=x64 `
+    "/p:PlatformToolset=$platformToolset" "/p:PythonExe=$pythonExe"
 if ($LASTEXITCODE -ne 0) { throw "Native layer build failed (exit $LASTEXITCODE)." }
 
 & (Join-Path $PSScriptRoot 'Build-OBSPlugin.ps1') `
