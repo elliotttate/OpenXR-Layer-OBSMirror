@@ -20,6 +20,10 @@ public sealed record SystemSnapshot(
     string SourceLayerHash,
     string PluginHash,
     string SourcePluginHash,
+    // Non-empty when OBSMirror is also registered under HKLM. Elevated OpenXR
+    // applications ignore the current-user layer and may load this copy.
+    string MachineLayerManifestPaths,
+    bool MachineLayerCurrent,
     bool OverscanEnabled,
     int HorizontalPercent,
     int VerticalPercent,

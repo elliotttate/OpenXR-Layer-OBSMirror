@@ -82,6 +82,18 @@ replacing a DLL already loaded by a headset session. Restart the OpenXR
 application to load the new layer. Restart OBS Studio when the OBS source is
 updated.
 
+Setup registers OBSMirror for the current user. If the Control Center reports a
+machine-wide OBSMirror registration, check the manifest path before removing or
+updating it. An old machine-wide copy can take precedence over the current
+per-user version.
+
+Elevated OpenXR applications do not load per-user implicit API layers. Run the
+VR launcher and game without administrator rights when using the normal
+per-user installation. If elevation is required, install both the layer files
+and manifest in an administrator-protected location before registering that
+manifest for all users. Do not register a machine-wide manifest that points to
+a DLL in a user-writable folder.
+
 Use **Installed apps > OpenXR OBS Mirror > Uninstall** to remove the Control
 Center, OBS source, current-user OpenXR layer registration, and installed layer
 files. Close OBS Studio and any OpenXR application first so loaded files can be

@@ -72,6 +72,14 @@ public sealed class OBSMirrorService
         var registeredManifest = FindRegisteredLayerManifest();
         var sourceLayerHash = HashFile(ReleaseLayerPath);
         var layerHash = HashFile(InstalledLayerPath);
+        var machineLayerManifests = FindMachineLayerManifests();
+        var machineLayerCurrent = machineLayerManifests.Count > 0 &&
+                                  !string.IsNullOrEmpty(sourceLayerHash) &&
+                                  machineLayerManifests.All(manifest =>
+                                      string.Equals(
+                                          sourceLayerHash,
+                                          HashFile(ResolveManifestLibraryPath(manifest)),
+                                          StringComparison.OrdinalIgnoreCase));
         var sourcePluginHash = HashFile(ReleasePluginPath);
         var pluginHash = HashFile(PluginPath);
         var sourceOpenVrApiHash = HashFile(ReleaseOpenVrApiPath);
@@ -103,6 +111,8 @@ public sealed class OBSMirrorService
             SourceLayerHash: sourceLayerHash,
             PluginHash: pluginHash,
             SourcePluginHash: sourcePluginHash,
+            MachineLayerManifestPaths: string.Join("; ", machineLayerManifests),
+            MachineLayerCurrent: machineLayerCurrent,
             OverscanEnabled: enabled,
             HorizontalPercent: horizontal,
             VerticalPercent: vertical,
@@ -706,6 +716,39 @@ public sealed class OBSMirrorService
         return key?.GetValueNames().FirstOrDefault(name =>
             Path.GetFileName(name).Equals(LayerManifestName, StringComparison.OrdinalIgnoreCase) &&
             Convert.ToInt32(key.GetValue(name, 1) ?? 1) == 0);
+    }
+
+    private static IReadOnlyList<string> FindMachineLayerManifests()
+    {
+        var manifests = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
+        {
+            try
+            {
+                using var root = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
+                using var key = root.OpenSubKey(LayerRegistryKey);
+                if (key is null)
+                    continue;
+
+                foreach (var valueName in key.GetValueNames())
+                {
+                    if (!Path.GetFileName(valueName).Equals(LayerManifestName, StringComparison.OrdinalIgnoreCase) ||
+                        Convert.ToInt32(key.GetValue(valueName, 1) ?? 1) != 0)
+                    {
+                        continue;
+                    }
+
+                    manifests.Add(Environment.ExpandEnvironmentVariables(valueName.Trim().Trim('"')));
+                }
+            }
+            catch
+            {
+                // A status refresh must still succeed if a registry view is
+                // unavailable or contains a malformed legacy value.
+            }
+        }
+
+        return manifests.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     private static RuntimeSelection ResolveRuntimeSelection()

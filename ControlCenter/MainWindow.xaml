@@ -213,6 +213,8 @@
                                         </Grid>
                                         <InfoBar x:Name="RuntimeModeInfoBar" IsOpen="True" IsClosable="False" Severity="Informational"
                                                  Title="Checking runtime selection" Message="Reading the effective and system OpenXR runtime settings." />
+                                        <InfoBar x:Name="MachineLayerInfoBar" IsOpen="False" IsClosable="False" Severity="Warning"
+                                                 Title="Machine-wide OBSMirror layer is registered" />
                                         <InfoBar x:Name="ConflictingPluginInfoBar" IsOpen="False" IsClosable="False" Severity="Error"
                                                  Title="An old OBS source copy is taking over">
                                             <InfoBar.ActionButton>
