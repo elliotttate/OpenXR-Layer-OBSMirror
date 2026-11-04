@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XR_APILAYER_NOVENDOR_OBSMir
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OBSMirror.ControlCenter", "ControlCenter\OBSMirror.ControlCenter.csproj", "{C2A6F138-F16B-4A70-8E09-99237E8BCB19}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OBSMirror.ControlCenter.Tests", "ControlCenter.Tests\OBSMirror.ControlCenter.Tests.csproj", "{DFA9A417-80F3-47DD-A8CD-2A795C6F0D3B}"
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Files", "Solution Files", "{A53ED6CB-95D3-4833-8A16-C6A588F16F6E}"
 	ProjectSection(SolutionItems) = preProject
 		.clang-format = .clang-format
@@ -46,6 +48,14 @@ Global
 		{C2A6F138-F16B-4A70-8E09-99237E8BCB19}.Debug|x64.ActiveCfg = Debug|x64
 		{C2A6F138-F16B-4A70-8E09-99237E8BCB19}.Release|Win32.ActiveCfg = Release|x64
 		{C2A6F138-F16B-4A70-8E09-99237E8BCB19}.Release|x64.ActiveCfg = Release|x64
+		{DFA9A417-80F3-47DD-A8CD-2A795C6F0D3B}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{DFA9A417-80F3-47DD-A8CD-2A795C6F0D3B}.Debug|Win32.Build.0 = Debug|Any CPU
+		{DFA9A417-80F3-47DD-A8CD-2A795C6F0D3B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{DFA9A417-80F3-47DD-A8CD-2A795C6F0D3B}.Debug|x64.Build.0 = Debug|Any CPU
+		{DFA9A417-80F3-47DD-A8CD-2A795C6F0D3B}.Release|Win32.ActiveCfg = Release|Any CPU
+		{DFA9A417-80F3-47DD-A8CD-2A795C6F0D3B}.Release|Win32.Build.0 = Release|Any CPU
+		{DFA9A417-80F3-47DD-A8CD-2A795C6F0D3B}.Release|x64.ActiveCfg = Release|Any CPU
+		{DFA9A417-80F3-47DD-A8CD-2A795C6F0D3B}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
