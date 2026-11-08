@@ -935,8 +935,9 @@ namespace {
                     if (_lastMirroredExtent.width > 0 && _lastMirroredExtent.height > 0) {
                         defaultRect.extent = _lastMirroredExtent;
                     } else {
-                        defaultRect.extent.width = _xrViewsList[0].recommendedImageRectWidth;
-                        defaultRect.extent.height = _xrViewsList[0].recommendedImageRectHeight;
+                        const auto& rec = _xrViewsList[defaultEye < _xrViewsList.size() ? defaultEye : 0];
+                        defaultRect.extent.width = rec.recommendedImageRectWidth;
+                        defaultRect.extent.height = rec.recommendedImageRectHeight;
                     }
 
                     const bool includeQuadLayers = mirrorQuadLayers();
