@@ -911,7 +911,14 @@ namespace {
                 }
 
                 if (outcome >= MirrorOutcome::NoProjectionLayer) {
-                    const XrCompositionLayerProjectionView* projView = &_projectionViews[0];
+                    // Quads on frames without a projection layer (or listed
+                    // before one) are drawn from this located view, so start
+                    // from the eye OBS is mirroring rather than always eye 0.
+                    // Both-eyes mode (index 2) falls back to eye 0.
+                    uint32_t defaultEye = _mirror->getEyeIndex();
+                    if (defaultEye >= _projectionViews.size())
+                        defaultEye = 0;
+                    const XrCompositionLayerProjectionView* projView = &_projectionViews[defaultEye];
                     const XrCompositionLayerProjection* projLayer = nullptr;
 
                     // This rect sizes the mirror ring on frames that carry
@@ -922,15 +929,14 @@ namespace {
                     // different source resolution - every time a frame arrived
                     // without a projection layer. Reuse whatever the
                     // projection path last mirrored instead.
-                    _projectionViews[0].subImage.imageRect.offset.x = 0;
-                    _projectionViews[0].subImage.imageRect.offset.y = 0;
+                    auto& defaultRect = _projectionViews[defaultEye].subImage.imageRect;
+                    defaultRect.offset.x = 0;
+                    defaultRect.offset.y = 0;
                     if (_lastMirroredExtent.width > 0 && _lastMirroredExtent.height > 0) {
-                        _projectionViews[0].subImage.imageRect.extent = _lastMirroredExtent;
+                        defaultRect.extent = _lastMirroredExtent;
                     } else {
-                        _projectionViews[0].subImage.imageRect.extent.width =
-                            _xrViewsList[0].recommendedImageRectWidth;
-                        _projectionViews[0].subImage.imageRect.extent.height =
-                            _xrViewsList[0].recommendedImageRectHeight;
+                        defaultRect.extent.width = _xrViewsList[0].recommendedImageRectWidth;
+                        defaultRect.extent.height = _xrViewsList[0].recommendedImageRectHeight;
                     }
 
                     const bool includeQuadLayers = mirrorQuadLayers();
@@ -938,7 +944,7 @@ namespace {
                     // view they are drawn over. Eye FOVs are asymmetric, so
                     // pairing the right eye's pose with the left eye's FOV
                     // misplaces world-locked quads and makes them swim (#21).
-                    XrFovf quadFov = _projectionViews[0].fov;
+                    XrFovf quadFov = _projectionViews[defaultEye].fov;
                     // Set when the mirrored view belongs to the eye we are not
                     // publishing this frame (see trackAlternateEyeRendering).
                     bool holdPublish = false;
