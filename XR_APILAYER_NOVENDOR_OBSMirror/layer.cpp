@@ -911,7 +911,14 @@ namespace {
                 }
 
                 if (outcome >= MirrorOutcome::NoProjectionLayer) {
-                    const XrCompositionLayerProjectionView* projView = &_projectionViews[0];
+                    // Quads on frames without a projection layer (or listed
+                    // before one) are drawn from this located view, so start
+                    // from the eye OBS is mirroring rather than always eye 0.
+                    // Both-eyes mode (index 2) falls back to eye 0.
+                    uint32_t defaultEye = _mirror->getEyeIndex();
+                    if (defaultEye >= _projectionViews.size())
+                        defaultEye = 0;
+                    const XrCompositionLayerProjectionView* projView = &_projectionViews[defaultEye];
                     const XrCompositionLayerProjection* projLayer = nullptr;
 
                     // This rect sizes the mirror ring on frames that carry
@@ -922,18 +929,23 @@ namespace {
                     // different source resolution - every time a frame arrived
                     // without a projection layer. Reuse whatever the
                     // projection path last mirrored instead.
-                    _projectionViews[0].subImage.imageRect.offset.x = 0;
-                    _projectionViews[0].subImage.imageRect.offset.y = 0;
+                    auto& defaultRect = _projectionViews[defaultEye].subImage.imageRect;
+                    defaultRect.offset.x = 0;
+                    defaultRect.offset.y = 0;
                     if (_lastMirroredExtent.width > 0 && _lastMirroredExtent.height > 0) {
-                        _projectionViews[0].subImage.imageRect.extent = _lastMirroredExtent;
+                        defaultRect.extent = _lastMirroredExtent;
                     } else {
-                        _projectionViews[0].subImage.imageRect.extent.width =
-                            _xrViewsList[0].recommendedImageRectWidth;
-                        _projectionViews[0].subImage.imageRect.extent.height =
-                            _xrViewsList[0].recommendedImageRectHeight;
+                        const auto& rec = _xrViewsList[defaultEye < _xrViewsList.size() ? defaultEye : 0];
+                        defaultRect.extent.width = rec.recommendedImageRectWidth;
+                        defaultRect.extent.height = rec.recommendedImageRectHeight;
                     }
 
                     const bool includeQuadLayers = mirrorQuadLayers();
+                    // Quads must be projected with the same eye's FOV as the
+                    // view they are drawn over. Eye FOVs are asymmetric, so
+                    // pairing the right eye's pose with the left eye's FOV
+                    // misplaces world-locked quads and makes them swim (#21).
+                    XrFovf quadFov = _projectionViews[defaultEye].fov;
                     // Set when the mirrored view belongs to the eye we are not
                     // publishing this frame (see trackAlternateEyeRendering).
                     bool holdPublish = false;
@@ -971,6 +983,8 @@ namespace {
                                             "mirroring it as mono (the OBS eye selection has no effect here)\n");
                                     }
                                     projView = &projLayer->views[eyeIndex];
+                                    quadFov = eyeIndex < _projectionViews.size() ? _projectionViews[eyeIndex].fov
+                                                                                 : _projectionViews[0].fov;
                                     // An alternate-eye application moves the
                                     // viewpoint behind this view index by one
                                     // eye separation on every other frame;
@@ -1047,7 +1061,7 @@ namespace {
                                 if (swapchainState._dx11LastTexture || swapchainState._dx12LastTexture) {
                                     if (projView) {
                                         _mirror->Blend(projView,
-                                                       _projectionViews[0].fov,
+                                                       quadFov,
                                                        quadLayer,
                                                        (DXGI_FORMAT)swapchainState._createInfo.format,
                                                        projLayer ? projLayer->space : XR_NULL_HANDLE,
