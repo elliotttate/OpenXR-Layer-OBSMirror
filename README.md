@@ -6,7 +6,7 @@ while the headset continues to look and track normally.**
 
 OpenXR OBS Mirror combines a native OpenXR API layer, native OpenXR and OpenVR
 OBS sources, and a self-contained dark WinUI 3 Control Center. It supports
-Direct3D 11 and Direct3D 12 OpenXR applications plus SteamVR/OpenVR compositor
+Direct3D 11, Direct3D 12 and Vulkan OpenXR applications plus SteamVR/OpenVR compositor
 capture on Windows x64, while keeping the machine's normal headset runtime as
 the default.
 
@@ -109,7 +109,8 @@ installs the plugin under OBS's Windows discovery path at
   is available, then automatically falls back to SteamVR's native compositor
   mirror for OpenVR applications. Existing scenes saved with the older
   **OpenXR Mirror Capture** name are upgraded in place because the source ID is
-  unchanged. Direct3D 11 and Direct3D 12 OpenXR applications are supported.
+  unchanged. Direct3D 11, Direct3D 12 and Vulkan OpenXR applications are
+  supported (Vulkan details: [docs/VULKAN.md](docs/VULKAN.md)).
 - **OpenVR / SteamVR Mirror Capture** reads SteamVR's native compositor mirror
   directly and remains available as an explicit advanced source. It offers left,
   right, and side-by-side stereo modes, percentage crop controls, automatic

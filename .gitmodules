@@ -13,3 +13,6 @@
 [submodule "external/OpenVR"]
 	path = external/OpenVR
 	url = https://github.com/ValveSoftware/openvr.git
+[submodule "external/Vulkan-Headers"]
+	path = external/Vulkan-Headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers.git

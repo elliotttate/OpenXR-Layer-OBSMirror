@@ -108,7 +108,7 @@ $metadata = [ordered]@{
     platform = 'Windows x64'
     obs_version = (Get-Item -LiteralPath (Join-Path $OBSInstallPath 'bin\64bit\obs64.exe')).VersionInfo.ProductVersion
     runtime_apis = @('OpenXR', 'OpenVR / SteamVR')
-    graphics_apis = @('Direct3D 11', 'Direct3D 12')
+    graphics_apis = @('Direct3D 11', 'Direct3D 12', 'Vulkan')
 }
 $metadata | ConvertTo-Json -Depth 4 | Set-Content `
     -LiteralPath (Join-Path $payloadRoot 'release.json') -Encoding utf8
