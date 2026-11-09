@@ -49,6 +49,10 @@ namespace Mirror {
             PFN_vkGetInstanceProcAddr _gipa = nullptr;
         };
 
+        /// XR_KHR_vulkan_enable: the runtime's space-separated device
+        /// extension list plus the ones the copy path needs.
+        std::string AppendLegacyDeviceExtensions(const std::string& list);
+
         /// Empty when the device can be mirrored; otherwise why not.
         std::string DeviceProblem(VkDevice device);
         PFN_vkGetInstanceProcAddr DeviceGetInstanceProcAddr(VkDevice device);

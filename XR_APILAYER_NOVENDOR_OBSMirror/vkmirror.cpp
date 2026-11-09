@@ -248,6 +248,37 @@ namespace Mirror {
             g_devices[device] = DeviceRecord{_ready, _reason, _gipa};
         }
 
+        std::string AppendLegacyDeviceExtensions(const std::string& list) {
+            // Every Windows driver with Vulkan 1.2 offers these; the
+            // timelineSemaphore feature itself is up to the application.
+            std::string merged = list;
+            std::vector<std::string> present;
+            {
+                std::istringstream stream(list);
+                for (std::string name; stream >> name;)
+                    present.push_back(name);
+            }
+            bool logged = false;
+            for (const char* wanted : {VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
+                                       VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME,
+                                       VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
+                                       VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME,
+                                       VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
+                                       VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
+                                       VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME}) {
+                if (std::find(present.begin(), present.end(), wanted) != present.end())
+                    continue;
+                if (!merged.empty())
+                    merged += ' ';
+                merged += wanted;
+                if (!logged) {
+                    logged = true;
+                    Log("Vulkan (XR_KHR_vulkan_enable): adding the device extensions OBS mirroring needs\n");
+                }
+            }
+            return merged;
+        }
+
         std::string DeviceProblem(VkDevice device) {
             std::lock_guard lock(g_lock);
             auto it = g_devices.find(device);

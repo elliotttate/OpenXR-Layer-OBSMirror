@@ -235,6 +235,42 @@ namespace {
             return result;
         }
 
+        // XR_KHR_vulkan_enable: the application creates its device itself
+        // with the extensions listed here, so the ones the mirror copy needs
+        // are appended to the runtime's list.
+        XrResult xrGetVulkanDeviceExtensionsKHR(XrInstance instance,
+                                                XrSystemId systemId,
+                                                uint32_t bufferCapacityInput,
+                                                uint32_t* bufferCountOutput,
+                                                char* buffer) override {
+            uint32_t length = 0;
+            XrResult result = OpenXrApi::xrGetVulkanDeviceExtensionsKHR(instance, systemId, 0, &length, nullptr);
+            if (XR_FAILED(result) || !bufferCountOutput) {
+                return OpenXrApi::xrGetVulkanDeviceExtensionsKHR(
+                    instance, systemId, bufferCapacityInput, bufferCountOutput, buffer);
+            }
+            std::string list(length, '\0');
+            if (length) {
+                result = OpenXrApi::xrGetVulkanDeviceExtensionsKHR(instance, systemId, length, &length, list.data());
+                if (XR_FAILED(result)) {
+                    return result;
+                }
+            }
+            list.resize(strnlen(list.c_str(), list.size()));
+            const std::string merged = VulkanSetup::AppendLegacyDeviceExtensions(list);
+
+            const uint32_t needed = static_cast<uint32_t>(merged.size() + 1);
+            *bufferCountOutput = needed;
+            if (bufferCapacityInput == 0) {
+                return XR_SUCCESS;
+            }
+            if (bufferCapacityInput < needed || !buffer) {
+                return XR_ERROR_SIZE_INSUFFICIENT;
+            }
+            memcpy(buffer, merged.c_str(), needed);
+            return XR_SUCCESS;
+        }
+
         XrResult xrCreateSession(XrInstance instance,
                                  const XrSessionCreateInfo* createInfo,
                                  XrSession* session) override {
