@@ -28,6 +28,7 @@
 #include "log.h"
 #include "util.h"
 #include "dx11mirror.h"
+#include "vkmirror.h"
 
 #include <directxmath.h> // Matrix math functions and objects
 #include <d3dcompiler.h> // For compiling shaders! D3DCompile
@@ -194,6 +195,82 @@ namespace {
             return XR_SUCCESS;
         }
 
+        // XR_KHR_vulkan_enable2: the application lets the runtime create its
+        // Vulkan objects, which is where the layer adds what mirroring needs
+        // (external memory/semaphore extensions, timeline semaphores).
+        XrResult xrCreateVulkanInstanceKHR(XrInstance instance,
+                                           const XrVulkanInstanceCreateInfoKHR* createInfo,
+                                           VkInstance* vulkanInstance,
+                                           VkResult* vulkanResult) override {
+            if (!createInfo || !createInfo->vulkanCreateInfo || !vulkanInstance) {
+                return OpenXrApi::xrCreateVulkanInstanceKHR(instance, createInfo, vulkanInstance, vulkanResult);
+            }
+            XrVulkanInstanceCreateInfoKHR info = *createInfo;
+            VkInstanceCreateInfo ci = *createInfo->vulkanCreateInfo;
+            std::vector<const char*> names;
+            VulkanSetup::PatchInstanceCreateInfo(info, ci, names);
+            info.vulkanCreateInfo = &ci;
+            const XrResult result = OpenXrApi::xrCreateVulkanInstanceKHR(instance, &info, vulkanInstance, vulkanResult);
+            if (XR_SUCCEEDED(result) && vulkanResult && *vulkanResult == VK_SUCCESS) {
+                VulkanSetup::OnInstanceCreated(info, ci, *vulkanInstance);
+            }
+            return result;
+        }
+
+        XrResult xrCreateVulkanDeviceKHR(XrInstance instance,
+                                         const XrVulkanDeviceCreateInfoKHR* createInfo,
+                                         VkDevice* vulkanDevice,
+                                         VkResult* vulkanResult) override {
+            if (!createInfo || !createInfo->vulkanCreateInfo || !vulkanDevice) {
+                return OpenXrApi::xrCreateVulkanDeviceKHR(instance, createInfo, vulkanDevice, vulkanResult);
+            }
+            XrVulkanDeviceCreateInfoKHR info = *createInfo;
+            VkDeviceCreateInfo ci = *createInfo->vulkanCreateInfo;
+            VulkanSetup::DevicePatch patch(info, ci);
+            info.vulkanCreateInfo = &ci;
+            const XrResult result = OpenXrApi::xrCreateVulkanDeviceKHR(instance, &info, vulkanDevice, vulkanResult);
+            if (XR_SUCCEEDED(result) && vulkanResult) {
+                patch.onDeviceCreated(*vulkanDevice, *vulkanResult);
+            }
+            return result;
+        }
+
+        // XR_KHR_vulkan_enable: the application creates its device itself
+        // with the extensions listed here, so the ones the mirror copy needs
+        // are appended to the runtime's list.
+        XrResult xrGetVulkanDeviceExtensionsKHR(XrInstance instance,
+                                                XrSystemId systemId,
+                                                uint32_t bufferCapacityInput,
+                                                uint32_t* bufferCountOutput,
+                                                char* buffer) override {
+            uint32_t length = 0;
+            XrResult result = OpenXrApi::xrGetVulkanDeviceExtensionsKHR(instance, systemId, 0, &length, nullptr);
+            if (XR_FAILED(result) || !bufferCountOutput) {
+                return OpenXrApi::xrGetVulkanDeviceExtensionsKHR(
+                    instance, systemId, bufferCapacityInput, bufferCountOutput, buffer);
+            }
+            std::string list(length, '\0');
+            if (length) {
+                result = OpenXrApi::xrGetVulkanDeviceExtensionsKHR(instance, systemId, length, &length, list.data());
+                if (XR_FAILED(result)) {
+                    return result;
+                }
+            }
+            list.resize(strnlen(list.c_str(), list.size()));
+            const std::string merged = VulkanSetup::AppendLegacyDeviceExtensions(list);
+
+            const uint32_t needed = static_cast<uint32_t>(merged.size() + 1);
+            *bufferCountOutput = needed;
+            if (bufferCapacityInput == 0) {
+                return XR_SUCCESS;
+            }
+            if (bufferCapacityInput < needed || !buffer) {
+                return XR_ERROR_SIZE_INSUFFICIENT;
+            }
+            memcpy(buffer, merged.c_str(), needed);
+            return XR_SUCCESS;
+        }
+
         XrResult xrCreateSession(XrInstance instance,
                                  const XrSessionCreateInfo* createInfo,
                                  XrSession* session) override {
@@ -227,6 +304,27 @@ namespace {
                         reinterpret_cast<const XrGraphicsBindingD3D12KHR*>(entry);
                     _d3d12Device = d3d12Bindings->device;
                     _d3d12CommandQueue = d3d12Bindings->queue;
+                } else if (entry->type == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR) {
+                    // Also XR_TYPE_GRAPHICS_BINDING_VULKAN2_KHR (same value).
+                    const XrGraphicsBindingVulkanKHR* vkBindings =
+                        reinterpret_cast<const XrGraphicsBindingVulkanKHR*>(entry);
+                    const std::string problem = VulkanSetup::DeviceProblem(vkBindings->device);
+                    if (!problem.empty()) {
+                        Log("Vulkan session cannot be mirrored: %s\n", problem.c_str());
+                    } else if (!_vulkanBridge) {
+                        auto bridge = std::make_unique<VulkanBridge>(
+                            *vkBindings, VulkanSetup::DeviceGetInstanceProcAddr(vkBindings->device));
+                        if (bridge->initialized()) {
+                            _vulkanBridge = std::move(bridge);
+                            boundApi = entry->type;
+                        } else {
+                            Log("Vulkan session cannot be mirrored: the Vulkan copy bridge failed to initialize\n");
+                        }
+                    } else if (_vulkanBridge->device() == vkBindings->device) {
+                        boundApi = entry->type;
+                    } else {
+                        Log("Vulkan session cannot be mirrored: another Vulkan device is already being mirrored\n");
+                    }
                 }
 
                 entry = entry->next;
@@ -234,13 +332,19 @@ namespace {
 
             if (boundApi != XR_TYPE_UNKNOWN) {
                 _xrGraphicsAPI = boundApi;
-                Log("Graphics binding: %s\n", boundApi == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR ? "D3D11" : "D3D12");
+                Log("Graphics binding: %s\n",
+                    boundApi == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR   ? "D3D11"
+                    : boundApi == XR_TYPE_GRAPHICS_BINDING_D3D12_KHR ? "D3D12"
+                                                                     : "Vulkan");
             } else {
-                Log("No supported graphics binding found (D3D11 or D3D12 required); mirroring disabled for this "
-                    "session\n");
+                Log("No supported graphics binding found (D3D11, D3D12 or Vulkan required); mirroring disabled for "
+                    "this session\n");
             }
 
             const XrResult result = OpenXrApi::xrCreateSession(instance, createInfo, session);
+            if (XR_FAILED(result) && boundApi == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR && _sessions.empty()) {
+                _vulkanBridge.reset();
+            }
             if (XR_SUCCEEDED(result)) {
                 Session newSession;
                 newSession._xrSession = *session;
@@ -327,6 +431,16 @@ namespace {
             TraceLoggingWrite(g_traceProvider, "xrDestroySession", TLXArg(session, "Session"));
             Log("xrDestroySession\n");
 
+            if (_vulkanBridge && isSessionHandled(session)) {
+                // Finish our copies before the runtime destroys the images.
+                for (auto& [handle, state] : _swapchains) {
+                    if (state._xrSession == session) {
+                        _vulkanBridge->removeTarget(handle);
+                        state._vkTargetReady = false;
+                    }
+                }
+            }
+
             const XrResult result = OpenXrApi::xrDestroySession(session);
             if (XR_SUCCEEDED(result) && isSessionHandled(session)) {
                 // Destroying a session destroys all of its child handles, so
@@ -335,6 +449,9 @@ namespace {
                     if (it->second._xrSession == session) {
                         if (_mirror) {
                             _mirror->removeSwapchain(it->first);
+                        }
+                        if (_vulkanBridge) {
+                            _vulkanBridge->removeTarget(it->first);
                         }
                         it = _swapchains.erase(it);
                     } else {
@@ -359,6 +476,7 @@ namespace {
                     _d3d11Device = nullptr;
                     _d3d12Device = nullptr;
                     _d3d12CommandQueue = nullptr;
+                    _vulkanBridge.reset();
                     _xrGraphicsAPI = XR_TYPE_UNKNOWN;
                 }
             }
@@ -389,6 +507,11 @@ namespace {
 
             XrSwapchainCreateInfo chainCreateInfo = *createInfo;
             const bool handled = isSessionHandled(session);
+            const bool vulkan = handled && _xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR;
+            if (vulkan && (createInfo->usageFlags & XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT)) {
+                // The mirror copies released images with vkCmdCopyImage.
+                chainCreateInfo.usageFlags |= XR_SWAPCHAIN_USAGE_TRANSFER_SRC_BIT;
+            }
 
             if (handled) {
                 Log("Creating swapchain with dimensions=%ux%u, arraySize=%u, mipCount=%u, sampleCount=%u, format=%d, "
@@ -409,6 +532,12 @@ namespace {
                 newSwapchain._xrSwapchain = *swapchain;
                 newSwapchain._xrSession = session;
                 newSwapchain._createInfo = chainCreateInfo;
+                if (vulkan) {
+                    // Everything downstream speaks DXGI formats; keep the
+                    // Vulkan one for the copy.
+                    newSwapchain._vkFormat = static_cast<VkFormat>(chainCreateInfo.format);
+                    newSwapchain._createInfo.format = Mirror::DxgiFormatFromVulkan(chainCreateInfo.format);
+                }
                 _swapchains.insert_or_assign(*swapchain, std::move(newSwapchain));
                 Log("Tracking swapchain %p\n", *swapchain);
 
@@ -422,6 +551,12 @@ namespace {
             TraceLoggingWrite(g_traceProvider, "xrDestroySwapchain", TLXArg(swapchain, "Swapchain"));
 
             Log("xrDestroySwapchain %p\n", swapchain);
+            if (_vulkanBridge && isSwapchainHandled(swapchain)) {
+                // Our in-flight copies read the runtime's images; let them
+                // finish before the runtime destroys those images.
+                _vulkanBridge->removeTarget(swapchain);
+                _swapchains[swapchain]._vkTargetReady = false;
+            }
             const XrResult result = OpenXrApi::xrDestroySwapchain(swapchain);
             if (XR_SUCCEEDED(result) && isSwapchainHandled(swapchain)) {
                 if (_mirror) {
@@ -461,7 +596,9 @@ namespace {
                     Mirror::GetFormatInfo((DXGI_FORMAT)swapchainState._createInfo.format, formatInfo);
                 const bool colorAttachment =
                     (swapchainState._createInfo.usageFlags & XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT) != 0;
-                const bool mirrorable = knownFormat && formatInfo.bpc <= 10 && colorAttachment;
+                const bool vulkanSession = _xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR;
+                const bool singleSample = !vulkanSession || swapchainState._createInfo.sampleCount <= 1;
+                const bool mirrorable = knownFormat && formatInfo.bpc <= 10 && colorAttachment && singleSample;
 
                 // Whether a swapchain is mirrored decides if OBS ever receives
                 // pixels from it, so the decision and its reason must reach the
@@ -477,6 +614,15 @@ namespace {
                             swapchainState._createInfo.usageFlags,
                             swapchainState._createInfo.sampleCount,
                             swapchainState._createInfo.arraySize);
+                    } else if (!knownFormat && vulkanSession) {
+                        Log("NOT mirroring swapchain %p: Vulkan format %d has no supported DXGI equivalent. If the "
+                            "OBS capture stays blank, the game renders in a format the mirror does not support.\n",
+                            swapchain,
+                            swapchainState._vkFormat);
+                    } else if (!singleSample && colorAttachment) {
+                        Log("NOT mirroring swapchain %p: multisampled Vulkan swapchain (%u samples)\n",
+                            swapchain,
+                            swapchainState._createInfo.sampleCount);
                     } else if (!knownFormat) {
                         Log("NOT mirroring swapchain %p: unsupported DXGI format %d. If the OBS capture stays "
                             "blank, the game renders in a format the mirror does not support.\n",
@@ -651,6 +797,20 @@ namespace {
                             _mirror->createSharedMirrorTexture(
                                 swapchain, swapchainState._sharedHandle.get(), swapchainState._copyFenceHandle.get());
                         }
+                    } else if (_xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR && _vulkanBridge) {
+                        swapchainState._vkSurfaceImages.resize(*imageCountOutput);
+                        for (uint32_t i = 0; i < *imageCountOutput; ++i) {
+                            swapchainState._vkSurfaceImages[i] =
+                                reinterpret_cast<XrSwapchainImageVulkanKHR*>(images)[i].image;
+                        }
+                        if (!_vulkanBridge->hasTarget(swapchain)) {
+                            swapchainState._vkTargetReady =
+                                _vulkanBridge->createTarget(swapchain,
+                                                            swapchainState._createInfo,
+                                                            swapchainState._vkFormat,
+                                                            (DXGI_FORMAT)swapchainState._createInfo.format,
+                                                            *_mirror);
+                        }
                     }
                 }
             } else {
@@ -658,6 +818,8 @@ namespace {
                     swapchainState._dx11SurfaceImages.clear();
                 else if (_xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_D3D12_KHR)
                     swapchainState._dx12SurfaceImages.clear();
+                else if (_xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR)
+                    swapchainState._vkSurfaceImages.clear();
             }
 
             return result;
@@ -742,6 +904,17 @@ namespace {
                             noteMirrorCopyResult(swapchainState, false, "fence wait timed out");
                         }
                     }
+                } else if (_xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR && _vulkanBridge &&
+                           swapchainState._vkTargetReady && idx < swapchainState._vkSurfaceImages.size()) {
+                    // Runs before the runtime's release, while the application
+                    // still holds its queue, so the copy is ordered after the
+                    // game's rendering and before the runtime reads the image.
+                    const char* reason = nullptr;
+                    const bool copied =
+                        _vulkanBridge->copy(swapchain, swapchainState._vkSurfaceImages[idx], *_mirror, &reason);
+                    if (copied)
+                        swapchainState._lastCopiedIndex = idx;
+                    noteMirrorCopyResult(swapchainState, copied, reason);
                 }
             }
 
@@ -985,7 +1158,7 @@ namespace {
                                         outcome = std::max(outcome, MirrorOutcome::Mirroring);
                                     } else if (isSwapchainHandled(projView->subImage.swapchain)) {
                                         auto& swapchainState = _swapchains[projView->subImage.swapchain];
-                                        if (swapchainState._dx11LastTexture || swapchainState._dx12LastTexture) {
+                                        if (hasMirrorCopy(swapchainState)) {
                                             const XrFovf& mirrorFov = eyeIndex < _projectionViews.size()
                                                                                 ? _projectionViews[eyeIndex].fov
                                                                                 : _projectionViews[0].fov;
@@ -1012,8 +1185,7 @@ namespace {
                                         isSwapchainHandled(projView2->subImage.swapchain)) {
                                         auto& swapchainState = _swapchains[projView->subImage.swapchain];
                                         auto& swapchainState2 = _swapchains[projView2->subImage.swapchain];
-                                        if ((swapchainState._dx11LastTexture || swapchainState._dx12LastTexture) &&
-                                            (swapchainState2._dx11LastTexture || swapchainState2._dx12LastTexture)) {
+                                        if (hasMirrorCopy(swapchainState) && hasMirrorCopy(swapchainState2)) {
                                             _lastMirroredExtent = projView->subImage.imageRect.extent;
                                             const bool drew =
                                                 _mirror->Blend(projView,
@@ -1044,7 +1216,7 @@ namespace {
                                     // Swapchains don't need to be updated every frame so just copy the last one aquired
                                     updateSwapChainImages(quadLayer->subImage.swapchain, nullptr, false);
                                 }
-                                if (swapchainState._dx11LastTexture || swapchainState._dx12LastTexture) {
+                                if (hasMirrorCopy(swapchainState)) {
                                     if (projView) {
                                         _mirror->Blend(projView,
                                                        _projectionViews[0].fov,
@@ -1092,6 +1264,9 @@ namespace {
             XrSwapchainCreateInfo _createInfo{};
             std::vector<XrSwapchainImageD3D11KHR> _dx11SurfaceImages;
             std::vector<XrSwapchainImageD3D12KHR> _dx12SurfaceImages;
+            std::vector<VkImage> _vkSurfaceImages;
+            VkFormat _vkFormat = VK_FORMAT_UNDEFINED;
+            bool _vkTargetReady = false;
             std::deque<uint32_t> _acquiredIndices;
             uint32_t _lastAcquiredIndex = UINT32_MAX;
             uint32_t _lastCopiedIndex = UINT32_MAX;
@@ -1114,6 +1289,10 @@ namespace {
             uint32_t _copySkipStreak = 0;
             bool _copySkipWarned = false;
         };
+
+        static bool hasMirrorCopy(const Swapchain& state) {
+            return state._dx11LastTexture || state._dx12LastTexture || state._vkTargetReady;
+        }
 
         // CopyResource silently does nothing unless both resources have
         // identical descriptions - including mip count. Applications that ask
@@ -1716,6 +1895,12 @@ namespace {
                 if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) {
                     factory->EnumAdapterByLuid(luid, IID_PPV_ARGS(adapter.ReleaseAndGetAddressOf()));
                 }
+            } else if (_xrGraphicsAPI == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR && _vulkanBridge) {
+                const LUID luid = _vulkanBridge->adapterLuid();
+                ComPtr<IDXGIFactory4> factory;
+                if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) {
+                    factory->EnumAdapterByLuid(luid, IID_PPV_ARGS(adapter.ReleaseAndGetAddressOf()));
+                }
             }
 
             _mirror = std::make_unique<D3D11Mirror>(adapter.Get());
@@ -1740,6 +1925,9 @@ namespace {
         }
 
         std::unique_ptr<D3D11Mirror> _mirror;
+        // Copies Vulkan swapchain images into textures the mirror can open.
+        // Declared after _mirror so it is destroyed first.
+        std::unique_ptr<VulkanBridge> _vulkanBridge;
 
         UINT64 _currentFenceValue{0};
 

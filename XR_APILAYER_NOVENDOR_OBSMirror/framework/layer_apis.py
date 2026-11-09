@@ -13,7 +13,10 @@ override_functions = [
     "xrEndFrame",
     "xrCreateReferenceSpace",
     "xrDestroySpace",
-    "xrGetVisibilityMaskKHR"
+    "xrGetVisibilityMaskKHR",
+    "xrCreateVulkanInstanceKHR",
+    "xrCreateVulkanDeviceKHR",
+    "xrGetVulkanDeviceExtensionsKHR"
 ]
 
 # The list of OpenXR functions our layer will use from the runtime.
@@ -27,4 +30,4 @@ requested_functions = [
 ]
 
 # The list of OpenXR extensions our layer will either override or use.
-extensions = ["XR_KHR_visibility_mask"]
+extensions = ["XR_KHR_visibility_mask", "XR_KHR_vulkan_enable", "XR_KHR_vulkan_enable2"]
